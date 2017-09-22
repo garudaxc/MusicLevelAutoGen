@@ -236,7 +236,7 @@ def calc_segment(y, sr, k = 4):
     import matplotlib.patches as patches
     plt.figure(figsize=(12, 4))
 
-    bound_times = librosa.frames_to_time(bound_frames)
+    bound_times = librosa.frames_to_time(bound_frames, sr=sr)
 
     save_file(bound_times, file, '_seg')
 
@@ -260,7 +260,7 @@ def calc_segment(y, sr, k = 4):
     return bound_frames
 
 
-def calc_power(y, sr):
+def calc_power(y, sr, bound_frames, bound_segs):
     S = np.abs(librosa.stft(y))
     print(S[0])
     print(len(S[0]))
@@ -270,16 +270,17 @@ def calc_power(y, sr):
     l = np.sum(db * db, 0)**0.5
     print(len(l))
 
+    sl = np.split(bound_frames)
+
     plt.figure(figsize=(12, 4))
     plt.plot(l)
     plt.tight_layout()
 
     #librosa.display.specshow(db, sr=sr, y_axis='log', x_axis='time')
 
-
-
 calc_segment(y, sr)
 
 calc_power(y, sr)
+
 
 plt.show()
