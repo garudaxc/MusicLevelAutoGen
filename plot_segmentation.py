@@ -39,11 +39,11 @@ import librosa.display
 
 file = 'D:/librosa/炫舞自动关卡生成/music/100018.mp3'
 file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\BOYFRIEND (보이프렌드) - On & On (온앤온).mp3'
+file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Sam Tsui - Make It Up.mp3'
 file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Frankmusik - Wrecking Ball.mp3'
 file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Lily Allen - Hard Out Here.mp3'
-file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Sam Tsui - Make It Up.mp3'
-file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\张靓颖 - 我是我的.mp3'
 file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\张杰 - 逆战.mp3'
+file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\张靓颖 - 我是我的.mp3'
 y, sr = librosa.load(file)
 
 def calc_segment(y, sr, k = 4):
@@ -56,6 +56,9 @@ def calc_segment(y, sr, k = 4):
                                             n_bins=N_OCTAVES * BINS_PER_OCTAVE),
                                 ref=np.max)
 
+    print('frame1', C.shape[1])
+    print('frame2', len(y) / 512)
+    
     # plt.figure(figsize=(12, 4))
     # librosa.display.specshow(C, y_axis='cqt_hz', sr=sr,
     #                          bins_per_octave=BINS_PER_OCTAVE,
@@ -202,12 +205,20 @@ def calc_segment(y, sr, k = 4):
     ###############################################################
     # Locate segment boundaries from the label sequence
     bound_beats = 1 + np.flatnonzero(seg_ids[:-1] != seg_ids[1:])
+    # print('total beats', len(beats))
+    #print('bound beats', bound_beats)
+
 
     # Count beat 0 as a boundary
     bound_beats = librosa.util.fix_frames(bound_beats, x_min=0)
 
     # Compute the segment label for each boundary
     bound_segs = list(seg_ids[bound_beats])
+    
+    my_bound_beats = librosa.util.fix_frames(bound_beats, x_min=0, x_max = len(beats) - 1)
+    #print('my bound beats', my_bound_beats)
+    my_bound_frames = beats[my_bound_beats]
+    print('num bound seg', len(bound_segs), 'num bound frames', len(my_bound_frames))
 
     # Convert beat indices to frames
     bound_frames = beats[bound_beats]
@@ -217,8 +228,8 @@ def calc_segment(y, sr, k = 4):
                                         x_min=None,
                                         x_max=C.shape[1]-1)
 
-    print(bound_segs)
-    print(bound_frames)
+    # print(bound_segs)
+    # print(bound_frames)
 
     ###################################################
     # And plot the final segmentation over original CQT
@@ -257,30 +268,56 @@ def calc_segment(y, sr, k = 4):
                                     alpha=0.50))
 
     plt.tight_layout()
-    return bound_frames
-
+    return my_bound_frames, np.array(bound_segs)
 
 def calc_power(y, sr, bound_frames, bound_segs):
+    # 计算音乐强度
     S = np.abs(librosa.stft(y))
-    print(S[0])
-    print(len(S[0]))
-    print(S.shape)
-
     db = librosa.amplitude_to_db(S)
+    db = (db - np.min(db)) / (np.max(db) - np.min(db))    
     l = np.sum(db * db, 0)**0.5
-    print(len(l))
 
-    sl = np.split(bound_frames)
+    # 在每个分段内累计强度
+    ss = [sum(l[bound_frames[i]:bound_frames[i+1]]) for i in range(len(bound_frames) - 1)]
+    ss = np.array(ss)
+
+    db_seg = [sum(ss[np.nonzero(bound_segs == i)]) for i in range(np.max(bound_segs) + 1)]
+    db_seg = np.array(db_seg)
+    print('db_seg', db_seg)
+    frame_count = bound_frames[1:] - bound_frames[:-1]
+    frame_count_seg = [sum(frame_count[np.nonzero(bound_segs == i)]) for i in range(np.max(bound_segs) + 1)]
+    frame_count_seg = np.array(frame_count_seg)
+    db_aver = db_seg / frame_count_seg
+    
+    print('frame count seg', frame_count_seg)
+    
+    # draw line
+    y_db = db_aver[bound_segs]
+    y_db = np.array([y_db, y_db]).flatten('F')
+    x_db = np.array([bound_frames[:-1], bound_frames[1:] - 1]).flatten('F')
+
+
+    #onset_frames = librosa.onset.onset_detect(y=y, sr=sr, delta = 0.1)
 
     plt.figure(figsize=(12, 4))
     plt.plot(l)
+    plt.plot(x_db, y_db)
+    #plt.vlines(onset_frames, 0, np.max(l))
     plt.tight_layout()
 
     #librosa.display.specshow(db, sr=sr, y_axis='log', x_axis='time')
 
-calc_segment(y, sr)
+def gen_seg_probability(pos, y_min=0.5):
+    total = np.max(pos)
+    x = np.array(range(total + 1)) / total
+    y = np.sin(4*np.pi*x - np.pi*0.5) / 4 + 0.75
+    plt.figure(figsize=(12, 4))
+    plt.plot(y)
 
-calc_power(y, sr)
+bound_frames, bound_segs = calc_segment(y, sr)
 
+#calc_power(y, sr, bound_frames, bound_segs)
+
+gen_seg_probability(bound_frames)
 
 plt.show()

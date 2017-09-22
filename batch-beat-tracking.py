@@ -7,7 +7,8 @@ import numpy as np
 
 tempos = []
 
-path = '/Users/xuchao/Music/网易云音乐/'
+#path = '/Users/xuchao/Music/网易云音乐/'
+path = 'd:/librosa/炫舞自动关卡生成/测试歌曲2/'
 filenames = ['薛之谦 - 我好像在哪见过你.mp3',
              '薛之谦 - 演员.mp3',
              '赵雷 - 成都.mp3',
@@ -117,14 +118,14 @@ def save_file(beats, mp3filename, postfix = ''):
 
 def do_file(pathname):
     beat_times = load_data(pathname)
-    save_file(beat_times, pathname, '')
+    #save_file(beat_times, pathname, '')
     numBeats = len(beat_times)
     itvals = beat_intervals(beat_times)
     #print('mean ' + str(mean))
 
     a, b = MSL(beat_times)
     beat_times_msl = np.array(range(numBeats)) * a + b
-    save_file(beat_times_msl, pathname, '_msl')
+    #save_file(beat_times_msl, pathname, '_msl')
     print('a b', a, b)
     #plt.plot(np.ones(numBeats) * a, 'r')
 
@@ -134,7 +135,7 @@ def do_file(pathname):
 
     new_beat_times = np.array(range(numBeats)) * a + b
 
-    save_file(new_beat_times, pathname, '_even')
+    save_file(new_beat_times, pathname, '')
 
 ##filenames = filenames[-2:-1]
 ##for f in filenames:
@@ -145,11 +146,10 @@ def do_file(pathname):
 files = [path + f for f in listdir(path) if os.path.splitext(f)[1] == '.mp3']
 
 def dummy(f):
-    if 'Stronger' in f:
-        do_file(f)
-        print(f)
+    do_file(f)
+    print(f)
 
 list(map(dummy, files))
 
-plt.show()
+#plt.show()
 
