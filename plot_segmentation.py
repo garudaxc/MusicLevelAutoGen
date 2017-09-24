@@ -37,15 +37,6 @@ import librosa.display
 #############################
 # First, we'll load in a song
 
-file = 'D:/librosa/炫舞自动关卡生成/music/100018.mp3'
-file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\BOYFRIEND (보이프렌드) - On & On (온앤온).mp3'
-file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Sam Tsui - Make It Up.mp3'
-file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Frankmusik - Wrecking Ball.mp3'
-file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Lily Allen - Hard Out Here.mp3'
-file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\张杰 - 逆战.mp3'
-file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\张靓颖 - 我是我的.mp3'
-y, sr = librosa.load(file)
-
 def calc_segment(y, sr, k = 4):
     ##############################################
     # Next, we'll compute and plot a log-power CQT
@@ -55,9 +46,6 @@ def calc_segment(y, sr, k = 4):
                                             bins_per_octave=BINS_PER_OCTAVE,
                                             n_bins=N_OCTAVES * BINS_PER_OCTAVE),
                                 ref=np.max)
-
-    print('frame1', C.shape[1])
-    print('frame2', len(y) / 512)
     
     # plt.figure(figsize=(12, 4))
     # librosa.display.specshow(C, y_axis='cqt_hz', sr=sr,
@@ -236,20 +224,18 @@ def calc_segment(y, sr, k = 4):
 
     # sphinx_gallery_thumbnail_number = 5
 
-    from os import listdir
-    import os.path
-    def save_file(beats, mp3filename, postfix = ''):
-        outname = os.path.splitext(mp3filename)[0]
-        outname = outname + postfix + '.csv'
-        librosa.output.times_csv(outname, beats)
-        print('output beat time file ' + outname)
+    # from os import listdir
+    # import os.path
+    # def save_file(beats, mp3filename, postfix = ''):
+    #     outname = os.path.splitext(mp3filename)[0]
+    #     outname = outname + postfix + '.csv'
+    #     librosa.output.times_csv(outname, beats)
+    #     print('output beat time file ' + outname)
 
     import matplotlib.patches as patches
     plt.figure(figsize=(12, 4))
 
     bound_times = librosa.frames_to_time(bound_frames, sr=sr)
-
-    save_file(bound_times, file, '_seg')
 
     freqs = librosa.cqt_frequencies(n_bins=C.shape[0],
                                     fmin=librosa.note_to_hz('C1'),
@@ -274,12 +260,11 @@ def calc_power(y, sr, bound_frames, bound_segs):
     # 计算音乐强度
     S = np.abs(librosa.stft(y))
     db = librosa.amplitude_to_db(S)
-    db = (db - np.min(db)) / (np.max(db) - np.min(db))    
+    db = (db - np.min(db)) / (np.max(db) - np.min(db))
     l = np.sum(db * db, 0)**0.5
 
     # 在每个分段内累计强度
-    ss = [sum(l[bound_frames[i]:bound_frames[i+1]]) for i in range(len(bound_frames) - 1)]
-    ss = np.array(ss)
+    ss = np.array(list(sum(l[bound_frames[i]:bound_frames[i+1]]) for i in range(bound_frames.size - 1)))
 
     db_seg = [sum(ss[np.nonzero(bound_segs == i)]) for i in range(np.max(bound_segs) + 1)]
     db_seg = np.array(db_seg)
@@ -288,6 +273,9 @@ def calc_power(y, sr, bound_frames, bound_segs):
     frame_count_seg = [sum(frame_count[np.nonzero(bound_segs == i)]) for i in range(np.max(bound_segs) + 1)]
     frame_count_seg = np.array(frame_count_seg)
     db_aver = db_seg / frame_count_seg
+
+    #归一化
+    db_aver = (db_aver - np.min(db_aver)) / (np.max(db_aver) - np.min(db_aver))
     
     print('frame count seg', frame_count_seg)
     
@@ -296,28 +284,56 @@ def calc_power(y, sr, bound_frames, bound_segs):
     y_db = np.array([y_db, y_db]).flatten('F')
     x_db = np.array([bound_frames[:-1], bound_frames[1:] - 1]).flatten('F')
 
+    print('y_db size ', y_db.size, 'bound frame size ', bound_frames.size)
 
     #onset_frames = librosa.onset.onset_detect(y=y, sr=sr, delta = 0.1)
 
     plt.figure(figsize=(12, 4))
-    plt.plot(l)
+    #plt.plot(l)
     plt.plot(x_db, y_db)
     #plt.vlines(onset_frames, 0, np.max(l))
     plt.tight_layout()
 
+    x_db = librosa.frames_to_time(x_db, sr=sr)
+    power_data = np.array([x_db, y_db]).T
+
+    #plt.figure()
+    seg_power = db_aver[bound_segs]
+
+    return seg_power, power_data
+
     #librosa.display.specshow(db, sr=sr, y_axis='log', x_axis='time')
 
-def gen_seg_probability(pos, y_min=0.5):
-    total = np.max(pos)
-    x = np.array(range(total + 1)) / total
-    y = np.sin(4*np.pi*x - np.pi*0.5) / 4 + 0.75
-    plt.figure(figsize=(12, 4))
-    plt.plot(y)
+def gen_seg_probability(x_max, x_point, y_min=0.5):
 
-bound_frames, bound_segs = calc_segment(y, sr)
+    x = x_point / float(x_max - 1)
 
-#calc_power(y, sr, bound_frames, bound_segs)
+    y = (np.sin(6*np.pi*x + np.pi*0.5)) / 4 + 0.75
+    y[np.flatnonzero(x < 1.0 / 6)] = y_min
+    y[np.flatnonzero(x > 5.0 / 6)] = y_min
 
-gen_seg_probability(bound_frames)
+    #plt.figure(figsize=(12, 4))
+    plt.plot(x * x_max, y)
+    return y
 
-plt.show()
+
+if __name__ == '__main__':
+
+    file = 'D:/librosa/炫舞自动关卡生成/music/100018.mp3'
+    file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\BOYFRIEND (보이프렌드) - On & On (온앤온).mp3'
+    file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Sam Tsui - Make It Up.mp3'
+    file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Frankmusik - Wrecking Ball.mp3'
+    file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Lily Allen - Hard Out Here.mp3'
+    file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\张杰 - 逆战.mp3'
+    file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\张靓颖 - 我是我的.mp3'
+    file = '/Users/xuchao/Music/网易云音乐/金志文 - 哭给你听.mp3'
+    file = '/Users/xuchao/Music/网易云音乐/G.E.M.邓紫棋 - 后会无期.mp3'
+    file = '/Users/xuchao/Music/网易云音乐/Good Time.mp3'
+
+    y, sr = librosa.load(file)
+
+    bound_frames, bound_segs = calc_segment(y, sr)
+
+    calc_power(y, sr, bound_frames, bound_segs)
+
+    plt.show()

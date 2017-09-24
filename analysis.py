@@ -10,6 +10,7 @@ file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\BOYFRIEND (보이프�
 file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Sam Tsui - Make It Up.mp3'
 file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\QQ炫舞 - Love You.mp3'
 file = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Nightwish - I Want My Tears Back.mp3'
+file = '/Users/xuchao/Music/网易云音乐/G.E.M.邓紫棋 - 后会无期.mp3'
 
 def down_sample(chromas, rate):
     new = np.array([np.average(chromas[i:i+rate], 0) for i in range(0, len(chromas), rate)])
