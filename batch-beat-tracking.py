@@ -4,6 +4,8 @@ import librosa
 import matplotlib.pyplot as plt
 import numpy as np
 import csv
+import sys
+import io
 import plot_segmentation as seg
 
 
@@ -147,7 +149,9 @@ def do_file(pathname):
     print('load ' + pathname)
 
     onset_env = librosa.onset.onset_strength(y=y, sr=sr)
-    print('num onset_env', onset_env.size)
+    num_frames = onset_env.shape[0]
+    print('frame count ', num_frames)
+    music_length = librosa.frames_to_time(num_frames, sr=sr)
 
     beat_frames, max_index = init_beat(y, sr, onset_env)    
     beat_times = librosa.frames_to_time(beat_frames, sr=sr)
@@ -158,14 +162,18 @@ def do_file(pathname):
 
     #最小二乘计算固定间隔拍子·
     a, b = MSL(beat_times)    
-    print('a b', a, b)
 
     #计算头，尾两处相对准确的拍子，进一步计算更准确的拍子间隔
     i1, i2 = diff(itvals, a)
     a, b = calc_beat_interval(beat_times, i1, i2)
-    print('a b', a, b)
+    # 将b补偿到最近的正数位置
+    compensate = int(min(0, b//a))
+    b -= compensate * a
+    numBeats += compensate
+    print('a b ', a, b)
 
     new_beat_times = np.arange(numBeats) * a + b
+
     bpm = 60.0 / a
     print('bpm ', bpm)
 
@@ -176,17 +184,17 @@ def do_file(pathname):
     bound_frames, bound_segs = seg.calc_segment(y, sr)
     seg_power, power_data = seg.calc_power(y, sr, bound_frames, bound_segs)
 
-    num_frames = onset_env.shape[0]
     bar_value = np.zeros(bar_frames.shape[0])
     for i in range(bar_frames.shape[0]):
         index = np.flatnonzero(bound_frames < bar_frames[i])
-        if len(index) == 0:
+        if len(index) == 0 or index.shape[0] == bound_frames.shape[0]:
+            # 当前位置在第一个分段之前或最后一个分段之后
             bar_value[i] = 0
         else:
-            index = index[-1]
-            if index == len(seg_power):
-                bar_value[i] = 0
-            bar_value[i] = seg_power[index]
+            bar_value[i] = seg_power[index[-1]]
+
+    
+    #计算转移概率，激烈变舒缓的地方概率高
     bar_value = bar_value[:-1] - bar_value[1:]
     bar_value = np.append(bar_value, 0)
     bar_value = np.fmax(bar_value, np.zeros(bar_value.shape))
@@ -233,9 +241,15 @@ def save_time_value_tofile(data, mp3filename, postfix=''):
 def dummy(f):
     do_file(f)
 
-# files = [path + f for f in listdir(path) if os.path.splitext(f)[1] == '.mp3']
-#list(map(dummy, files))
+
 #plt.show()
 
 if __name__ == '__main__':
-    dummy(file)
+    #sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
+    
+    path = 'd:/librosa/炫舞自动关卡生成/测试歌曲/'
+    files = [path + f for f in listdir(path) if os.path.splitext(f)[1] == '.mp3']
+    print(files)
+
+    list(map(dummy, files))
+   # dummy(file)

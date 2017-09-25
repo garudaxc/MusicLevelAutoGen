@@ -193,19 +193,21 @@ def calc_segment(y, sr, k = 4):
     ###############################################################
     # Locate segment boundaries from the label sequence
     bound_beats = 1 + np.flatnonzero(seg_ids[:-1] != seg_ids[1:])
-    # print('total beats', len(beats))
-    #print('bound beats', bound_beats)
-
 
     # Count beat 0 as a boundary
     bound_beats = librosa.util.fix_frames(bound_beats, x_min=0)
 
     # Compute the segment label for each boundary
-    bound_segs = list(seg_ids[bound_beats])
+    bound_segs = seg_ids[bound_beats]
     
     my_bound_beats = librosa.util.fix_frames(bound_beats, x_min=0, x_max = len(beats) - 1)
+    # 确保分段数量之间的关系
+    bound_segs = bound_segs[:my_bound_beats.shape[0]-1]
+    
     #print('my bound beats', my_bound_beats)
     my_bound_frames = beats[my_bound_beats]
+
+
     print('num bound seg', len(bound_segs), 'num bound frames', len(my_bound_frames))
 
     # Convert beat indices to frames
@@ -254,7 +256,7 @@ def calc_segment(y, sr, k = 4):
                                     alpha=0.50))
 
     plt.tight_layout()
-    return my_bound_frames, np.array(bound_segs)
+    return my_bound_frames, bound_segs
 
 def calc_power(y, sr, bound_frames, bound_segs):
     # 计算音乐强度
@@ -268,17 +270,18 @@ def calc_power(y, sr, bound_frames, bound_segs):
 
     db_seg = [sum(ss[np.nonzero(bound_segs == i)]) for i in range(np.max(bound_segs) + 1)]
     db_seg = np.array(db_seg)
-    print('db_seg', db_seg)
+    
     frame_count = bound_frames[1:] - bound_frames[:-1]
+    
     frame_count_seg = [sum(frame_count[np.nonzero(bound_segs == i)]) for i in range(np.max(bound_segs) + 1)]
     frame_count_seg = np.array(frame_count_seg)
+    frame_count_seg = np.maximum(frame_count_seg, 1)
+    
     db_aver = db_seg / frame_count_seg
 
     #归一化
     db_aver = (db_aver - np.min(db_aver)) / (np.max(db_aver) - np.min(db_aver))
-    
-    print('frame count seg', frame_count_seg)
-    
+        
     # draw line
     y_db = db_aver[bound_segs]
     y_db = np.array([y_db, y_db]).flatten('F')
