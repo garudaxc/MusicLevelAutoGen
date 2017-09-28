@@ -33,6 +33,7 @@ import sklearn.cluster
 
 import librosa
 import librosa.display
+import logger
 
 #############################
 # First, we'll load in a song
@@ -170,7 +171,7 @@ def calc_segment(y, sr, k = 4):
     KM = sklearn.cluster.KMeans(n_clusters=k)
 
     seg_ids = KM.fit_predict(X)
-    #print(seg_ids)
+    #logger.info(seg_ids)
 
     # and plot the results
     # plt.figure(figsize=(12, 4))
@@ -204,11 +205,11 @@ def calc_segment(y, sr, k = 4):
     # 确保分段数量之间的关系
     bound_segs = bound_segs[:my_bound_beats.shape[0]-1]
     
-    #print('my bound beats', my_bound_beats)
+    #logger.info('my bound beats', my_bound_beats)
     my_bound_frames = beats[my_bound_beats]
 
 
-    print('num bound seg', len(bound_segs), 'num bound frames', len(my_bound_frames))
+    logger.info('num bound seg', len(bound_segs), 'num bound frames', len(my_bound_frames))
 
     # Convert beat indices to frames
     bound_frames = beats[bound_beats]
@@ -218,8 +219,8 @@ def calc_segment(y, sr, k = 4):
                                         x_min=None,
                                         x_max=C.shape[1]-1)
 
-    # print(bound_segs)
-    # print(bound_frames)
+    # logger.info(bound_segs)
+    # logger.info(bound_frames)
 
     ###################################################
     # And plot the final segmentation over original CQT
@@ -232,7 +233,7 @@ def calc_segment(y, sr, k = 4):
     #     outname = os.path.splitext(mp3filename)[0]
     #     outname = outname + postfix + '.csv'
     #     librosa.output.times_csv(outname, beats)
-    #     print('output beat time file ' + outname)
+    #     logger.info('output beat time file ' + outname)
 
     import matplotlib.patches as patches
     plt.figure(figsize=(12, 4))
@@ -287,7 +288,7 @@ def calc_power(y, sr, bound_frames, bound_segs):
     y_db = np.array([y_db, y_db]).flatten('F')
     x_db = np.array([bound_frames[:-1], bound_frames[1:] - 1]).flatten('F')
 
-    print('y_db size ', y_db.size, 'bound frame size ', bound_frames.size)
+    logger.info('y_db size ', y_db.size, 'bound frame size ', bound_frames.size)
 
     #onset_frames = librosa.onset.onset_detect(y=y, sr=sr, delta = 0.1)
 
@@ -320,6 +321,7 @@ def gen_seg_probability(x_max, x_point, y_min=0.5):
     return y
 
 
+
 if __name__ == '__main__':
 
     file = 'D:/librosa/炫舞自动关卡生成/music/100018.mp3'
@@ -339,4 +341,6 @@ if __name__ == '__main__':
 
     calc_power(y, sr, bound_frames, bound_segs)
 
-    plt.show()
+    #plt.show()
+
+    

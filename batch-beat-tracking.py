@@ -7,6 +7,7 @@ import csv
 import sys
 import io
 import plot_segmentation as seg
+import logger
 
 
 #path = '/Users/xuchao/Music/网易云音乐/'
@@ -43,7 +44,7 @@ def max_power_beat(frame_power, beat_frames):
     frame_strength = frame_power[beat_frames]
     frame_strength = np.resize(frame_strength, (beat_frames.size//4, 4)).T
     frame_strength = np.sum(frame_strength, 1) / (beat_frames.size // 4)
-    print('frame strength', frame_strength, 'average', np.average(frame_power)) 
+    logger.info('frame strength', frame_strength, 'average', np.average(frame_power)) 
     
     max_index = np.argmax(frame_strength)
     return max_index
@@ -52,7 +53,7 @@ def init_beat(y, sr, onset_env):
     tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr, onset_envelope=onset_env, hop_length=hop_lenth, tightness=50)
 
     max_index = max_power_beat(onset_env, beat_frames)
-    print('max index', max_index) 
+    logger.info('max index', max_index) 
 
     # plt.plot(onset_env)
     # plt.vlines(beat_frames, 0, np.max(onset_env))
@@ -62,12 +63,12 @@ def init_beat(y, sr, onset_env):
 
 def MSL(beats):
     numBeats = len(beats)
-    print(len(beats))
+    logger.info(len(beats))
 
     AT = np.matrix([np.ones(numBeats), range(numBeats)])
     b = np.matrix(beats)
     x = (AT * AT.T).I * AT * b.T
-    #print(x)
+    #logger.info(x)
 
     a = x[1, 0]
     b = x[0, 0]
@@ -114,7 +115,7 @@ def diff(beats, a):
     cnt = int(numBeat / 3)
     
     m, i1 = min_measure(mean[:cnt], dist[:cnt])
-    print(m, ' ', i1)
+    logger.info(m, ' ', i1)
     #plt.plot(i, m, 'o')
     
     m, i2 = min_measure(mean[-cnt:], dist[-cnt:])
@@ -142,15 +143,15 @@ def save_file(beats, mp3filename, postfix = ''):
     outname = os.path.splitext(mp3filename)[0]
     outname = outname + postfix + '.csv'
     librosa.output.times_csv(outname, beats)
-    print('output beat time file ' + outname)
+    logger.info('output beat time file ' + outname)
 
 def do_file(pathname):    
     y, sr = librosa.load(pathname, sr = None)
-    print('load ' + pathname)
+    logger.info('load ' + pathname)
 
     onset_env = librosa.onset.onset_strength(y=y, sr=sr)
     num_frames = onset_env.shape[0]
-    print('frame count ', num_frames)
+    logger.info('frame count ', num_frames)
     music_length = librosa.frames_to_time(num_frames, sr=sr)
 
     beat_frames, max_index = init_beat(y, sr, onset_env)    
@@ -158,7 +159,7 @@ def do_file(pathname):
 
     numBeats = len(beat_times)
     itvals = beat_intervals(beat_times)
-    #print('mean ' + str(mean))
+    #logger.info('mean ' + str(mean))
 
     #最小二乘计算固定间隔拍子·
     a, b = MSL(beat_times)    
@@ -170,16 +171,19 @@ def do_file(pathname):
     compensate = int(min(0, b//a))
     b -= compensate * a
     numBeats += compensate
-    print('a b ', a, b)
+    logger.info('a b ', a, b)
 
     new_beat_times = np.arange(numBeats) * a + b
 
     bpm = 60.0 / a
-    print('bpm ', bpm)
+    logger.info('bpm ', bpm)
+    print('bpm', bpm)
 
     # 挑出重拍，只支持4/4拍
     bar_times = new_beat_times[max_index:new_beat_times.size:4]
     bar_frames = librosa.time_to_frames(bar_times, sr=sr, hop_length=512)
+
+    print('et', bar_times[0])
 
     bound_frames, bound_segs = seg.calc_segment(y, sr)
     seg_power, power_data = seg.calc_power(y, sr, bound_frames, bound_segs)
@@ -222,7 +226,7 @@ def do_file(pathname):
 
     save_time_value_tofile(power_data, pathname, '_pow')
 
-    plt.show()
+    #plt.show()
     
 def save_time_value_tofile(data, mp3filename, postfix=''):
     outname = os.path.splitext(mp3filename)[0]
@@ -242,14 +246,23 @@ def dummy(f):
     do_file(f)
 
 
-#plt.show()
+def calc_bpm():
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
+    logger.init('calc_bpm.log', to_console=False)
+    
+    if len(sys.argv) < 2:
+        print('')
+
+
 
 if __name__ == '__main__':
-    #sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
-    
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
+
+    exit(1)
+
     path = 'd:/librosa/炫舞自动关卡生成/测试歌曲/'
-    files = [path + f for f in listdir(path) if os.path.splitext(f)[1] == '.mp3']
-    print(files)
+    files = [path + f for f in listdir(path) if os.path.splitext(f)[1] == '.mp3' or os.path.splitext(f)[1] == '.m4a']
+    logger.info(files)
 
     list(map(dummy, files))
    # dummy(file)
