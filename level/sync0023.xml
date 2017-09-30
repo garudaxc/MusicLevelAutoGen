@@ -1,0 +1,1504 @@
+<?xml version="1.0" encoding="GB18030" ?>
+<Level>
+    <LevelInfo>
+        <Type>sync</Type>
+        <Difficulty>5</Difficulty>
+        <EXPRatio>1</EXPRatio>
+        <BPM>129.9992</BPM>
+        <BeatPerBar>4</BeatPerBar>
+        <BeatLen>8</BeatLen>
+        <BarAmount>114</BarAmount>
+        <EnterTime>956</EnterTime>
+        <Remark />
+    </LevelInfo>
+    <MusicInfo>
+        <Title>str_res_level_song_023</Title>
+        <Artist>str_res_level_singer_twins</Artist>
+        <FilePath>Media\audio\Music\song_0023.ogg</FilePath>
+        <Remark />
+    </MusicInfo>
+    <DanceSequence UnSync="0" Eight_Key_P="0.5" AllRythm="0">
+        <DanceSegment startBar="4" type="normal">
+            <Dance type="normal" bar="4" level="1">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>1</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="5" level="1">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>4</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="6" level="2">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>4</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="7" level="2">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>4</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="8" level="3">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="9" level="3">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="10" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="12" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="14" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="16" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="18" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>4</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="20" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>4</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="22" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>4</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="24" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>4</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="26" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="28" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="30" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="32" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="34" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="36" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>8</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="38" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>4</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>9</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+        </DanceSegment>
+        <DanceSegment startBar="42" type="normal">
+            <Dance type="normal" bar="42" level="3">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="43" level="3">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="44" level="3">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="45" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="47" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="49" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="51" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="53" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="55" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="57" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="59" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="61" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="63" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="65" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="67" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="69" level="7">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="71" level="3">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="72" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>4</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>9</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+        </DanceSegment>
+        <DanceSegment startBar="76" type="normal">
+            <Dance type="normal" bar="76" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>9</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="78" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>9</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="80" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>9</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="82" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>9</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="84" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="86" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="88" level="7">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="90" level="7">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="92" level="3">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>6</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="93" level="3">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="94" level="3">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>1</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>5</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="95" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="97" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="99" level="4">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="101" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>7</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="103" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>8</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="105" level="5">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>2</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>8</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+            <Dance type="normal" bar="107" level="6">
+                <ActionSelector>
+                    <ActionRule>
+                        <ActionLength>4</ActionLength>
+                        <ActionStyle>Common</ActionStyle>
+                        <ActionLevel>9</ActionLevel>
+                    </ActionRule>
+                </ActionSelector>
+            </Dance>
+        </DanceSegment>
+        <DanceSegment startBar="111" type="Blank">
+            <Dance type="Blank" bar="111" level="1" />
+        </DanceSegment>
+    </DanceSequence>
+    <FaceSequence>
+        <FACIAL_TRACK>
+            <Face weight="1" id="normal" bar="10" reltime="7 32" />
+            <Face weight="1" id="I" bar="10" reltime="8 32" />
+            <Face weight="1" id="U" bar="10" reltime="12 32" />
+            <Face weight="1" id="normal" bar="10" reltime="15 32" />
+            <Face weight="1" id="I" bar="10" reltime="16 32" />
+            <Face weight="1" id="U" bar="10" reltime="20 32" />
+            <Face weight="1" id="normal" bar="10" reltime="23 32" />
+            <Face weight="1" id="I" bar="10" reltime="24 32" />
+            <Face weight="1" id="U" bar="10" reltime="28 32" />
+            <Face weight="1" id="normal" bar="10" reltime="32 32" />
+            <Face weight="1" id="normal" bar="13" reltime="31 32" />
+            <Face weight="1" id="O" bar="13" reltime="32 32" />
+            <Face weight="1" id="I" bar="14" reltime="4 32" />
+            <Face weight="1" id="U" bar="14" reltime="7 32" />
+            <Face weight="1" id="O" bar="14" reltime="8 32" />
+            <Face weight="1" id="normal" bar="14" reltime="15 32" />
+            <Face weight="1" id="I" bar="14" reltime="16 32" />
+            <Face weight="1" id="I" bar="14" reltime="20 32" />
+            <Face weight="1" id="A" bar="14" reltime="24 32" />
+            <Face weight="1" id="normal" bar="14" reltime="32 32" />
+            <Face weight="1" id="normal" bar="17" reltime="31 32" />
+            <Face weight="1" id="I" bar="17" reltime="32 32" />
+            <Face weight="1" id="U" bar="18" reltime="4 32" />
+            <Face weight="1" id="normal" bar="18" reltime="7 32" />
+            <Face weight="1" id="I" bar="18" reltime="8 32" />
+            <Face weight="1" id="U" bar="18" reltime="12 32" />
+            <Face weight="1" id="normal" bar="18" reltime="15 32" />
+            <Face weight="1" id="I" bar="18" reltime="16 32" />
+            <Face weight="1" id="U" bar="18" reltime="20 32" />
+            <Face weight="1" id="normal" bar="18" reltime="24 32" />
+            <Face weight="1" id="normal" bar="18" reltime="32 32" />
+            <Face weight="1" id="E" bar="19" reltime="3 32" />
+            <Face weight="1" id="O" bar="19" reltime="4 32" />
+            <Face weight="1" id="U" bar="19" reltime="6 32" />
+            <Face weight="1" id="normal" bar="19" reltime="7 32" />
+            <Face weight="1" id="I" bar="19" reltime="8 32" />
+            <Face weight="1" id="normal" bar="19" reltime="11 32" />
+            <Face weight="1" id="I" bar="19" reltime="12 32" />
+            <Face weight="1" id="normal" bar="19" reltime="14 32" />
+            <Face weight="1" id="E" bar="19" reltime="15 32" />
+            <Face weight="1" id="U" bar="19" reltime="16 32" />
+            <Face weight="1" id="O" bar="19" reltime="17 32" />
+            <Face weight="1" id="E" bar="19" reltime="19 32" />
+            <Face weight="1" id="I" bar="19" reltime="20 32" />
+            <Face weight="1" id="normal" bar="19" reltime="23 32" />
+            <Face weight="1" id="A" bar="19" reltime="24 32" />
+            <Face weight="1" id="normal" bar="19" reltime="28 32" />
+            <Face weight="1" id="normal" bar="19" reltime="31 32" />
+            <Face weight="1" id="U" bar="19" reltime="32 32" />
+            <Face weight="1" id="U" bar="20" reltime="3 32" />
+            <Face weight="1" id="A" bar="20" reltime="4 32" />
+            <Face weight="1" id="normal" bar="20" reltime="11 32" />
+            <Face weight="1" id="O" bar="20" reltime="12 32" />
+            <Face weight="1" id="U" bar="20" reltime="15 32" />
+            <Face weight="1" id="normal" bar="20" reltime="16 32" />
+            <Face weight="1" id="normal" bar="20" reltime="22 32" />
+            <Face weight="1" id="U" bar="20" reltime="23 32" />
+            <Face weight="1" id="A" bar="20" reltime="24 32" />
+            <Face weight="1" id="normal" bar="20" reltime="26 32" />
+            <Face weight="1" id="E" bar="20" reltime="27 32" />
+            <Face weight="1" id="I" bar="20" reltime="28 32" />
+            <Face weight="1" id="normal" bar="20" reltime="31 32" />
+            <Face weight="1" id="I" bar="20" reltime="32 32" />
+            <Face weight="1" id="normal" bar="21" reltime="7 32" />
+            <Face weight="1" id="I" bar="21" reltime="8 32" />
+            <Face weight="1" id="normal" bar="21" reltime="11 32" />
+            <Face weight="1" id="O" bar="21" reltime="12 32" />
+            <Face weight="1" id="U" bar="21" reltime="14 32" />
+            <Face weight="1" id="normal" bar="21" reltime="15 32" />
+            <Face weight="1" id="A" bar="21" reltime="16 32" />
+            <Face weight="1" id="normal" bar="21" reltime="19 32" />
+            <Face weight="1" id="O" bar="21" reltime="20 32" />
+            <Face weight="1" id="U" bar="21" reltime="22 32" />
+            <Face weight="1" id="U" bar="21" reltime="23 32" />
+            <Face weight="1" id="A" bar="21" reltime="24 32" />
+            <Face weight="1" id="normal" bar="21" reltime="26 32" />
+            <Face weight="1" id="U" bar="21" reltime="27 32" />
+            <Face weight="1" id="O" bar="21" reltime="28 32" />
+            <Face weight="1" id="normal" bar="21" reltime="31 32" />
+            <Face weight="1" id="A" bar="21" reltime="32 32" />
+            <Face weight="1" id="normal" bar="22" reltime="5 32" />
+            <Face weight="1" id="E" bar="22" reltime="6 32" />
+            <Face weight="1" id="E" bar="22" reltime="7 32" />
+            <Face weight="1" id="U" bar="22" reltime="8 32" />
+            <Face weight="1" id="normal" bar="22" reltime="11 32" />
+            <Face weight="1" id="I" bar="22" reltime="12 32" />
+            <Face weight="1" id="O" bar="22" reltime="14 32" />
+            <Face weight="1" id="U" bar="22" reltime="18 32" />
+            <Face weight="1" id="normal" bar="22" reltime="20 32" />
+            <Face weight="1" id="normal" bar="23" reltime="2 32" />
+            <Face weight="1" id="U" bar="23" reltime="3 32" />
+            <Face weight="1" id="A" bar="23" reltime="4 32" />
+            <Face weight="1" id="normal" bar="23" reltime="7 32" />
+            <Face weight="1" id="I" bar="23" reltime="8 32" />
+            <Face weight="1" id="normal" bar="23" reltime="11 32" />
+            <Face weight="1" id="O" bar="23" reltime="12 32" />
+            <Face weight="1" id="U" bar="23" reltime="14 32" />
+            <Face weight="1" id="normal" bar="23" reltime="15 32" />
+            <Face weight="1" id="A" bar="23" reltime="16 32" />
+            <Face weight="1" id="normal" bar="23" reltime="19 32" />
+            <Face weight="1" id="A" bar="23" reltime="20 32" />
+            <Face weight="1" id="normal" bar="23" reltime="23 32" />
+            <Face weight="1" id="I" bar="23" reltime="24 32" />
+            <Face weight="1" id="normal" bar="23" reltime="31 32" />
+            <Face weight="1" id="O" bar="23" reltime="32 32" />
+            <Face weight="1" id="U" bar="24" reltime="2 32" />
+            <Face weight="1" id="normal" bar="24" reltime="3 32" />
+            <Face weight="1" id="U" bar="24" reltime="4 32" />
+            <Face weight="1" id="U" bar="24" reltime="5 32" />
+            <Face weight="1" id="normal" bar="24" reltime="7 32" />
+            <Face weight="1" id="A" bar="24" reltime="8 32" />
+            <Face weight="1" id="normal" bar="24" reltime="11 32" />
+            <Face weight="1" id="O" bar="24" reltime="12 32" />
+            <Face weight="1" id="U" bar="24" reltime="18 32" />
+            <Face weight="1" id="normal" bar="24" reltime="20 32" />
+            <Face weight="1" id="normal" bar="24" reltime="27 32" />
+            <Face weight="1" id="I" bar="24" reltime="28 32" />
+            <Face weight="1" id="normal" bar="24" reltime="31 32" />
+            <Face weight="1" id="O" bar="24" reltime="32 32" />
+            <Face weight="1" id="U" bar="25" reltime="5 32" />
+            <Face weight="1" id="normal" bar="25" reltime="7 32" />
+            <Face weight="1" id="I" bar="25" reltime="8 32" />
+            <Face weight="1" id="normal" bar="25" reltime="11 32" />
+            <Face weight="1" id="A" bar="25" reltime="12 32" />
+            <Face weight="1" id="normal" bar="25" reltime="19 32" />
+            <Face weight="1" id="I" bar="25" reltime="20 32" />
+            <Face weight="1" id="normal" bar="25" reltime="23 32" />
+            <Face weight="1" id="I" bar="25" reltime="24 32" />
+            <Face weight="1" id="E" bar="25" reltime="26 32" />
+            <Face weight="1" id="E" bar="25" reltime="27 32" />
+            <Face weight="1" id="I" bar="25" reltime="28 32" />
+            <Face weight="1" id="O" bar="25" reltime="29 32" />
+            <Face weight="1" id="U" bar="26" reltime="7 32" />
+            <Face weight="1" id="normal" bar="26" reltime="8 32" />
+            <Face weight="1" id="normal" bar="26" reltime="15 32" />
+            <Face weight="1" id="A" bar="26" reltime="16 32" />
+            <Face weight="1" id="normal" bar="26" reltime="23 32" />
+            <Face weight="1" id="O" bar="26" reltime="24 32" />
+            <Face weight="1" id="U" bar="26" reltime="28 32" />
+            <Face weight="1" id="normal" bar="26" reltime="29 32" />
+            <Face weight="1" id="E" bar="26" reltime="31 32" />
+            <Face weight="1" id="A" bar="26" reltime="32 32" />
+            <Face weight="1" id="normal" bar="27" reltime="7 32" />
+            <Face weight="1" id="A" bar="27" reltime="8 32" />
+            <Face weight="1" id="normal" bar="27" reltime="10 32" />
+            <Face weight="1" id="E" bar="27" reltime="11 32" />
+            <Face weight="1" id="I" bar="27" reltime="12 32" />
+            <Face weight="1" id="normal" bar="27" reltime="23 32" />
+            <Face weight="1" id="normal" bar="27" reltime="29 32" />
+            <Face weight="1" id="E" bar="27" reltime="31 32" />
+            <Face weight="1" id="A" bar="27" reltime="32 32" />
+            <Face weight="1" id="normal" bar="28" reltime="7 32" />
+            <Face weight="1" id="A" bar="28" reltime="8 32" />
+            <Face weight="1" id="normal" bar="28" reltime="10 32" />
+            <Face weight="1" id="E" bar="28" reltime="11 32" />
+            <Face weight="1" id="I" bar="28" reltime="12 32" />
+            <Face weight="1" id="O" bar="28" reltime="13 32" />
+            <Face weight="1" id="U" bar="28" reltime="23 32" />
+            <Face weight="1" id="normal" bar="28" reltime="24 32" />
+            <Face weight="1" id="normal" bar="28" reltime="27 32" />
+            <Face weight="1" id="O" bar="28" reltime="28 32" />
+            <Face weight="1" id="U" bar="28" reltime="30 32" />
+            <Face weight="1" id="normal" bar="28" reltime="31 32" />
+            <Face weight="1" id="O" bar="28" reltime="32 32" />
+            <Face weight="1" id="U" bar="29" reltime="5 32" />
+            <Face weight="1" id="normal" bar="29" reltime="7 32" />
+            <Face weight="1" id="I" bar="29" reltime="8 32" />
+            <Face weight="1" id="normal" bar="29" reltime="11 32" />
+            <Face weight="1" id="A" bar="29" reltime="12 32" />
+            <Face weight="1" id="normal" bar="29" reltime="15 32" />
+            <Face weight="1" id="O" bar="29" reltime="16 32" />
+            <Face weight="1" id="U" bar="29" reltime="21 32" />
+            <Face weight="1" id="E" bar="29" reltime="23 32" />
+            <Face weight="1" id="I" bar="29" reltime="24 32" />
+            <Face weight="1" id="normal" bar="29" reltime="27 32" />
+            <Face weight="1" id="O" bar="29" reltime="28 32" />
+            <Face weight="1" id="U" bar="30" reltime="3 32" />
+            <Face weight="1" id="normal" bar="30" reltime="4 32" />
+            <Face weight="1" id="normal" bar="30" reltime="15 32" />
+            <Face weight="1" id="I" bar="30" reltime="16 32" />
+            <Face weight="1" id="U" bar="30" reltime="21 32" />
+            <Face weight="1" id="normal" bar="30" reltime="23 32" />
+            <Face weight="1" id="I" bar="30" reltime="24 32" />
+            <Face weight="1" id="U" bar="30" reltime="29 32" />
+            <Face weight="1" id="normal" bar="30" reltime="31 32" />
+            <Face weight="1" id="I" bar="30" reltime="32 32" />
+            <Face weight="1" id="normal" bar="31" reltime="5 32" />
+            <Face weight="1" id="E" bar="31" reltime="7 32" />
+            <Face weight="1" id="U" bar="31" reltime="8 32" />
+            <Face weight="1" id="normal" bar="31" reltime="11 32" />
+            <Face weight="1" id="O" bar="31" reltime="12 32" />
+            <Face weight="1" id="U" bar="31" reltime="22 32" />
+            <Face weight="1" id="normal" bar="31" reltime="24 32" />
+            <Face weight="1" id="normal" bar="31" reltime="31 32" />
+            <Face weight="1" id="O" bar="31" reltime="32 32" />
+            <Face weight="1" id="U" bar="32" reltime="2 32" />
+            <Face weight="1" id="normal" bar="32" reltime="3 32" />
+            <Face weight="1" id="O" bar="32" reltime="4 32" />
+            <Face weight="1" id="U" bar="32" reltime="9 32" />
+            <Face weight="1" id="normal" bar="32" reltime="11 32" />
+            <Face weight="1" id="O" bar="32" reltime="12 32" />
+            <Face weight="1" id="U" bar="32" reltime="20 32" />
+            <Face weight="1" id="normal" bar="32" reltime="22 32" />
+            <Face weight="1" id="U" bar="32" reltime="23 32" />
+            <Face weight="1" id="I" bar="32" reltime="24 32" />
+            <Face weight="1" id="normal" bar="32" reltime="27 32" />
+            <Face weight="1" id="U" bar="32" reltime="28 32" />
+            <Face weight="1" id="U" bar="32" reltime="29 32" />
+            <Face weight="1" id="normal" bar="32" reltime="31 32" />
+            <Face weight="1" id="O" bar="32" reltime="32 32" />
+            <Face weight="1" id="U" bar="33" reltime="5 32" />
+            <Face weight="1" id="normal" bar="33" reltime="7 32" />
+            <Face weight="1" id="A" bar="33" reltime="8 32" />
+            <Face weight="1" id="E" bar="33" reltime="10 32" />
+            <Face weight="1" id="E" bar="33" reltime="11 32" />
+            <Face weight="1" id="A" bar="33" reltime="12 32" />
+            <Face weight="1" id="normal" bar="33" reltime="15 32" />
+            <Face weight="1" id="I" bar="33" reltime="16 32" />
+            <Face weight="1" id="normal" bar="33" reltime="23 32" />
+            <Face weight="1" id="U" bar="33" reltime="24 32" />
+            <Face weight="1" id="U" bar="33" reltime="27 32" />
+            <Face weight="1" id="normal" bar="33" reltime="31 32" />
+            <Face weight="1" id="I" bar="33" reltime="32 32" />
+            <Face weight="1" id="O" bar="34" reltime="1 32" />
+            <Face weight="1" id="U" bar="34" reltime="8 32" />
+            <Face weight="1" id="normal" bar="34" reltime="12 32" />
+            <Face weight="1" id="normal" bar="34" reltime="22 32" />
+            <Face weight="1" id="U" bar="34" reltime="23 32" />
+            <Face weight="1" id="O" bar="34" reltime="24 32" />
+            <Face weight="1" id="normal" bar="34" reltime="27 32" />
+            <Face weight="1" id="I" bar="34" reltime="28 32" />
+            <Face weight="1" id="U" bar="34" reltime="31 32" />
+            <Face weight="1" id="A" bar="34" reltime="32 32" />
+            <Face weight="1" id="normal" bar="35" reltime="7 32" />
+            <Face weight="1" id="I" bar="35" reltime="8 32" />
+            <Face weight="1" id="normal" bar="35" reltime="11 32" />
+            <Face weight="1" id="A" bar="35" reltime="12 32" />
+            <Face weight="1" id="normal" bar="35" reltime="15 32" />
+            <Face weight="1" id="I" bar="35" reltime="16 32" />
+            <Face weight="1" id="normal" bar="35" reltime="23 32" />
+            <Face weight="1" id="A" bar="35" reltime="24 32" />
+            <Face weight="1" id="normal" bar="35" reltime="31 32" />
+            <Face weight="1" id="U" bar="35" reltime="32 32" />
+            <Face weight="1" id="normal" bar="36" reltime="3 32" />
+            <Face weight="1" id="A" bar="36" reltime="4 32" />
+            <Face weight="1" id="normal" bar="36" reltime="11 32" />
+            <Face weight="1" id="I" bar="36" reltime="12 32" />
+            <Face weight="1" id="normal" bar="36" reltime="15 32" />
+            <Face weight="1" id="A" bar="36" reltime="16 32" />
+            <Face weight="1" id="normal" bar="36" reltime="22 32" />
+            <Face weight="1" id="U" bar="36" reltime="23 32" />
+            <Face weight="1" id="O" bar="36" reltime="24 32" />
+            <Face weight="1" id="normal" bar="36" reltime="27 32" />
+            <Face weight="1" id="I" bar="36" reltime="28 32" />
+            <Face weight="1" id="normal" bar="36" reltime="31 32" />
+            <Face weight="1" id="A" bar="36" reltime="32 32" />
+            <Face weight="1" id="normal" bar="37" reltime="3 32" />
+            <Face weight="1" id="I" bar="37" reltime="4 32" />
+            <Face weight="1" id="normal" bar="37" reltime="7 32" />
+            <Face weight="1" id="O" bar="37" reltime="8 32" />
+            <Face weight="1" id="U" bar="37" reltime="10 32" />
+            <Face weight="1" id="normal" bar="37" reltime="11 32" />
+            <Face weight="1" id="A" bar="37" reltime="12 32" />
+            <Face weight="1" id="normal" bar="37" reltime="15 32" />
+            <Face weight="1" id="I" bar="37" reltime="16 32" />
+            <Face weight="1" id="normal" bar="37" reltime="19 32" />
+            <Face weight="1" id="I" bar="37" reltime="20 32" />
+            <Face weight="1" id="normal" bar="37" reltime="23 32" />
+            <Face weight="1" id="U" bar="37" reltime="24 32" />
+            <Face weight="1" id="U" bar="37" reltime="27 32" />
+            <Face weight="1" id="A" bar="37" reltime="28 32" />
+            <Face weight="1" id="normal" bar="37" reltime="31 32" />
+            <Face weight="1" id="I" bar="37" reltime="32 32" />
+            <Face weight="1" id="E" bar="38" reltime="2 32" />
+            <Face weight="1" id="E" bar="38" reltime="3 32" />
+            <Face weight="1" id="I" bar="38" reltime="4 32" />
+            <Face weight="1" id="normal" bar="38" reltime="6 32" />
+            <Face weight="1" id="U" bar="38" reltime="7 32" />
+            <Face weight="1" id="A" bar="38" reltime="8 32" />
+            <Face weight="1" id="normal" bar="38" reltime="10 32" />
+            <Face weight="1" id="U" bar="38" reltime="11 32" />
+            <Face weight="1" id="A" bar="38" reltime="12 32" />
+            <Face weight="1" id="normal" bar="38" reltime="18 32" />
+            <Face weight="1" id="normal" bar="38" reltime="22 32" />
+            <Face weight="1" id="U" bar="38" reltime="23 32" />
+            <Face weight="1" id="O" bar="38" reltime="24 32" />
+            <Face weight="1" id="normal" bar="38" reltime="27 32" />
+            <Face weight="1" id="I" bar="38" reltime="28 32" />
+            <Face weight="1" id="U" bar="38" reltime="31 32" />
+            <Face weight="1" id="A" bar="38" reltime="32 32" />
+            <Face weight="1" id="normal" bar="39" reltime="7 32" />
+            <Face weight="1" id="I" bar="39" reltime="8 32" />
+            <Face weight="1" id="normal" bar="39" reltime="11 32" />
+            <Face weight="1" id="A" bar="39" reltime="12 32" />
+            <Face weight="1" id="normal" bar="39" reltime="15 32" />
+            <Face weight="1" id="A" bar="39" reltime="16 32" />
+            <Face weight="1" id="normal" bar="39" reltime="19 32" />
+            <Face weight="1" id="I" bar="39" reltime="20 32" />
+            <Face weight="1" id="normal" bar="39" reltime="23 32" />
+            <Face weight="1" id="A" bar="39" reltime="24 32" />
+            <Face weight="1" id="normal" bar="39" reltime="31 32" />
+            <Face weight="1" id="U" bar="39" reltime="32 32" />
+            <Face weight="1" id="normal" bar="40" reltime="3 32" />
+            <Face weight="1" id="A" bar="40" reltime="4 32" />
+            <Face weight="1" id="normal" bar="40" reltime="11 32" />
+            <Face weight="1" id="I" bar="40" reltime="12 32" />
+            <Face weight="1" id="normal" bar="40" reltime="15 32" />
+            <Face weight="1" id="A" bar="40" reltime="16 32" />
+            <Face weight="1" id="normal" bar="40" reltime="23 32" />
+            <Face weight="1" id="I" bar="40" reltime="24 32" />
+            <Face weight="1" id="normal" bar="40" reltime="27 32" />
+            <Face weight="1" id="A" bar="40" reltime="28 32" />
+            <Face weight="1" id="normal" bar="40" reltime="31 32" />
+            <Face weight="1" id="A" bar="40" reltime="32 32" />
+            <Face weight="1" id="normal" bar="41" reltime="7 32" />
+            <Face weight="1" id="A" bar="41" reltime="8 32" />
+            <Face weight="1" id="normal" bar="41" reltime="11 32" />
+            <Face weight="1" id="A" bar="41" reltime="12 32" />
+            <Face weight="1" id="normal" bar="41" reltime="15 32" />
+            <Face weight="1" id="A" bar="41" reltime="16 32" />
+            <Face weight="1" id="normal" bar="41" reltime="19 32" />
+            <Face weight="1" id="I" bar="41" reltime="20 32" />
+            <Face weight="1" id="normal" bar="41" reltime="27 32" />
+            <Face weight="1" id="A" bar="41" reltime="28 32" />
+            <Face weight="1" id="E" bar="41" reltime="30 32" />
+            <Face weight="1" id="E" bar="41" reltime="31 32" />
+            <Face weight="1" id="I" bar="41" reltime="32 32" />
+            <Face weight="1" id="normal" bar="42" reltime="8 32" />
+            <Face weight="1" id="normal" bar="42" reltime="23 32" />
+            <Face weight="1" id="A" bar="42" reltime="24 32" />
+            <Face weight="1" id="normal" bar="42" reltime="26 32" />
+            <Face weight="1" id="U" bar="42" reltime="27 32" />
+            <Face weight="1" id="A" bar="42" reltime="28 32" />
+            <Face weight="1" id="normal" bar="42" reltime="30 32" />
+            <Face weight="1" id="U" bar="42" reltime="31 32" />
+            <Face weight="1" id="A" bar="42" reltime="32 32" />
+            <Face weight="1" id="normal" bar="43" reltime="4 32" />
+            <Face weight="1" id="normal" bar="43" reltime="7 32" />
+            <Face weight="1" id="A" bar="43" reltime="8 32" />
+            <Face weight="1" id="E" bar="43" reltime="11 32" />
+            <Face weight="1" id="U" bar="43" reltime="12 32" />
+            <Face weight="1" id="normal" bar="43" reltime="14 32" />
+            <Face weight="1" id="U" bar="43" reltime="15 32" />
+            <Face weight="1" id="O" bar="43" reltime="16 32" />
+            <Face weight="1" id="U" bar="43" reltime="21 32" />
+            <Face weight="1" id="E" bar="43" reltime="22 32" />
+            <Face weight="1" id="E" bar="43" reltime="23 32" />
+            <Face weight="1" id="A" bar="43" reltime="24 32" />
+            <Face weight="1" id="normal" bar="43" reltime="27 32" />
+            <Face weight="1" id="I" bar="43" reltime="28 32" />
+            <Face weight="1" id="E" bar="43" reltime="31 32" />
+            <Face weight="1" id="A" bar="43" reltime="32 32" />
+            <Face weight="1" id="normal" bar="44" reltime="8 32" />
+            <Face weight="1" id="normal" bar="47" reltime="3 32" />
+            <Face weight="1" id="I" bar="47" reltime="4 32" />
+            <Face weight="1" id="U" bar="47" reltime="7 32" />
+            <Face weight="1" id="I" bar="47" reltime="8 32" />
+            <Face weight="1" id="normal" bar="47" reltime="15 32" />
+            <Face weight="1" id="I" bar="47" reltime="16 32" />
+            <Face weight="1" id="U" bar="47" reltime="22 32" />
+            <Face weight="1" id="normal" bar="47" reltime="24 32" />
+            <Face weight="1" id="normal" bar="48" reltime="3 32" />
+            <Face weight="1" id="O" bar="48" reltime="4 32" />
+            <Face weight="1" id="U" bar="48" reltime="6 32" />
+            <Face weight="1" id="normal" bar="48" reltime="7 32" />
+            <Face weight="1" id="I" bar="48" reltime="8 32" />
+            <Face weight="1" id="normal" bar="48" reltime="11 32" />
+            <Face weight="1" id="O" bar="48" reltime="12 32" />
+            <Face weight="1" id="U" bar="48" reltime="14 32" />
+            <Face weight="1" id="U" bar="48" reltime="15 32" />
+            <Face weight="1" id="A" bar="48" reltime="16 32" />
+            <Face weight="1" id="E" bar="48" reltime="18 32" />
+            <Face weight="1" id="E" bar="48" reltime="19 32" />
+            <Face weight="1" id="I" bar="48" reltime="20 32" />
+            <Face weight="1" id="normal" bar="48" reltime="23 32" />
+            <Face weight="1" id="U" bar="48" reltime="24 32" />
+            <Face weight="1" id="U" bar="48" reltime="26 32" />
+            <Face weight="1" id="normal" bar="48" reltime="28 32" />
+            <Face weight="1" id="normal" bar="48" reltime="31 32" />
+            <Face weight="1" id="A" bar="48" reltime="32 32" />
+            <Face weight="1" id="U" bar="49" reltime="3 32" />
+            <Face weight="1" id="I" bar="49" reltime="4 32" />
+            <Face weight="1" id="normal" bar="49" reltime="11 32" />
+            <Face weight="1" id="O" bar="49" reltime="12 32" />
+            <Face weight="1" id="U" bar="49" reltime="15 32" />
+            <Face weight="1" id="normal" bar="49" reltime="16 32" />
+            <Face weight="1" id="normal" bar="49" reltime="23 32" />
+            <Face weight="1" id="O" bar="49" reltime="24 32" />
+            <Face weight="1" id="U" bar="49" reltime="26 32" />
+            <Face weight="1" id="normal" bar="49" reltime="27 32" />
+            <Face weight="1" id="A" bar="49" reltime="28 32" />
+            <Face weight="1" id="normal" bar="49" reltime="31 32" />
+            <Face weight="1" id="I" bar="49" reltime="32 32" />
+            <Face weight="1" id="normal" bar="50" reltime="6 32" />
+            <Face weight="1" id="U" bar="50" reltime="7 32" />
+            <Face weight="1" id="I" bar="50" reltime="8 32" />
+            <Face weight="1" id="E" bar="50" reltime="10 32" />
+            <Face weight="1" id="E" bar="50" reltime="11 32" />
+            <Face weight="1" id="O" bar="50" reltime="12 32" />
+            <Face weight="1" id="U" bar="50" reltime="14 32" />
+            <Face weight="1" id="normal" bar="50" reltime="15 32" />
+            <Face weight="1" id="A" bar="50" reltime="16 32" />
+            <Face weight="1" id="normal" bar="50" reltime="19 32" />
+            <Face weight="1" id="O" bar="50" reltime="20 32" />
+            <Face weight="1" id="U" bar="50" reltime="22 32" />
+            <Face weight="1" id="U" bar="50" reltime="23 32" />
+            <Face weight="1" id="O" bar="50" reltime="24 32" />
+            <Face weight="1" id="normal" bar="50" reltime="27 32" />
+            <Face weight="1" id="A" bar="50" reltime="28 32" />
+            <Face weight="1" id="normal" bar="50" reltime="31 32" />
+            <Face weight="1" id="A" bar="50" reltime="32 32" />
+            <Face weight="1" id="normal" bar="51" reltime="7 32" />
+            <Face weight="1" id="A" bar="51" reltime="8 32" />
+            <Face weight="1" id="normal" bar="51" reltime="11 32" />
+            <Face weight="1" id="I" bar="51" reltime="12 32" />
+            <Face weight="1" id="O" bar="51" reltime="13 32" />
+            <Face weight="1" id="U" bar="51" reltime="18 32" />
+            <Face weight="1" id="normal" bar="51" reltime="20 32" />
+            <Face weight="1" id="normal" bar="52" reltime="3 32" />
+            <Face weight="1" id="I" bar="52" reltime="4 32" />
+            <Face weight="1" id="normal" bar="52" reltime="7 32" />
+            <Face weight="1" id="A" bar="52" reltime="8 32" />
+            <Face weight="1" id="normal" bar="52" reltime="11 32" />
+            <Face weight="1" id="O" bar="52" reltime="12 32" />
+            <Face weight="1" id="U" bar="52" reltime="14 32" />
+            <Face weight="1" id="normal" bar="52" reltime="15 32" />
+            <Face weight="1" id="I" bar="52" reltime="16 32" />
+            <Face weight="1" id="normal" bar="52" reltime="19 32" />
+            <Face weight="1" id="I" bar="52" reltime="20 32" />
+            <Face weight="1" id="normal" bar="52" reltime="23 32" />
+            <Face weight="1" id="O" bar="52" reltime="24 32" />
+            <Face weight="1" id="U" bar="52" reltime="29 32" />
+            <Face weight="1" id="normal" bar="52" reltime="31 32" />
+            <Face weight="1" id="A" bar="52" reltime="32 32" />
+            <Face weight="1" id="normal" bar="53" reltime="3 32" />
+            <Face weight="1" id="O" bar="53" reltime="4 32" />
+            <Face weight="1" id="U" bar="53" reltime="6 32" />
+            <Face weight="1" id="normal" bar="53" reltime="7 32" />
+            <Face weight="1" id="I" bar="53" reltime="8 32" />
+            <Face weight="1" id="normal" bar="53" reltime="11 32" />
+            <Face weight="1" id="O" bar="53" reltime="12 32" />
+            <Face weight="1" id="U" bar="53" reltime="18 32" />
+            <Face weight="1" id="normal" bar="53" reltime="20 32" />
+            <Face weight="1" id="normal" bar="53" reltime="24 32" />
+            <Face weight="1" id="E" bar="53" reltime="26 32" />
+            <Face weight="1" id="E" bar="53" reltime="27 32" />
+            <Face weight="1" id="A" bar="53" reltime="28 32" />
+            <Face weight="1" id="normal" bar="53" reltime="31 32" />
+            <Face weight="1" id="U" bar="53" reltime="32 32" />
+            <Face weight="1" id="U" bar="54" reltime="3 32" />
+            <Face weight="1" id="normal" bar="54" reltime="7 32" />
+            <Face weight="1" id="I" bar="54" reltime="8 32" />
+            <Face weight="1" id="normal" bar="54" reltime="11 32" />
+            <Face weight="1" id="A" bar="54" reltime="12 32" />
+            <Face weight="1" id="normal" bar="54" reltime="19 32" />
+            <Face weight="1" id="I" bar="54" reltime="20 32" />
+            <Face weight="1" id="E" bar="54" reltime="22 32" />
+            <Face weight="1" id="E" bar="54" reltime="23 32" />
+            <Face weight="1" id="I" bar="54" reltime="24 32" />
+            <Face weight="1" id="normal" bar="54" reltime="27 32" />
+            <Face weight="1" id="I" bar="54" reltime="28 32" />
+            <Face weight="1" id="O" bar="54" reltime="29 32" />
+            <Face weight="1" id="U" bar="55" reltime="7 32" />
+            <Face weight="1" id="normal" bar="55" reltime="8 32" />
+            <Face weight="1" id="normal" bar="55" reltime="15 32" />
+            <Face weight="1" id="A" bar="55" reltime="16 32" />
+            <Face weight="1" id="normal" bar="55" reltime="23 32" />
+            <Face weight="1" id="O" bar="55" reltime="24 32" />
+            <Face weight="1" id="U" bar="55" reltime="29 32" />
+            <Face weight="1" id="E" bar="55" reltime="30 32" />
+            <Face weight="1" id="E" bar="55" reltime="31 32" />
+            <Face weight="1" id="A" bar="55" reltime="32 32" />
+            <Face weight="1" id="normal" bar="56" reltime="7 32" />
+            <Face weight="1" id="A" bar="56" reltime="8 32" />
+            <Face weight="1" id="E" bar="56" reltime="11 32" />
+            <Face weight="1" id="I" bar="56" reltime="12 32" />
+            <Face weight="1" id="normal" bar="56" reltime="23 32" />
+            <Face weight="1" id="normal" bar="56" reltime="29 32" />
+            <Face weight="1" id="E" bar="56" reltime="30 32" />
+            <Face weight="1" id="E" bar="56" reltime="31 32" />
+            <Face weight="1" id="A" bar="56" reltime="32 32" />
+            <Face weight="1" id="normal" bar="57" reltime="7 32" />
+            <Face weight="1" id="A" bar="57" reltime="8 32" />
+            <Face weight="1" id="E" bar="57" reltime="11 32" />
+            <Face weight="1" id="I" bar="57" reltime="12 32" />
+            <Face weight="1" id="O" bar="57" reltime="14 32" />
+            <Face weight="1" id="U" bar="57" reltime="23 32" />
+            <Face weight="1" id="normal" bar="57" reltime="24 32" />
+            <Face weight="1" id="normal" bar="57" reltime="27 32" />
+            <Face weight="1" id="O" bar="57" reltime="28 32" />
+            <Face weight="1" id="U" bar="57" reltime="30 32" />
+            <Face weight="1" id="normal" bar="57" reltime="31 32" />
+            <Face weight="1" id="O" bar="57" reltime="32 32" />
+            <Face weight="1" id="U" bar="58" reltime="5 32" />
+            <Face weight="1" id="normal" bar="58" reltime="7 32" />
+            <Face weight="1" id="I" bar="58" reltime="8 32" />
+            <Face weight="1" id="normal" bar="58" reltime="11 32" />
+            <Face weight="1" id="A" bar="58" reltime="12 32" />
+            <Face weight="1" id="normal" bar="58" reltime="15 32" />
+            <Face weight="1" id="O" bar="58" reltime="16 32" />
+            <Face weight="1" id="U" bar="58" reltime="21 32" />
+            <Face weight="1" id="E" bar="58" reltime="22 32" />
+            <Face weight="1" id="E" bar="58" reltime="23 32" />
+            <Face weight="1" id="I" bar="58" reltime="24 32" />
+            <Face weight="1" id="normal" bar="58" reltime="27 32" />
+            <Face weight="1" id="O" bar="58" reltime="28 32" />
+            <Face weight="1" id="U" bar="59" reltime="3 32" />
+            <Face weight="1" id="normal" bar="59" reltime="4 32" />
+            <Face weight="1" id="normal" bar="59" reltime="15 32" />
+            <Face weight="1" id="I" bar="59" reltime="16 32" />
+            <Face weight="1" id="U" bar="59" reltime="22 32" />
+            <Face weight="1" id="normal" bar="59" reltime="23 32" />
+            <Face weight="1" id="I" bar="59" reltime="24 32" />
+            <Face weight="1" id="O" bar="59" reltime="25 32" />
+            <Face weight="1" id="U" bar="59" reltime="30 32" />
+            <Face weight="1" id="normal" bar="59" reltime="31 32" />
+            <Face weight="1" id="I" bar="59" reltime="32 32" />
+            <Face weight="1" id="normal" bar="60" reltime="7 32" />
+            <Face weight="1" id="U" bar="60" reltime="8 32" />
+            <Face weight="1" id="U" bar="60" reltime="9 32" />
+            <Face weight="1" id="normal" bar="60" reltime="11 32" />
+            <Face weight="1" id="O" bar="60" reltime="12 32" />
+            <Face weight="1" id="U" bar="60" reltime="23 32" />
+            <Face weight="1" id="normal" bar="60" reltime="24 32" />
+            <Face weight="1" id="normal" bar="60" reltime="31 32" />
+            <Face weight="1" id="O" bar="60" reltime="32 32" />
+            <Face weight="1" id="U" bar="61" reltime="2 32" />
+            <Face weight="1" id="E" bar="61" reltime="3 32" />
+            <Face weight="1" id="O" bar="61" reltime="4 32" />
+            <Face weight="1" id="U" bar="61" reltime="9 32" />
+            <Face weight="1" id="normal" bar="61" reltime="11 32" />
+            <Face weight="1" id="O" bar="61" reltime="12 32" />
+            <Face weight="1" id="U" bar="61" reltime="20 32" />
+            <Face weight="1" id="normal" bar="61" reltime="22 32" />
+            <Face weight="1" id="U" bar="61" reltime="23 32" />
+            <Face weight="1" id="I" bar="61" reltime="24 32" />
+            <Face weight="1" id="normal" bar="61" reltime="27 32" />
+            <Face weight="1" id="U" bar="61" reltime="28 32" />
+            <Face weight="1" id="O" bar="61" reltime="29 32" />
+            <Face weight="1" id="normal" bar="61" reltime="31 32" />
+            <Face weight="1" id="O" bar="61" reltime="32 32" />
+            <Face weight="1" id="U" bar="62" reltime="5 32" />
+            <Face weight="1" id="normal" bar="62" reltime="7 32" />
+            <Face weight="1" id="A" bar="62" reltime="8 32" />
+            <Face weight="1" id="E" bar="62" reltime="10 32" />
+            <Face weight="1" id="E" bar="62" reltime="11 32" />
+            <Face weight="1" id="A" bar="62" reltime="12 32" />
+            <Face weight="1" id="normal" bar="62" reltime="15 32" />
+            <Face weight="1" id="I" bar="62" reltime="16 32" />
+            <Face weight="1" id="normal" bar="62" reltime="23 32" />
+            <Face weight="1" id="U" bar="62" reltime="24 32" />
+            <Face weight="1" id="U" bar="62" reltime="26 32" />
+            <Face weight="1" id="normal" bar="62" reltime="31 32" />
+            <Face weight="1" id="I" bar="62" reltime="32 32" />
+            <Face weight="1" id="O" bar="63" reltime="1 32" />
+            <Face weight="1" id="U" bar="63" reltime="8 32" />
+            <Face weight="1" id="normal" bar="63" reltime="12 32" />
+            <Face weight="1" id="normal" bar="63" reltime="22 32" />
+            <Face weight="1" id="U" bar="63" reltime="23 32" />
+            <Face weight="1" id="O" bar="63" reltime="24 32" />
+            <Face weight="1" id="normal" bar="63" reltime="27 32" />
+            <Face weight="1" id="I" bar="63" reltime="28 32" />
+            <Face weight="1" id="U" bar="63" reltime="31 32" />
+            <Face weight="1" id="A" bar="63" reltime="32 32" />
+            <Face weight="1" id="normal" bar="64" reltime="7 32" />
+            <Face weight="1" id="I" bar="64" reltime="8 32" />
+            <Face weight="1" id="normal" bar="64" reltime="11 32" />
+            <Face weight="1" id="A" bar="64" reltime="12 32" />
+            <Face weight="1" id="normal" bar="64" reltime="15 32" />
+            <Face weight="1" id="I" bar="64" reltime="16 32" />
+            <Face weight="1" id="normal" bar="64" reltime="23 32" />
+            <Face weight="1" id="A" bar="64" reltime="24 32" />
+            <Face weight="1" id="normal" bar="64" reltime="31 32" />
+            <Face weight="1" id="U" bar="64" reltime="32 32" />
+            <Face weight="1" id="normal" bar="65" reltime="3 32" />
+            <Face weight="1" id="A" bar="65" reltime="4 32" />
+            <Face weight="1" id="normal" bar="65" reltime="11 32" />
+            <Face weight="1" id="I" bar="65" reltime="12 32" />
+            <Face weight="1" id="normal" bar="65" reltime="15 32" />
+            <Face weight="1" id="A" bar="65" reltime="16 32" />
+            <Face weight="1" id="normal" bar="65" reltime="23 32" />
+            <Face weight="1" id="U" bar="65" reltime="24 32" />
+            <Face weight="1" id="normal" bar="65" reltime="27 32" />
+            <Face weight="1" id="A" bar="65" reltime="28 32" />
+            <Face weight="1" id="normal" bar="65" reltime="31 32" />
+            <Face weight="1" id="O" bar="65" reltime="32 32" />
+            <Face weight="1" id="U" bar="66" reltime="2 32" />
+            <Face weight="1" id="E" bar="66" reltime="3 32" />
+            <Face weight="1" id="A" bar="66" reltime="4 32" />
+            <Face weight="1" id="normal" bar="66" reltime="7 32" />
+            <Face weight="1" id="A" bar="66" reltime="8 32" />
+            <Face weight="1" id="U" bar="66" reltime="11 32" />
+            <Face weight="1" id="O" bar="66" reltime="12 32" />
+            <Face weight="1" id="E" bar="66" reltime="15 32" />
+            <Face weight="1" id="A" bar="66" reltime="16 32" />
+            <Face weight="1" id="normal" bar="66" reltime="19 32" />
+            <Face weight="1" id="O" bar="66" reltime="20 32" />
+            <Face weight="1" id="U" bar="66" reltime="22 32" />
+            <Face weight="1" id="normal" bar="66" reltime="23 32" />
+            <Face weight="1" id="U" bar="66" reltime="24 32" />
+            <Face weight="1" id="U" bar="66" reltime="25 32" />
+            <Face weight="1" id="normal" bar="66" reltime="27 32" />
+            <Face weight="1" id="O" bar="66" reltime="28 32" />
+            <Face weight="1" id="U" bar="66" reltime="30 32" />
+            <Face weight="1" id="normal" bar="66" reltime="31 32" />
+            <Face weight="1" id="A" bar="66" reltime="32 32" />
+            <Face weight="1" id="normal" bar="67" reltime="3 32" />
+            <Face weight="1" id="I" bar="67" reltime="4 32" />
+            <Face weight="1" id="normal" bar="67" reltime="7 32" />
+            <Face weight="1" id="I" bar="67" reltime="8 32" />
+            <Face weight="1" id="normal" bar="67" reltime="11 32" />
+            <Face weight="1" id="A" bar="67" reltime="12 32" />
+            <Face weight="1" id="normal" bar="67" reltime="18 32" />
+            <Face weight="1" id="normal" bar="67" reltime="22 32" />
+            <Face weight="1" id="U" bar="67" reltime="23 32" />
+            <Face weight="1" id="O" bar="67" reltime="24 32" />
+            <Face weight="1" id="normal" bar="67" reltime="27 32" />
+            <Face weight="1" id="I" bar="67" reltime="28 32" />
+            <Face weight="1" id="U" bar="67" reltime="31 32" />
+            <Face weight="1" id="A" bar="67" reltime="32 32" />
+            <Face weight="1" id="normal" bar="68" reltime="7 32" />
+            <Face weight="1" id="I" bar="68" reltime="8 32" />
+            <Face weight="1" id="normal" bar="68" reltime="11 32" />
+            <Face weight="1" id="A" bar="68" reltime="12 32" />
+            <Face weight="1" id="normal" bar="68" reltime="15 32" />
+            <Face weight="1" id="A" bar="68" reltime="16 32" />
+            <Face weight="1" id="normal" bar="68" reltime="19 32" />
+            <Face weight="1" id="I" bar="68" reltime="20 32" />
+            <Face weight="1" id="normal" bar="68" reltime="23 32" />
+            <Face weight="1" id="A" bar="68" reltime="24 32" />
+            <Face weight="1" id="normal" bar="68" reltime="31 32" />
+            <Face weight="1" id="U" bar="68" reltime="32 32" />
+            <Face weight="1" id="normal" bar="69" reltime="3 32" />
+            <Face weight="1" id="A" bar="69" reltime="4 32" />
+            <Face weight="1" id="normal" bar="69" reltime="11 32" />
+            <Face weight="1" id="I" bar="69" reltime="12 32" />
+            <Face weight="1" id="normal" bar="69" reltime="15 32" />
+            <Face weight="1" id="A" bar="69" reltime="16 32" />
+            <Face weight="1" id="normal" bar="69" reltime="23 32" />
+            <Face weight="1" id="I" bar="69" reltime="24 32" />
+            <Face weight="1" id="E" bar="69" reltime="26 32" />
+            <Face weight="1" id="E" bar="69" reltime="27 32" />
+            <Face weight="1" id="A" bar="69" reltime="28 32" />
+            <Face weight="1" id="normal" bar="69" reltime="31 32" />
+            <Face weight="1" id="A" bar="69" reltime="32 32" />
+            <Face weight="1" id="normal" bar="70" reltime="6 32" />
+            <Face weight="1" id="U" bar="70" reltime="7 32" />
+            <Face weight="1" id="O" bar="70" reltime="8 32" />
+            <Face weight="1" id="normal" bar="70" reltime="11 32" />
+            <Face weight="1" id="A" bar="70" reltime="12 32" />
+            <Face weight="1" id="normal" bar="70" reltime="15 32" />
+            <Face weight="1" id="A" bar="70" reltime="16 32" />
+            <Face weight="1" id="normal" bar="70" reltime="21 32" />
+            <Face weight="1" id="I" bar="70" reltime="22 32" />
+            <Face weight="1" id="normal" bar="70" reltime="27 32" />
+            <Face weight="1" id="A" bar="70" reltime="28 32" />
+            <Face weight="1" id="E" bar="70" reltime="30 32" />
+            <Face weight="1" id="E" bar="70" reltime="31 32" />
+            <Face weight="1" id="I" bar="70" reltime="32 32" />
+            <Face weight="1" id="normal" bar="71" reltime="8 32" />
+            <Face weight="1" id="normal" bar="71" reltime="23 32" />
+            <Face weight="1" id="O" bar="71" reltime="24 32" />
+            <Face weight="1" id="U" bar="71" reltime="26 32" />
+            <Face weight="1" id="U" bar="71" reltime="27 32" />
+            <Face weight="1" id="O" bar="71" reltime="28 32" />
+            <Face weight="1" id="normal" bar="71" reltime="31 32" />
+            <Face weight="1" id="A" bar="71" reltime="32 32" />
+            <Face weight="1" id="normal" bar="72" reltime="4 32" />
+            <Face weight="1" id="normal" bar="72" reltime="7 32" />
+            <Face weight="1" id="U" bar="72" reltime="8 32" />
+            <Face weight="1" id="U" bar="72" reltime="9 32" />
+            <Face weight="1" id="normal" bar="72" reltime="11 32" />
+            <Face weight="1" id="I" bar="72" reltime="12 32" />
+            <Face weight="1" id="U" bar="72" reltime="15 32" />
+            <Face weight="1" id="O" bar="72" reltime="16 32" />
+            <Face weight="1" id="normal" bar="72" reltime="19 32" />
+            <Face weight="1" id="I" bar="72" reltime="20 32" />
+            <Face weight="1" id="normal" bar="72" reltime="25 32" />
+            <Face weight="1" id="E" bar="72" reltime="27 32" />
+            <Face weight="1" id="I" bar="72" reltime="28 32" />
+            <Face weight="1" id="normal" bar="72" reltime="31 32" />
+            <Face weight="1" id="A" bar="72" reltime="32 32" />
+            <Face weight="1" id="normal" bar="73" reltime="8 32" />
+            <Face weight="1" id="normal" bar="84" reltime="22 32" />
+            <Face weight="1" id="U" bar="84" reltime="23 32" />
+            <Face weight="1" id="O" bar="84" reltime="24 32" />
+            <Face weight="1" id="normal" bar="84" reltime="27 32" />
+            <Face weight="1" id="I" bar="84" reltime="28 32" />
+            <Face weight="1" id="U" bar="84" reltime="31 32" />
+            <Face weight="1" id="A" bar="84" reltime="32 32" />
+            <Face weight="1" id="normal" bar="85" reltime="7 32" />
+            <Face weight="1" id="I" bar="85" reltime="8 32" />
+            <Face weight="1" id="normal" bar="85" reltime="11 32" />
+            <Face weight="1" id="A" bar="85" reltime="12 32" />
+            <Face weight="1" id="normal" bar="85" reltime="15 32" />
+            <Face weight="1" id="I" bar="85" reltime="16 32" />
+            <Face weight="1" id="normal" bar="85" reltime="23 32" />
+            <Face weight="1" id="A" bar="85" reltime="24 32" />
+            <Face weight="1" id="normal" bar="85" reltime="31 32" />
+            <Face weight="1" id="U" bar="85" reltime="32 32" />
+            <Face weight="1" id="normal" bar="86" reltime="5 32" />
+            <Face weight="1" id="A" bar="86" reltime="6 32" />
+            <Face weight="1" id="normal" bar="86" reltime="11 32" />
+            <Face weight="1" id="I" bar="86" reltime="12 32" />
+            <Face weight="1" id="normal" bar="86" reltime="15 32" />
+            <Face weight="1" id="A" bar="86" reltime="16 32" />
+            <Face weight="1" id="normal" bar="86" reltime="22 32" />
+            <Face weight="1" id="U" bar="86" reltime="23 32" />
+            <Face weight="1" id="O" bar="86" reltime="24 32" />
+            <Face weight="1" id="normal" bar="86" reltime="27 32" />
+            <Face weight="1" id="I" bar="86" reltime="28 32" />
+            <Face weight="1" id="normal" bar="86" reltime="31 32" />
+            <Face weight="1" id="A" bar="86" reltime="32 32" />
+            <Face weight="1" id="normal" bar="87" reltime="3 32" />
+            <Face weight="1" id="I" bar="87" reltime="4 32" />
+            <Face weight="1" id="normal" bar="87" reltime="7 32" />
+            <Face weight="1" id="O" bar="87" reltime="8 32" />
+            <Face weight="1" id="U" bar="87" reltime="10 32" />
+            <Face weight="1" id="normal" bar="87" reltime="11 32" />
+            <Face weight="1" id="A" bar="87" reltime="12 32" />
+            <Face weight="1" id="normal" bar="87" reltime="15 32" />
+            <Face weight="1" id="I" bar="87" reltime="16 32" />
+            <Face weight="1" id="normal" bar="87" reltime="19 32" />
+            <Face weight="1" id="I" bar="87" reltime="20 32" />
+            <Face weight="1" id="normal" bar="87" reltime="23 32" />
+            <Face weight="1" id="U" bar="87" reltime="24 32" />
+            <Face weight="1" id="U" bar="87" reltime="27 32" />
+            <Face weight="1" id="A" bar="87" reltime="28 32" />
+            <Face weight="1" id="normal" bar="87" reltime="31 32" />
+            <Face weight="1" id="I" bar="87" reltime="32 32" />
+            <Face weight="1" id="E" bar="88" reltime="2 32" />
+            <Face weight="1" id="E" bar="88" reltime="3 32" />
+            <Face weight="1" id="I" bar="88" reltime="4 32" />
+            <Face weight="1" id="normal" bar="88" reltime="6 32" />
+            <Face weight="1" id="U" bar="88" reltime="7 32" />
+            <Face weight="1" id="A" bar="88" reltime="8 32" />
+            <Face weight="1" id="normal" bar="88" reltime="10 32" />
+            <Face weight="1" id="U" bar="88" reltime="11 32" />
+            <Face weight="1" id="A" bar="88" reltime="12 32" />
+            <Face weight="1" id="normal" bar="88" reltime="18 32" />
+            <Face weight="1" id="normal" bar="88" reltime="22 32" />
+            <Face weight="1" id="U" bar="88" reltime="23 32" />
+            <Face weight="1" id="O" bar="88" reltime="24 32" />
+            <Face weight="1" id="normal" bar="88" reltime="27 32" />
+            <Face weight="1" id="I" bar="88" reltime="28 32" />
+            <Face weight="1" id="U" bar="88" reltime="31 32" />
+            <Face weight="1" id="A" bar="88" reltime="32 32" />
+            <Face weight="1" id="normal" bar="89" reltime="7 32" />
+            <Face weight="1" id="I" bar="89" reltime="8 32" />
+            <Face weight="1" id="normal" bar="89" reltime="11 32" />
+            <Face weight="1" id="A" bar="89" reltime="12 32" />
+            <Face weight="1" id="normal" bar="89" reltime="15 32" />
+            <Face weight="1" id="A" bar="89" reltime="16 32" />
+            <Face weight="1" id="normal" bar="89" reltime="19 32" />
+            <Face weight="1" id="I" bar="89" reltime="20 32" />
+            <Face weight="1" id="normal" bar="89" reltime="23 32" />
+            <Face weight="1" id="A" bar="89" reltime="24 32" />
+            <Face weight="1" id="normal" bar="89" reltime="31 32" />
+            <Face weight="1" id="U" bar="89" reltime="32 32" />
+            <Face weight="1" id="normal" bar="90" reltime="3 32" />
+            <Face weight="1" id="A" bar="90" reltime="4 32" />
+            <Face weight="1" id="normal" bar="90" reltime="11 32" />
+            <Face weight="1" id="I" bar="90" reltime="12 32" />
+            <Face weight="1" id="normal" bar="90" reltime="15 32" />
+            <Face weight="1" id="A" bar="90" reltime="16 32" />
+            <Face weight="1" id="normal" bar="90" reltime="23 32" />
+            <Face weight="1" id="I" bar="90" reltime="24 32" />
+            <Face weight="1" id="normal" bar="90" reltime="27 32" />
+            <Face weight="1" id="A" bar="90" reltime="28 32" />
+            <Face weight="1" id="normal" bar="90" reltime="31 32" />
+            <Face weight="1" id="A" bar="90" reltime="32 32" />
+            <Face weight="1" id="normal" bar="91" reltime="7 32" />
+            <Face weight="1" id="A" bar="91" reltime="8 32" />
+            <Face weight="1" id="normal" bar="91" reltime="11 32" />
+            <Face weight="1" id="A" bar="91" reltime="12 32" />
+            <Face weight="1" id="normal" bar="91" reltime="15 32" />
+            <Face weight="1" id="A" bar="91" reltime="16 32" />
+            <Face weight="1" id="normal" bar="91" reltime="21 32" />
+            <Face weight="1" id="I" bar="91" reltime="22 32" />
+            <Face weight="1" id="normal" bar="91" reltime="27 32" />
+            <Face weight="1" id="A" bar="91" reltime="28 32" />
+            <Face weight="1" id="E" bar="91" reltime="30 32" />
+            <Face weight="1" id="E" bar="91" reltime="31 32" />
+            <Face weight="1" id="I" bar="91" reltime="32 32" />
+            <Face weight="1" id="normal" bar="92" reltime="19 32" />
+            <Face weight="1" id="normal" bar="92" reltime="23 32" />
+            <Face weight="1" id="A" bar="92" reltime="24 32" />
+            <Face weight="1" id="normal" bar="92" reltime="26 32" />
+            <Face weight="1" id="U" bar="92" reltime="27 32" />
+            <Face weight="1" id="A" bar="92" reltime="28 32" />
+            <Face weight="1" id="normal" bar="92" reltime="30 32" />
+            <Face weight="1" id="U" bar="92" reltime="31 32" />
+            <Face weight="1" id="A" bar="92" reltime="32 32" />
+            <Face weight="1" id="normal" bar="93" reltime="4 32" />
+            <Face weight="1" id="normal" bar="93" reltime="7 32" />
+            <Face weight="1" id="A" bar="93" reltime="8 32" />
+            <Face weight="1" id="E" bar="93" reltime="10 32" />
+            <Face weight="1" id="E" bar="93" reltime="11 32" />
+            <Face weight="1" id="U" bar="93" reltime="12 32" />
+            <Face weight="1" id="U" bar="93" reltime="15 32" />
+            <Face weight="1" id="O" bar="93" reltime="16 32" />
+            <Face weight="1" id="U" bar="93" reltime="21 32" />
+            <Face weight="1" id="E" bar="93" reltime="22 32" />
+            <Face weight="1" id="E" bar="93" reltime="23 32" />
+            <Face weight="1" id="A" bar="93" reltime="24 32" />
+            <Face weight="1" id="normal" bar="93" reltime="27 32" />
+            <Face weight="1" id="I" bar="93" reltime="28 32" />
+            <Face weight="1" id="normal" bar="93" reltime="31 32" />
+            <Face weight="1" id="I" bar="93" reltime="32 32" />
+            <Face weight="1" id="normal" bar="94" reltime="3 32" />
+            <Face weight="1" id="A" bar="94" reltime="4 32" />
+            <Face weight="1" id="normal" bar="94" reltime="7 32" />
+            <Face weight="1" id="A" bar="94" reltime="8 32" />
+            <Face weight="1" id="normal" bar="94" reltime="13 32" />
+            <Face weight="1" id="E" bar="94" reltime="15 32" />
+            <Face weight="1" id="O" bar="94" reltime="16 32" />
+            <Face weight="1" id="U" bar="94" reltime="17 32" />
+            <Face weight="1" id="normal" bar="94" reltime="19 32" />
+            <Face weight="1" id="I" bar="94" reltime="20 32" />
+            <Face weight="1" id="normal" bar="94" reltime="25 32" />
+            <Face weight="1" id="E" bar="94" reltime="27 32" />
+            <Face weight="1" id="I" bar="94" reltime="28 32" />
+            <Face weight="1" id="O" bar="94" reltime="30 32" />
+            <Face weight="1" id="U" bar="95" reltime="4 32" />
+            <Face weight="1" id="normal" bar="95" reltime="8 32" />
+            <Face weight="1" id="normal" bar="95" reltime="30 32" />
+            <Face weight="1" id="U" bar="95" reltime="31 32" />
+            <Face weight="1" id="O" bar="95" reltime="32 32" />
+            <Face weight="1" id="normal" bar="96" reltime="3 32" />
+            <Face weight="1" id="A" bar="96" reltime="4 32" />
+            <Face weight="1" id="normal" bar="96" reltime="7 32" />
+            <Face weight="1" id="A" bar="96" reltime="8 32" />
+            <Face weight="1" id="normal" bar="96" reltime="14 32" />
+            <Face weight="1" id="E" bar="96" reltime="15 32" />
+            <Face weight="1" id="A" bar="96" reltime="16 32" />
+            <Face weight="1" id="E" bar="96" reltime="18 32" />
+            <Face weight="1" id="E" bar="96" reltime="19 32" />
+            <Face weight="1" id="I" bar="96" reltime="20 32" />
+            <Face weight="1" id="normal" bar="96" reltime="27 32" />
+            <Face weight="1" id="I" bar="96" reltime="28 32" />
+            <Face weight="1" id="O" bar="96" reltime="30 32" />
+            <Face weight="1" id="U" bar="97" reltime="4 32" />
+            <Face weight="1" id="normal" bar="97" reltime="7 32" />
+            <Face weight="1" id="O" bar="97" reltime="8 32" />
+            <Face weight="1" id="U" bar="97" reltime="11 32" />
+            <Face weight="1" id="O" bar="97" reltime="12 32" />
+            <Face weight="1" id="O" bar="97" reltime="16 32" />
+            <Face weight="1" id="U" bar="97" reltime="19 32" />
+            <Face weight="1" id="normal" bar="97" reltime="20 32" />
+            <Face weight="1" id="normal" bar="97" reltime="27 32" />
+            <Face weight="1" id="I" bar="97" reltime="28 32" />
+            <Face weight="1" id="normal" bar="97" reltime="31 32" />
+            <Face weight="1" id="A" bar="97" reltime="32 32" />
+            <Face weight="1" id="normal" bar="98" reltime="3 32" />
+            <Face weight="1" id="A" bar="98" reltime="4 32" />
+            <Face weight="1" id="E" bar="98" reltime="6 32" />
+            <Face weight="1" id="E" bar="98" reltime="7 32" />
+            <Face weight="1" id="I" bar="98" reltime="8 32" />
+            <Face weight="1" id="O" bar="98" reltime="9 32" />
+            <Face weight="1" id="U" bar="98" reltime="12 32" />
+            <Face weight="1" id="normal" bar="98" reltime="15 32" />
+            <Face weight="1" id="O" bar="98" reltime="16 32" />
+            <Face weight="1" id="U" bar="98" reltime="18 32" />
+            <Face weight="1" id="normal" bar="98" reltime="19 32" />
+            <Face weight="1" id="A" bar="98" reltime="20 32" />
+            <Face weight="1" id="normal" bar="98" reltime="25 32" />
+            <Face weight="1" id="E" bar="98" reltime="27 32" />
+            <Face weight="1" id="I" bar="98" reltime="28 32" />
+            <Face weight="1" id="O" bar="98" reltime="30 32" />
+            <Face weight="1" id="U" bar="99" reltime="4 32" />
+            <Face weight="1" id="normal" bar="99" reltime="8 32" />
+            <Face weight="1" id="normal" bar="99" reltime="31 32" />
+            <Face weight="1" id="I" bar="99" reltime="32 32" />
+            <Face weight="1" id="normal" bar="100" reltime="7 32" />
+            <Face weight="1" id="A" bar="100" reltime="8 32" />
+            <Face weight="1" id="normal" bar="100" reltime="15 32" />
+            <Face weight="1" id="A" bar="100" reltime="16 32" />
+            <Face weight="1" id="E" bar="100" reltime="19 32" />
+            <Face weight="1" id="I" bar="100" reltime="20 32" />
+            <Face weight="1" id="normal" bar="100" reltime="25 32" />
+            <Face weight="1" id="E" bar="100" reltime="27 32" />
+            <Face weight="1" id="I" bar="100" reltime="28 32" />
+            <Face weight="1" id="O" bar="100" reltime="30 32" />
+            <Face weight="1" id="U" bar="101" reltime="4 32" />
+            <Face weight="1" id="normal" bar="101" reltime="7 32" />
+            <Face weight="1" id="O" bar="101" reltime="8 32" />
+            <Face weight="1" id="U" bar="101" reltime="11 32" />
+            <Face weight="1" id="O" bar="101" reltime="12 32" />
+            <Face weight="1" id="O" bar="101" reltime="16 32" />
+            <Face weight="1" id="normal" bar="101" reltime="20 32" />
+            <Face weight="1" id="normal" bar="101" reltime="27 32" />
+            <Face weight="1" id="A" bar="101" reltime="28 32" />
+            <Face weight="1" id="U" bar="101" reltime="31 32" />
+            <Face weight="1" id="O" bar="101" reltime="32 32" />
+            <Face weight="1" id="normal" bar="102" reltime="3 32" />
+            <Face weight="1" id="A" bar="102" reltime="4 32" />
+            <Face weight="1" id="normal" bar="102" reltime="7 32" />
+            <Face weight="1" id="O" bar="102" reltime="8 32" />
+            <Face weight="1" id="U" bar="102" reltime="13 32" />
+            <Face weight="1" id="normal" bar="102" reltime="15 32" />
+            <Face weight="1" id="A" bar="102" reltime="16 32" />
+            <Face weight="1" id="U" bar="102" reltime="18 32" />
+            <Face weight="1" id="E" bar="102" reltime="19 32" />
+            <Face weight="1" id="A" bar="102" reltime="20 32" />
+            <Face weight="1" id="normal" bar="102" reltime="24 32" />
+            <Face weight="1" id="normal" bar="102" reltime="31 32" />
+            <Face weight="1" id="I" bar="102" reltime="32 32" />
+            <Face weight="1" id="O" bar="103" reltime="2 32" />
+            <Face weight="1" id="U" bar="103" reltime="6 32" />
+            <Face weight="1" id="normal" bar="103" reltime="8 32" />
+            <Face weight="1" id="normal" bar="105" reltime="31 32" />
+            <Face weight="1" id="O" bar="105" reltime="32 32" />
+            <Face weight="1" id="I" bar="106" reltime="4 32" />
+            <Face weight="1" id="U" bar="106" reltime="7 32" />
+            <Face weight="1" id="O" bar="106" reltime="8 32" />
+            <Face weight="1" id="normal" bar="106" reltime="15 32" />
+            <Face weight="1" id="I" bar="106" reltime="16 32" />
+            <Face weight="1" id="I" bar="106" reltime="20 32" />
+            <Face weight="1" id="A" bar="106" reltime="24 32" />
+            <Face weight="1" id="normal" bar="106" reltime="32 32" />
+        </FACIAL_TRACK>
+    </FaceSequence>
+    <CameraSequence>
+        <Camera id="front_01" bar="4" />
+        <Camera id="left_01" bar="5" />
+        <Camera id="right_03" bar="7" />
+        <Camera id="front_02" bar="9" />
+        <Camera id="right_04_left_03" bar="11" />
+        <Camera id="left_03" bar="14.5" />
+        <Camera id="left_04_right_03" bar="15" />
+        <Camera id="right_03" bar="18.5" />
+        <Camera id="special_03" bar="19" />
+        <Camera id="special_12" bar="23" />
+        <Camera id="left_03_front_04" bar="27" />
+        <Camera id="front_04" bar="32.5" />
+        <Camera id="front_01" bar="33.5" />
+        <Camera id="special_11" bar="33.75" />
+        <Camera id="special_01" bar="34" />
+        <Camera id="left_03_right_04" bar="35" />
+        <Camera id="right_04" bar="39" />
+        <Camera id="left_02" bar="44" />
+        <Camera id="front_02_front_03" bar="48" />
+        <Camera id="front_03" bar="55" />
+        <Camera id="right_01" bar="56" />
+        <Camera id="left_02" bar="60" />
+        <Camera id="front_03_front_04" bar="64" />
+        <Camera id="front_04" bar="73" />
+        <Camera id="right_04_left_04" bar="77" />
+        <Camera id="left_04" bar="84" />
+        <Camera id="front_01" bar="85" />
+        <Camera id="left_02" bar="89" />
+        <Camera id="right_02_right_03" bar="94" />
+        <Camera id="right_03" bar="102" />
+        <Camera id="left_01_left_04" bar="102.875" />
+        <Camera id="left_04" bar="103" />
+        <Camera id="left_04_right_02" bar="105" />
+        <Camera id="right_02" bar="110" />
+    </CameraSequence>
+</Level>
