@@ -1,42 +1,29 @@
-import csv
-import sys
+
 import logger
 from xml.etree import ElementTree  
+import numpy as np
+import librosa
 
 
 
 class tradition_mode_autogen:
 
-    hop_lengh = 512
-    
-    # classify parameter
-    k = 4
 
     def __init__(self, file):
         self.filename = file
-        # self.__y, self.__sr = librosa.load(file, sr = None)
-        # print('load ' + file, 'sr', self.__sr)
 
 
     def calc_beats(self):
         return
 
-test_value = 101
-
-
-def foo(*arg):
-    for a in arg: print(a, end=' ')
-    print()
-
-
 
 if __name__ == '__main__':
     print(__name__)
 
-    tree = ElementTree.parse('/Users/xuchao/Documents/python/MusicLevelAutoGen/test.xml')
-    root = tree.getroot()
-    for node in root:
-        print(node.tag, node.attrib)
+    # tree = ElementTree.parse('/Users/xuchao/Documents/python/MusicLevelAutoGen/test.xml')
+    # root = tree.getroot()
+    # for node in root:
+    #     print(node.tag, node.attrib)
 
 
     # with open('eggs.csv', 'w', newline='') as csvfile:
@@ -53,5 +40,8 @@ if __name__ == '__main__':
 
     # a = input()
     # print(a)
+
+    # scipy six decorator scikit-learn audioread numpy, resampy, joblib
+
 
     

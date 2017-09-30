@@ -38,7 +38,7 @@ import logger
 #############################
 # First, we'll load in a song
 
-def calc_segment(y, sr, k = 4):
+def calc_segment(y, sr, k = 5):
     ##############################################
     # Next, we'll compute and plot a log-power CQT
     BINS_PER_OCTAVE = 12 * 3
