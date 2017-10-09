@@ -2,9 +2,9 @@
 import logger
 from xml.etree import ElementTree  
 import numpy as np
-import librosa
-
-
+import os
+import io
+import sys
 
 class tradition_mode_autogen:
 
@@ -17,8 +17,43 @@ class tradition_mode_autogen:
         return
 
 
+def parse_level_info(tree):
+    root = tree.getroot()
+    levelInfo = root.find('LevelInfo')
+    node = levelInfo.find('BPM')
+    bpm = float(node.text)
+    # num bar node = levelInfo.find('BarAmount')
+    node = levelInfo.find('EnterTime')
+    et = float(node.text)
+    print(bpm, et)
+    return bpm, et
+
+
+def load_levels(path):
+    for f in os.listdir(path):
+        ext = os.path.splitext(f)[1]
+
+        if (ext != '.xml'):
+            continue
+        
+        pathname = os.path.join(path, f)
+        xmlparser = ElementTree.XMLParser(encoding='utf-8')
+        tree = ElementTree.parse(pathname, parser=xmlparser)
+        parse_level_info(tree)
+
+
+
 if __name__ == '__main__':
     print(__name__)
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
+    # xmlp = ElementTree.XMLParser(encoding="utf-8")  
+    # f = ElementTree.parse('/Users/xuchao/Documents/python/MusicLevelAutoGen/level/sync0018.xml',parser=xmlp)
+
+    load_levels('/Users/xuchao/Documents/python/MusicLevelAutoGen/level')
+    # dir = os.listdir('/Users/xuchao/Documents/python/MusicLevelAutoGen/level')
+    # for f in dir:
+    #     print(os.path.join('/Users/xuchao/Documents/python/MusicLevelAutoGen/level', f))
+    # print(dir)
 
     # tree = ElementTree.parse('/Users/xuchao/Documents/python/MusicLevelAutoGen/test.xml')
     # root = tree.getroot()
