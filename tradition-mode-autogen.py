@@ -8,7 +8,6 @@ import sys
 
 class tradition_mode_autogen:
 
-
     def __init__(self, file):
         self.filename = file
 
@@ -30,6 +29,7 @@ def parse_level_info(tree):
 
 
 def load_levels(path):
+    infos = []
     for f in os.listdir(path):
         ext = os.path.splitext(f)[1]
 
@@ -39,8 +39,21 @@ def load_levels(path):
         pathname = os.path.join(path, f)
         xmlparser = ElementTree.XMLParser(encoding='utf-8')
         tree = ElementTree.parse(pathname, parser=xmlparser)
-        parse_level_info(tree)
+        bpm, et = parse_level_info(tree)
+        level = {'bpm':str(bpm), 'ET':str(et)}
+        infos.append(level)
 
+    return infos
+
+def save_level_info(pathname, infos):
+
+    root = ElementTree.Element('LevelInfo')
+    tree = ElementTree.ElementTree(root)
+    for level in infos:
+        node = ElementTree.Element('level', attrib=level)       
+        root.append(node)
+
+    tree.write(pathname)
 
 
 if __name__ == '__main__':
@@ -49,7 +62,8 @@ if __name__ == '__main__':
     # xmlp = ElementTree.XMLParser(encoding="utf-8")  
     # f = ElementTree.parse('/Users/xuchao/Documents/python/MusicLevelAutoGen/level/sync0018.xml',parser=xmlp)
 
-    load_levels('/Users/xuchao/Documents/python/MusicLevelAutoGen/level')
+    infos = load_levels('/Users/xuchao/Documents/python/MusicLevelAutoGen/level')
+    save_level_info('/Users/xuchao/Documents/python/MusicLevelAutoGen/levle-infos.xml', infos)
     # dir = os.listdir('/Users/xuchao/Documents/python/MusicLevelAutoGen/level')
     # for f in dir:
     #     print(os.path.join('/Users/xuchao/Documents/python/MusicLevelAutoGen/level', f))
