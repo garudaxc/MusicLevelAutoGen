@@ -7,6 +7,7 @@ import LevelInfo
 import logger
 import multiprocessing as mp
 import time
+import logger
 
 def save_file(beats, mp3filename, postfix = ''):
     outname = os.path.splitext(mp3filename)[0]
@@ -23,29 +24,28 @@ def do_work(filelist, levelInfo, processer, downbeatTracking, result):
     print('process ', os.getpid())
     for file in filelist:
         id = os.path.basename(file).split('.')[0]
-        levelId = levelInfo[id]
+        level = levelInfo[id]
+        enterTime = float(level[1]) / 1000.0
 
         print('id', id)
         act = processer(file)
         beat = downbeatTracking(act)
-        #downbeat = madmom.features.downbeats.filter_downbeats(beat)
+        downbeat = madmom.features.downbeats.filter_downbeats(beat)
 
-        beat = beat[:,0]
-        intervals = beat[1:] - beat[:-1]
-        aver = np.average(intervals)
+        beat = beat[:,0]    
 
-        #print('average', aver)
-
-        bpm = 60.0 / aver
-        print(id, 'bpm', bpm)
+        beatInter = (beat[-1] - beat[0]) / (len(beat) - 1)
+        bpm = 60.0 / beatInter
         # print('bpm in level', level[0])
 
-        variance = (intervals - aver) ** 2
-        variance = np.sum(variance)
-        #print('variance', variance)
+        downbeatInter = beatInter * 4
+        downbeatDiff = abs(downbeat[0] - enterTime) % downbeatInter
+        if downbeatDiff > (0.5 * downbeatInter):
+            downbeatDiff = downbeatInter - downbeatDiff        
 
-        r = {'id':id, 'bpm':bpm, 'bil':levelId[0], 'variance':variance}
-        result.put(r)
+        r = {'id':id, 'bpm':bpm, 'bil':level[0], 'downbeatDiff':downbeatDiff}
+        r2 = [id, bpm, level[0], downbeat[0], enterTime, downbeatDiff]
+        result.put(r2)
 
 
 def test():
@@ -59,11 +59,22 @@ def test():
     filename = r'd:\librosa\炫舞自动关卡生成\庄心妍 - 繁星点点.mp3'
     filename = r'D:\librosa\炫舞自动关卡生成\music\100003.mp3'
 
-    levelInfo = LevelInfo.load_levelinfo_file('D:/librosa/炫舞自动关卡生成/level-infos.xml')
+    if os.name == 'posix':
+        filename = '/Users/xuchao/Music/网易云音乐/G.E.M.邓紫棋 - 后会无期.mp3'
+        filename = '/Users/xuchao/Music/网易云音乐/李健 - 绽放.mp3'
+        filename = '/Users/xuchao/Music/网易云音乐/Good Time.mp3'
+        filename = '/Users/xuchao/Music/网易云音乐/金志文 - 哭给你听.mp3'
+        filename = '/Users/xuchao/Music/网易云音乐/薛之谦 - 我好像在哪见过你.mp3'
+        filename = '/Users/xuchao/Music/网易云音乐/萧敬腾 - 王妃.mp3'
+        filename = '/Users/xuchao/Music/网易云音乐/小沈阳 - 我的好兄弟.mp3'
+        filename = '/Users/xuchao/Music/网易云音乐/极乐净土.mp3'         #enterTime = 2.349
+        filename = '/Users/xuchao/Music/网易云音乐/信乐团 - 海阔天空.mp3'
 
-    id = os.path.basename(filename).split('.')[0]
-    level = levelInfo[id]
-    enterTime = float(level[1]) / 1000.0
+    levelInfo = LevelInfo.load_levelinfo_file('D:/librosa/炫舞自动关卡生成/level-infos.xml')
+    if levelInfo != None:
+        id = os.path.basename(filename).split('.')[0]
+        level = levelInfo[id]
+        enterTime = float(level[1]) / 1000.0
     
     processer = madmom.features.downbeats.RNNDownBeatProcessor()
     downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, fps=100)
@@ -72,33 +83,20 @@ def test():
     beat = downbeatTracking(act)
     downbeat = madmom.features.downbeats.filter_downbeats(beat)
 
-    #print(downbeat)
-    # index = int(5 - beat[0, 1]) % 4
-    # print('index', index)
-    # downbeat = beat[:,0][index::4]
-    # print(downbeat)
-
     beat = beat[:,0]
-    #save_file(beat, filename, '_beat')
+    # save_file(beat, filename, '_beat')
 
-    intervals = beat[1:] - beat[:-1]
-    #print(intervals)
-    aver = np.average(intervals)
-    print('average', aver)
-
-    bpm = 60.0 / aver
+    beatInter = (beat[-1] - beat[0]) / (len(beat) - 1)
+    bpm = 60.0 / beatInter
     print('bpm', bpm)
-    print('bpm in level', level[0])
 
-    variance = (intervals - aver) ** 2
-    variance = np.sum(variance)
-    print('variance', variance)
-    
-    downbeatInter = aver * 4
-    downbeatDiff = abs(downbeat[0] - enterTime) % downbeatInter
-    if downbeatDiff > (0.5 * downbeatInter):
-        downbeatDiff = downbeatInter - downbeatDiff
-    print('downbeatInter', downbeatInter, 'downbeat diff', downbeatDiff, 'enter time', enterTime)
+    if levelInfo != None:
+        downbeatInter = beatInter * 4
+        downbeatDiff = abs(downbeat[0] - enterTime) % downbeatInter
+        if downbeatDiff > (0.5 * downbeatInter):
+            downbeatDiff = downbeatInter - downbeatDiff
+        print('downbeat0', downbeat[0])
+        print('downbeatInter', downbeatInter, 'downbeat diff', downbeatDiff, 'enter time', enterTime)
 
     save_file(downbeat, filename, '_downbeat')
 
@@ -123,7 +121,9 @@ def doMultiProcess(numWorker = 4):
 
     for i in range(len(filelist)):
         r = queue.get(True)
-        print(r)
+        s = str.format('{0}, {1}, {2}, {3}, {4}, {5}', *r)        
+        print(s)
+        logger.info(s)
 
     for t in processes:
         t.join()    
@@ -131,10 +131,7 @@ def doMultiProcess(numWorker = 4):
     print('done')
 
 
-def calcEnterTime():
-    file = r'D:/librosa/炫舞自动关卡生成/music/100002.mp3'
-
-
 
 if __name__ == '__main__':
-    test()
+    
+    #test()

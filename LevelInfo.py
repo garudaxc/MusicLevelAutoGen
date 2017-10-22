@@ -60,6 +60,9 @@ def save_level_info(filename, infos):
     tree.write(filename, encoding="utf-8",xml_declaration=True)
 
 def load_levelinfo_file(filename):
+    if not os.path.exists(filename):
+        return None
+
     xmlparser = ElementTree.XMLParser(encoding='utf-8')
     tree = ElementTree.parse(filename, parser=xmlparser)
     root = tree.getroot()
