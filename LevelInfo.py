@@ -15,20 +15,22 @@ class tradition_mode_autogen:
         return
 
 def parse_level_info(tree):
-    root = tree.getroot() #level
+    #root = tree.getroot() #level
+    root = tree
     levelInfo = root.find('LevelInfo')
     node = levelInfo.find('BPM')
     bpm = float(node.text)
     # num bar node = levelInfo.find('BarAmount')
-    node = levelInfo.find('EnterTimeAdjust')
+    node = levelInfo.find('EnterTime')
     et = float(node.text)
 
     musicInfo = root.find('MusicInfo')
-    title = musicInfo.find('Title').text
-    artist = musicInfo.find('Artist').text
-    id = musicInfo.find('FilePath').text.split('/')[-1]
+    # title = musicInfo.find('Title').text
+    # artist = musicInfo.find('Artist').text
+    id = musicInfo.find('FilePath').text.split('_')[-1]
+    id = id.split('.')[0]
 
-    info = {'id':id, 'bpm':str(bpm), 'et':str(et), 'title':title, 'artist':artist}
+    info = {'id':id, 'bpm':str(bpm), 'et':str(et)}
     print(info)
     return info
 
@@ -42,8 +44,12 @@ def load_levels(path):
             continue
         
         pathname = os.path.join(path, f)
+        text=open(pathname).read()
         xmlparser = ElementTree.XMLParser(encoding='utf-8')
-        tree = ElementTree.parse(pathname, parser=xmlparser)
+        print(pathname)
+        #tree = ElementTree.parse(pathname, parser=xmlparser)
+        tree = ElementTree.fromstring(text)
+        
         info = parse_level_info(tree)
         infos.append(info)
 
@@ -62,9 +68,10 @@ def save_level_info(filename, infos):
 def load_levelinfo_file(filename):
     if not os.path.exists(filename):
         return None
-
+    
     xmlparser = ElementTree.XMLParser(encoding='utf-8')
     tree = ElementTree.parse(filename, parser=xmlparser)
+    #tree = ElementTree.fromstring(text)
     root = tree.getroot()
     infos = {}
     for l in root.iter('level'):
@@ -76,8 +83,8 @@ def load_levelinfo_file(filename):
 
 def test1(path):   
 
-    infos = load_levels(path + 'level')
-    save_level_info(path + 'level-infos.xml', infos)
+    infos = load_levels(path)
+    save_level_info(path + '../level-infos.xml', infos)
 
 
 if __name__ == '__main__':
@@ -85,7 +92,7 @@ if __name__ == '__main__':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
 
     if os.name == 'nt':
-        path = r'D:/librosa/炫舞自动关卡生成/'
+        path = r'D:/ab/QQX5_Mainland/exe/resources/level/test/'
     else :
         path = r'/Users/xuchao/Documents/python/MusicLevelAutoGen/'
 

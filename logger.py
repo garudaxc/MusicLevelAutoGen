@@ -13,6 +13,7 @@ class Logger:
         str = self.__make_string(objs)
         
         self.file.write('info: '+str+'\n')
+        self.file.flush()
         if self.to_console:
             print(str)
 
