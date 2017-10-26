@@ -85,8 +85,7 @@ def diff(beats, a):
     cnt = int(numBeat / 3)
     
     m, i1 = min_measure(mean[:cnt], dist[:cnt])
-    logger.info(m, ' ', i1)
-    
+    #logger.info(m, ' ', i1)    
     m, i2 = min_measure(mean[-cnt:], dist[-cnt:])
     
     i2 = numBeat - cnt + i2
@@ -106,9 +105,32 @@ def calc_beat_interval(beats, i1, i2):
     b2 = beats[i2] - a2 * i2
     
     return a2, b1
-    
 
-def calc_bpm():
+
+def CalcBPM(beat_times):
+    numBeats = len(beat_times)
+    itvals = beat_intervals(beat_times)
+    #logger.info('mean ' + str(mean))
+
+    #最小二乘计算固定间隔拍子·
+    a, b = MSL(beat_times)    
+
+    #计算头，尾两处相对准确的拍子，进一步计算更准确的拍子间隔
+    i1, i2 = diff(itvals, a)
+    a, b = calc_beat_interval(beat_times, i1, i2)
+    # 将b补偿到最近的正数位置
+    # compensate = int(min(0, b//a))
+    # b -= compensate * a
+    # numBeats += compensate
+    # logger.info('a b ', a, b)
+
+    # new_beat_times = np.arange(numBeats) * a + b
+
+    bpm = 60.0 / a
+    return bpm
+
+
+def doWork():
     logger.init('calc_bpm.log', to_console=False)
     
     if len(sys.argv) < 2:
