@@ -9,6 +9,7 @@ import multiprocessing as mp
 import time
 import logger
 import calc_bpm
+import matplotlib.pyplot as plt
 
 
 FPS = 100
@@ -97,13 +98,15 @@ def calcDownBeat(beat, firstBeat, lastBeat):
     downbeat = madmom.features.downbeats.filter_downbeats(newBeat)
 
     newBeat = newBeat[:,0]
-    bpm = calc_bpm.CalcBPM(newBeat)
-    beatInter = 60.0 / bpm
+    barInter, et = calc_bpm.CalcBarInterval(downbeat)
 
-    et = downbeat[0]
-    while (et - beatInter * 4) > firstBeatTime:
-        et = (et - beatInter * 4)
+    #et = downbeat[0]
+    print('first down beat', et)
+    while (et - barInter) > firstBeatTime:
+        et = (et - barInter)
     
+    bpm = 240.0 / barInter
+
     return bpm, et
 
 def SaveDownbeat(bpm, et, lastBeat, filename):
@@ -123,12 +126,13 @@ def test():
     filename = r'd:\librosa\炫舞自动关卡生成\测试歌曲\拍子不准\夏天Alex - 不再联系.mp3'
     filename = r'd:\librosa\炫舞自动关卡生成\测试歌曲\拍子不准\CNBLUE- LOVE.mp3' #不准
     filename = r'd:\librosa\炫舞自动关卡生成\庄心妍 - 繁星点点.mp3'
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1453.ogg'
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1351.ogg'
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1446.ogg'
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1363.ogg'
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1417.ogg'
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1409.ogg'
+    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1370.ogg'
+    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1374.ogg'
+    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1352.ogg'
+    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1347.ogg'
 
     if os.name == 'posix':
         filename = '/Users/xuchao/Music/网易云音乐/G.E.M.邓紫棋 - 后会无期.mp3'
@@ -149,8 +153,7 @@ def test():
         etManual = float(level[1]) / 1000.0
     
     processer = madmom.features.downbeats.RNNDownBeatProcessor()
-    downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, fps=FPS)
-    
+    downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda=1000, fps=FPS)    
 
     act = processer(filename)
     beat = downbeatTracking(act)
@@ -186,11 +189,18 @@ def doMultiProcess(numWorker = 4):
     errLog = logger.Logger('error.log', to_console=True)
 
     filelist = list_file(r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music')
-    filelist = filelist[350:390]
-    # filelist = [r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1421.ogg',
-    # r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1424.ogg',
-    # # r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1417.ogg',    
-    # r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1427.ogg',]
+    filelist = filelist[200:230]
+
+    idlist = [1266, 1407, 1404, 1262]
+    idlist = [1254, 1400, 1446, 1447, 1449, 1462, 1463, 1465, 1475, 1478, 1488, 1491] #拍子减半
+    idlist = [1262, 1279, 1374, 1391] #差两拍
+    idlist = [1347, 1426] #差拍
+    idlist = [1245] #不准
+    idlist = []
+
+    if len(idlist) > 0:
+        filelist = [r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_%d.ogg' % i for i in idlist]
+
     
     lists = [filelist[i::numWorker] for i in range(numWorker)]
     queue = mp.Queue()
@@ -198,7 +208,7 @@ def doMultiProcess(numWorker = 4):
     levelInfo = LevelInfo.load_levelinfo_file('D:/ab/QQX5_Mainland/exe/resources/level/level-infos.xml')
 
     processer = madmom.features.downbeats.RNNDownBeatProcessor()
-    downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, fps=FPS)
+    downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda = 1000, fps=FPS)
 
     processes = []
 
@@ -226,10 +236,26 @@ def doMultiProcess(numWorker = 4):
 
     print('done')
 
+def study():
+    
+    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1409.ogg'
+    processer = madmom.features.downbeats.RNNDownBeatProcessor()
+    downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, fps=FPS)    
+
+    act = processer(filename)
+
+    beatPropo = act[:,0]
+    downbeatPropo = act[:,1]
+
+    plt.plot(beatPropo)
+    plt.show()
+
+
 
 
 if __name__ == '__main__':    
-    doMultiProcess(3)
+    doMultiProcess(4)
     #test()
+    #study()
 
 

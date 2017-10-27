@@ -107,7 +107,7 @@ def calc_beat_interval(beats, i1, i2):
     return a2, b1
 
 
-def CalcBPM(beat_times):
+def CalcBarInterval(beat_times):
     numBeats = len(beat_times)
     itvals = beat_intervals(beat_times)
     #logger.info('mean ' + str(mean))
@@ -119,15 +119,13 @@ def CalcBPM(beat_times):
     i1, i2 = diff(itvals, a)
     a, b = calc_beat_interval(beat_times, i1, i2)
     # 将b补偿到最近的正数位置
-    # compensate = int(min(0, b//a))
-    # b -= compensate * a
+    compensate = int(min(0, b//a))
+    b -= compensate * a
     # numBeats += compensate
     # logger.info('a b ', a, b)
 
     # new_beat_times = np.arange(numBeats) * a + b
-
-    bpm = 60.0 / a
-    return bpm
+    return a, b
 
 
 def doWork():
