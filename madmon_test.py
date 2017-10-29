@@ -119,13 +119,6 @@ def SaveDownbeat(bpm, et, lastBeat, filename):
 
 def test():
     
-    filename = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Lily Allen - Hard Out Here.mp3'
-    filename = r'd:\librosa\炫舞自动关卡生成\测试歌曲\Sam Tsui - Make It Up.mp3'
-    filename = r'd:\librosa\炫舞自动关卡生成\测试歌曲\T-ara Falling U.mp3' #不准
-    filename = r'd:\librosa\炫舞自动关卡生成\测试歌曲\拍子不准\王心凌 - 灰姑娘的眼泪 (电音版).mp3'
-    filename = r'd:\librosa\炫舞自动关卡生成\测试歌曲\拍子不准\夏天Alex - 不再联系.mp3'
-    filename = r'd:\librosa\炫舞自动关卡生成\测试歌曲\拍子不准\CNBLUE- LOVE.mp3' #不准
-    filename = r'd:\librosa\炫舞自动关卡生成\庄心妍 - 繁星点点.mp3'
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1351.ogg'
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1446.ogg'
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1417.ogg'
@@ -145,6 +138,23 @@ def test():
         filename = '/Users/xuchao/Music/网易云音乐/极乐净土.mp3'         #enterTime = 2.349
         filename = '/Users/xuchao/Music/网易云音乐/信乐团 - 海阔天空.mp3'
 
+
+    idlist = [1254, 1400, 1446, 1447, 1449, 1462, 1463, 1465, 1475, 1478, 1488, 1491] #拍子减半
+    # 1400 快了一倍？
+    # 1254 1447 1488 1491 觉得没问题
+    # 1463 bpm对,et 差两拍
+    # 1446 查乐谱是对的
+    idlist = ['Nightwish - Bye Bye Beautiful', '胡夏 - 爱夏', 'See You Again', '王力宏 - 就是现在', '林俊杰 - 你有没有过', '拜你所赐', 'Bad Blood', '林昕阳 - 外婆的澎湖湾']
+
+    path = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_%d.ogg'
+    if os.name == 'posix':
+        path = '/Users/xuchao/Music/网易云音乐/%s.mp3'
+
+    if len(idlist) > 0:
+        filelist = [path % i for i in idlist]
+        filename = filelist[0]
+        
+
     levelInfo = LevelInfo.load_levelinfo_file('D:/ab/QQX5_Mainland/exe/resources/level/level-infos.xml')
     if levelInfo != None:
         id = os.path.basename(filename).split('.')[0]
@@ -155,6 +165,7 @@ def test():
     processer = madmom.features.downbeats.RNNDownBeatProcessor()
     downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda=1000, fps=FPS)    
 
+    print(filename)
     act = processer(filename)
     beat = downbeatTracking(act)
     downbeat_orig = madmom.features.downbeats.filter_downbeats(beat)
@@ -167,6 +178,7 @@ def test():
 
     bpm, etAuto = calcDownBeat(beat, firstBeat, lastBeat)
     beatInter = 60.0 / bpm
+    print('bpm', bpm)
     # beat = beat[:,0]
     # # save_file(beat, filename, '_beat')
 
@@ -182,7 +194,7 @@ def test():
 
     lastBeat = beat[-1, 0]
     SaveDownbeat(bpm, etAuto, lastBeat, filename)
-    save_file(downbeat_orig, filename, '_downbeatorig')
+    #save_file(downbeat_orig, filename, '_downbeatorig')
 
 def doMultiProcess(numWorker = 4):
     resLog = logger.Logger('result.log', to_console=True)
@@ -198,8 +210,12 @@ def doMultiProcess(numWorker = 4):
     idlist = [1245] #不准
     idlist = []
 
+    path = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_%d.ogg'
+    if os.name == 'posix':
+        path = '/Users/xuchao/Music/网易云音乐/%s.mp3'
+
     if len(idlist) > 0:
-        filelist = [r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_%d.ogg' % i for i in idlist]
+        filelist = [path % i for i in idlist]
 
     
     lists = [filelist[i::numWorker] for i in range(numWorker)]
@@ -254,8 +270,8 @@ def study():
 
 
 if __name__ == '__main__':    
-    doMultiProcess(4)
-    #test()
+    #doMultiProcess(4)
+    test()
     #study()
 
 
