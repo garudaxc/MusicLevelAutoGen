@@ -10,6 +10,7 @@ import time
 import logger
 import calc_bpm
 import matplotlib.pyplot as plt
+import time
 
 
 FPS = 100
@@ -29,6 +30,14 @@ def do_work(filelist, levelInfo, processer, downbeatTracking, result):
     for file in filelist:
         id = os.path.basename(file).split('.')[0]
         id = id.split('_')[-1]
+
+        try:            
+            level = levelInfo[id]
+        except:
+            r = [id, -1, 0]
+            result.put(r)
+            continue
+
         level = levelInfo[id]
         etManual = float(level[1]) / 1000.0
 
@@ -197,18 +206,15 @@ def test():
     #save_file(downbeat_orig, filename, '_downbeatorig')
 
 def doMultiProcess(numWorker = 4):
-    resLog = logger.Logger('result.log', to_console=True)
-    errLog = logger.Logger('error.log', to_console=True)
+    err0Log = logger.Logger('error0.log', to_console=True)
+    err1Log = logger.Logger('error1.log', to_console=True)
 
     filelist = list_file(r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music')
-    filelist = filelist[200:230]
+    filelist = filelist[10:20]
 
-    idlist = [1266, 1407, 1404, 1262]
     idlist = [1254, 1400, 1446, 1447, 1449, 1462, 1463, 1465, 1475, 1478, 1488, 1491] #拍子减半
     idlist = [1262, 1279, 1374, 1391] #差两拍
-    idlist = [1347, 1426] #差拍
-    idlist = [1245] #不准
-    idlist = []
+    idlist = [1245] #bpm有点不准
 
     path = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_%d.ogg'
     if os.name == 'posix':
@@ -226,6 +232,8 @@ def doMultiProcess(numWorker = 4):
     processer = madmom.features.downbeats.RNNDownBeatProcessor()
     downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda = 1000, fps=FPS)
 
+    startTime = time.time()
+    numError = 0
     processes = []
 
     for i in range(numWorker):
@@ -238,19 +246,26 @@ def doMultiProcess(numWorker = 4):
         r = queue.get(True)
         if r[1] == -1:
             s = str.format('{0}, too many abnormal rate {1}', r[0], r[2])
-            errLog.info(s)
+            err0Log.info(s)
         else :
             s = str.format('{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}', *r) 
             # 小节时长差别应该小于1毫秒
+
             if abs(r[3] - r[4]) > 0.001:
-                errLog.info(s)
+                err0Log.info(s)
+                numError = numError + 1
+            elif r[7] > 0.06:
+                err1Log.info(s)
+                numError = numError + 1
             else:
-                resLog.info(s)
+                logger.info(s)
 
     for t in processes:
         t.join()    
 
-    print('done')
+    print()
+    print('done in %.1f minute' % ((time.time() - startTime) / 60.0))
+    print('%d abnormal in %d samples' % (numError, len(filelist)))
 
 def study():
     
@@ -270,8 +285,8 @@ def study():
 
 
 if __name__ == '__main__':    
-    #doMultiProcess(4)
-    test()
+    doMultiProcess(4)
+    #test()
     #study()
 
 

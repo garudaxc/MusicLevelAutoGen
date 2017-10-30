@@ -46,7 +46,7 @@ def load_levels(path):
         pathname = os.path.join(path, f)
         text=open(pathname).read()
         xmlparser = ElementTree.XMLParser(encoding='utf-8')
-        print(pathname)
+        #print(pathname)
         #tree = ElementTree.parse(pathname, parser=xmlparser)
         tree = ElementTree.fromstring(text)
         
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
 
     if os.name == 'nt':
-        path = r'D:/ab/QQX5_Mainland/exe/resources/level/test/'
+        path = r'D:/ab/QQX5_Mainland/exe/resources/level/game_level/'
     else :
         path = r'/Users/xuchao/Documents/python/MusicLevelAutoGen/'
 
