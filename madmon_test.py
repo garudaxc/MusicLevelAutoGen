@@ -210,11 +210,12 @@ def doMultiProcess(numWorker = 4):
     err1Log = logger.Logger('error1.log', to_console=True)
 
     filelist = list_file(r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music')
-    filelist = filelist[10:20]
+    filelist = filelist[0:1000]
 
     idlist = [1254, 1400, 1446, 1447, 1449, 1462, 1463, 1465, 1475, 1478, 1488, 1491] #拍子减半
     idlist = [1262, 1279, 1374, 1391] #差两拍
     idlist = [1245] #bpm有点不准
+    idlist = []
 
     path = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_%d.ogg'
     if os.name == 'posix':
@@ -281,6 +282,8 @@ def study():
     plt.plot(beatPropo)
     plt.show()
 
+
+def studyOnset():
 
 
 
