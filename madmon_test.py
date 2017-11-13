@@ -210,7 +210,7 @@ def doMultiProcess(numWorker = 4):
     err1Log = logger.Logger('error1.log', to_console=True)
 
     filelist = list_file(r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music')
-    filelist = filelist[0:1000]
+    filelist = filelist[300:330]
 
     idlist = [1254, 1400, 1446, 1447, 1449, 1462, 1463, 1465, 1475, 1478, 1488, 1491] #拍子减半
     idlist = [1262, 1279, 1374, 1391] #差两拍
@@ -281,10 +281,6 @@ def study():
 
     plt.plot(beatPropo)
     plt.show()
-
-
-def studyOnset():
-
 
 
 if __name__ == '__main__':    
