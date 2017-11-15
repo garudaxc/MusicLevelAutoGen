@@ -87,6 +87,25 @@ def test1(path):
     save_level_info(path + '../level-infos.xml', infos)
 
 
+
+def LoadIdolInfo(pathname):
+    text=open(pathname).read()
+    xmlparser = ElementTree.XMLParser(encoding='utf-8')
+    tree = ElementTree.fromstring(text)
+
+    root = tree
+    levelInfo = root.find('LevelInfo')
+    node = levelInfo.find('BPM')
+    bpm = float(node.text)
+    node = levelInfo.find('EnterTimeAdjust')
+    et = float(node.text)
+
+    noteInfo = root.find('NoteInfo')
+
+    print(bpm, et)
+
+
+
 if __name__ == '__main__':
     
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
@@ -96,7 +115,9 @@ if __name__ == '__main__':
     else :
         path = r'/Users/xuchao/Documents/python/MusicLevelAutoGen/'
 
-    test1(path)
+    LoadIdolInfo(path + 'idol_100002.xml')
+
+    # test1(path)
 
     #load_levelinfo_file(path + 'level-infos.xml')
 
