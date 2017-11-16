@@ -4,6 +4,7 @@ import numpy as np
 import os
 import io
 import sys
+from struct import *
 
 class tradition_mode_autogen:
 
@@ -86,10 +87,15 @@ def test1(path):
     infos = load_levels(path)
     save_level_info(path + '../level-infos.xml', infos)
 
+def TransfromNotes(bpm, enterTime, notes):
+    barInterval = (60.0 / bpm) * 4
+    posInterval = barInterval / 64
 
+    result = [n[0] * barInterval + n[1] * posInterval + enterTime for n in notes]
+    return result
 
 def LoadIdolInfo(pathname):
-    text=open(pathname).read()
+    text=open(pathname, encoding='utf-8').read()
     xmlparser = ElementTree.XMLParser(encoding='utf-8')
     tree = ElementTree.fromstring(text)
 
@@ -98,24 +104,130 @@ def LoadIdolInfo(pathname):
     node = levelInfo.find('BPM')
     bpm = float(node.text)
     node = levelInfo.find('EnterTimeAdjust')
-    et = float(node.text)
+    et = float(node.text) / 1000.0
 
-    noteInfo = root.find('NoteInfo')
+    
+    notesNode = root.find('NoteInfo').find('Normal')
+    notes = []
+    for e in notesNode:
+        n = e
+        # 组合音符取第一个音符
+        if e.tag == 'CombineNote':
+            n = e[0]
+        
+        bar = int(n.attrib['Bar'])
+        pos = int(n.attrib['Pos'])
+        notes.append((bar, pos))
+        # print(bar, pos)
+
+    # unique
+    notes = list(set(notes))
+    notes = TransfromNotes(bpm, et, notes)
+    return notes
 
     print(bpm, et)
 
 
+def ReadAndOffset(fmt, buffer, offset):
+    r = unpack_from(fmt, buffer, offset)
+    offset += calcsize(fmt)
+    return r, offset
+
+
+def LoadRhythmMasterLevel(pathname):
+    with open(pathname, 'rb') as file:
+        data = file.read()
+        
+    offset = 0
+    r, offset = ReadAndOffset('2i', data, offset)
+    totalTime = r[0]
+    numTrunk = r[1]
+    print('total time', totalTime)
+
+    offset += calcsize('3i')    
+    r = unpack_from('i', data, offset)
+    interval = r[0]
+    print('interval', interval)
+
+    # 跳过一段数据
+    offset += calcsize('3i') * int(totalTime / interval)
+    r, offset = ReadAndOffset('h', data, offset)
+    print(r)
+    assert r[0] == 771
+
+    r, offset = ReadAndOffset('i', data, offset)
+    numNote = r[0]
+    print(numNote)
+    
+    combineNoteFlag = 0x20
+    cnBegin = 0x40
+    cnEnd = 0x80
+
+    slideNote = 0x01
+    longNote = 0x02
+
+    notes = []
+    for i in range(numNote):
+        r, offset = ReadAndOffset('=BBiBi', data, offset)
+
+        op = r[0]
+        time = float(r[2]) / 1000.0
+        track = r[3]
+        val = r[4]
+
+        if (op & combineNoteFlag == combineNoteFlag):
+            if op & op & cnBegin:
+                notes.append(time)
+               # print("combine note %x time %f" % (op, time))
+            continue
+        
+        if op & slideNote == slideNote:
+            notes.append(time)
+            print('slide note')
+            continue
+            
+        if op & longNote == longNote:
+            notes.append(time)
+            #print('long note during %d' % (val))
+            continue
+
+        # print("touch note %d %x %x" % (i, op, val))
+        
+    notes = list(set(notes))
+    return notes
+
+    
+
+def save_file(beats, mp3filename, postfix = ''):
+    outname = os.path.splitext(mp3filename)[0]
+    outname = outname + postfix + '.csv'
+    with open(outname, 'w') as file:
+        for obj in beats:
+            file.write(str(obj) + '\n')
+
+    return True
 
 if __name__ == '__main__':
     
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
+    #import madmon_test
+    #sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
 
     if os.name == 'nt':
         path = r'D:/ab/QQX5_Mainland/exe/resources/level/game_level/'
     else :
         path = r'/Users/xuchao/Documents/python/MusicLevelAutoGen/'
 
-    LoadIdolInfo(path + 'idol_100002.xml')
+    #LoadIdolInfo(path + 'idol_100002.xml')
+    if False:
+        pathname = r'D:\librosa\炫舞自动关卡生成\level\idol_100052.xml'
+        notes = LoadIdolInfo(pathname)
+        madmon_test.save_file(notes, pathname, '_notes')
+
+    filename = r'E:\download\AI\4minuteshm\4minuteshm_4k_nm_copy.imd'
+    filename = r'E:\download\AI\aibujieshi\aibujieshi_4k_nm.imd'
+    notes = LoadRhythmMasterLevel(filename)
+    # save_file(notes, filename, '_time')
+
 
     # test1(path)
 
