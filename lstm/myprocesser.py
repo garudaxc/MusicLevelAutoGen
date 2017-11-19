@@ -1,7 +1,6 @@
-
+# coding=UTF-8
 import numpy as np
 import madmom
-
 import librosa
 import librosa.display
 import matplotlib.pyplot as plt
@@ -19,7 +18,6 @@ from madmom.audio.spectrogram import (
 
 
 def CreateProcesser():
-
     # define pre-processing chain
     sig = SignalProcessor(num_channels=1, sample_rate=44100)
     # process the multi-resolution spec & diff in parallel
@@ -44,26 +42,27 @@ def CreateProcesser():
 
 
 
-def TestWrite():
+def TestWrite(pathname):
     pre_processor = CreateProcesser()
 
-    idlist = [100052] #bpm有点不准
-    #idlist = []
-    path = r'd:\librosa\炫舞自动关卡生成\music\%d.mp3' % idlist[0]
-
-    d = pre_processor(path)
+    d = pre_processor(pathname)
     print(type(d))
     print (d.shape)
 
-    with open('d:/test.pk', 'wb') as file:
-        pickle.dump(d, file)
+    # with open('d:/test.pk', 'wb') as file:
+    #     pickle.dump(d, file)
 
     return d
 
+def LoadAndProcessAudio(pathname):
+    pre_processor = CreateProcesser()
+    d = pre_processor(pathname)
+    print('audio processed ', d.shape)
+    return d
 
-def TestRead():
+def TestRead(pathname):
     d = None
-    with open('d:/test.pk', 'rb') as file:
+    with open(pathname, 'rb') as file:
         d = pickle.load(file)
     
     print(type(d))
@@ -75,20 +74,30 @@ def TestRead():
     return d
 
 
-# d1 = TestWrite()
-d2 = TestRead()
+def MainTest():
+    idlist = [100052] #bpm有点不准
+    #idlist = []
+    path = r'd:\librosa\炫舞自动关卡生成\music\%d.mp3' % idlist[0]
 
-t = d2[6000:6002]
-t = np.array(t)
+    pathname = '/Users/xuchao/Documents/rhythmMaster/abracadabra/abracadabra.mp3'
 
-#print(t)
+    TestWrite(pathname)
+    return
 
-t = t.reshape(t.shape[0], 1, t.shape[1])
-print(t)
+    d2 = TestRead(pathname)
+    print(d2.shape)
 
-print('asdfasdfdsf')
-print(t.shape)
+    t = d2[6000:6002]
+    t = np.array(t)
+    #print(t)
 
-print(t[0].reshape(1, 1, 314))
+    t = t.reshape(t.shape[0], 1, t.shape[1])
+    print(t)
+    print(t.shape)
+
+    print(t[0].reshape(1, 1, 314))
 
 
+if __name__ == '__main__':
+    MainTest()
+    

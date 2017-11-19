@@ -1,3 +1,4 @@
+# coding=UTF-8
 import logger
 from xml.etree import ElementTree  
 import numpy as np
@@ -142,22 +143,20 @@ def LoadRhythmMasterLevel(pathname):
     r, offset = ReadAndOffset('2i', data, offset)
     totalTime = r[0]
     numTrunk = r[1]
-    print('total time', totalTime)
+    print('total time', totalTime, 'trunk', numTrunk)
 
-    offset += calcsize('3i')    
-    r = unpack_from('i', data, offset)
-    interval = r[0]
+    r = unpack_from('4i', data, offset)
+    interval = r[-1]
     print('interval', interval)
 
     # 跳过一段数据
-    offset += calcsize('3i') * int(totalTime / interval)
+    offset += calcsize('3i') * numTrunk
     r, offset = ReadAndOffset('h', data, offset)
-    print(r)
-    assert r[0] == 771
+    assert r[0] == 0x0303
 
     r, offset = ReadAndOffset('i', data, offset)
     numNote = r[0]
-    print(numNote)
+    print('numNote', numNote)
     
     combineNoteFlag = 0x20
     cnBegin = 0x40
@@ -171,41 +170,62 @@ def LoadRhythmMasterLevel(pathname):
         r, offset = ReadAndOffset('=BBiBi', data, offset)
 
         op = r[0]
-        time = float(r[2]) / 1000.0
+        time = r[2]
         track = r[3]
         val = r[4]
 
+        # if track != 0 and track != 1:
+        #     continue
+
         if (op & combineNoteFlag == combineNoteFlag):
             if op & op & cnBegin:
-                notes.append(time)
+                notes.append((time, 3, 0))
                # print("combine note %x time %f" % (op, time))
             continue
         
         if op & slideNote == slideNote:
-            notes.append(time)
-            print('slide note')
+            notes.append((time, 1, 0))
+            print('slide note track ', track)
             continue
             
         if op & longNote == longNote:
-            notes.append(time)
+            notes.append((time, 2, val))
             #print('long note during %d' % (val))
             continue
 
-        # print("touch note %d %x %x" % (i, op, val))
+        notes.append((time, 0, 0))
+        #print("touch note %d %x %x" % (i, op, val))
         
     notes = list(set(notes))
     return notes
-
     
 
-def save_file(beats, mp3filename, postfix = ''):
-    outname = os.path.splitext(mp3filename)[0]
+def SaveInstantValue(beats, filename, postfix = ''):
+    outname = os.path.splitext(filename)[0]
     outname = outname + postfix + '.csv'
     with open(outname, 'w') as file:
         for obj in beats:
             file.write(str(obj) + '\n')
 
     return True
+
+def SaveNote(notes, filename, postfix = ''):
+    outname = os.path.splitext(filename)[0]
+    outname = outname + postfix + '.csv'
+    print('save', outname)
+    with open(outname, 'w') as file:
+        for v in notes:
+            time, type, last = v[0], v[1] * 4 + 10, v[2]
+            if last == 0:
+                last = 50
+            s = '%d,%d,%d\n' % (time, type, last)
+            file.write(s)
+            if type == 14:
+                s = '%d,%d,%d\n' % (time, 13, last)
+                file.write(s)
+                s = '%d,%d,%d\n' % (time, 12, last)
+                file.write(s)
+        print('done')
 
 if __name__ == '__main__':
     
@@ -225,8 +245,11 @@ if __name__ == '__main__':
 
     filename = r'E:\download\AI\4minuteshm\4minuteshm_4k_nm_copy.imd'
     filename = r'E:\download\AI\aibujieshi\aibujieshi_4k_nm.imd'
+    filename = '/Users/xuchao/Documents/rhythmMaster/4minuteshm/4minuteshm_4k_nm.imd'
+    filename = '/Users/xuchao/Documents/rhythmMaster/abracadabra/abracadabra_4k_hd.imd'
     notes = LoadRhythmMasterLevel(filename)
-    # save_file(notes, filename, '_time')
+    SaveNote(notes, filename, '_notes')
+    # SaveInstantValue(notes, filename, '_time')
 
 
     # test1(path)

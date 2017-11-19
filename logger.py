@@ -1,7 +1,7 @@
 
 class Logger:
     def __init__(self, filename = 'default.log', to_console = False):
-        self.file = open(filename, 'w', encoding='utf-8')
+        self.file = open(filename, 'w')
         self.to_console = to_console
 
     def __make_string(self, objs):
