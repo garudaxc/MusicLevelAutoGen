@@ -1,8 +1,14 @@
 # coding=UTF-8
 import numpy as np
+
+import os
+if os.name == 'nt':
+    import sys
+    sys.path.append(r'D:\librosa\madmom')
+
 import madmom
-import librosa
-import librosa.display
+# import librosa
+# import librosa.display
 import matplotlib.pyplot as plt
 import pickle
 
@@ -79,7 +85,13 @@ def MainTest():
     #idlist = []
     path = r'd:\librosa\炫舞自动关卡生成\music\%d.mp3' % idlist[0]
 
-    pathname = '/Users/xuchao/Documents/rhythmMaster/abracadabra/abracadabra.mp3'
+    path = '/Users/xuchao/Documents/rhythmMaster/'
+    if os.name == 'nt':
+        path = 'D:/librosa/RhythmMaster/'
+
+    songName = 'aiqingfadeguang'
+
+    pathname = '%s%s/%s.mp3' % (path, songName, songName)
 
     TestWrite(pathname)
     return

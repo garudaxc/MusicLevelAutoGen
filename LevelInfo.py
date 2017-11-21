@@ -185,7 +185,7 @@ def LoadRhythmMasterLevel(pathname):
         
         if op & slideNote == slideNote:
             notes.append((time, 1, 0))
-            print('slide note track ', track)
+            #print('slide note track ', track)
             continue
             
         if op & longNote == longNote:
@@ -243,12 +243,18 @@ if __name__ == '__main__':
         notes = LoadIdolInfo(pathname)
         madmon_test.save_file(notes, pathname, '_notes')
 
-    filename = r'E:\download\AI\4minuteshm\4minuteshm_4k_nm_copy.imd'
-    filename = r'E:\download\AI\aibujieshi\aibujieshi_4k_nm.imd'
-    filename = '/Users/xuchao/Documents/rhythmMaster/4minuteshm/4minuteshm_4k_nm.imd'
-    filename = '/Users/xuchao/Documents/rhythmMaster/abracadabra/abracadabra_4k_hd.imd'
-    notes = LoadRhythmMasterLevel(filename)
-    SaveNote(notes, filename, '_notes')
+
+    
+    path = '/Users/xuchao/Documents/rhythmMaster/'
+    if os.name == 'nt':
+        path = 'D:/librosa/RhythmMaster/'
+
+    songName = '4minuteshm'
+
+    pathname = '%s%s/%s_4k_nm.imd' % (path, songName, songName)
+
+    notes = LoadRhythmMasterLevel(pathname)
+    SaveNote(notes, pathname, '_notes')
     # SaveInstantValue(notes, filename, '_time')
 
 
