@@ -7,16 +7,9 @@ import io
 import sys
 from struct import *
 
-class tradition_mode_autogen:
-
-    def __init__(self, file):
-        self.filename = file
-
-
-    def calc_beats(self):
-        return
 
 def parse_level_info(tree):
+    #解析传统关卡中的bpm和et
     #root = tree.getroot() #level
     root = tree
     levelInfo = root.find('LevelInfo')
@@ -38,6 +31,7 @@ def parse_level_info(tree):
 
 
 def load_levels(path):
+    # 遍历目录下的xml，
     infos = []
     for f in os.listdir(path):
         ext = os.path.splitext(f)[1]
@@ -57,17 +51,9 @@ def load_levels(path):
 
     return infos
 
-def save_level_info(filename, infos):
-
-    root = ElementTree.Element('LevelInfo')
-    tree = ElementTree.ElementTree(root)
-    for level in infos:
-        node = ElementTree.Element('level', attrib=level)       
-        root.append(node)
-
-    tree.write(filename, encoding="utf-8",xml_declaration=True)
 
 def load_levelinfo_file(filename):
+    # 加载集合好的关卡信息
     if not os.path.exists(filename):
         return None
     
@@ -77,16 +63,24 @@ def load_levelinfo_file(filename):
     root = tree.getroot()
     infos = {}
     for l in root.iter('level'):
-        attri = l.attrib
-        #print(attri)
-        id = attri['id']
-        infos[id] = [attri['bpm'], attri['et']]
+        attrib = l.attribb
+        #print(attrib)
+        id = attrib['id']
+        infos[id] = [attrib['bpm'], attrib['et']]
     return infos
 
-def test1(path):   
-
+def CollectLevelInfo(path):   
+    #加载所有传统对局的bpm和et，写到单独文件里
     infos = load_levels(path)
-    save_level_info(path + '../level-infos.xml', infos)
+
+    filename = path + '../level-infos.xml'
+    root = ElementTree.Element('LevelInfo')
+    tree = ElementTree.ElementTree(root)
+    for level in infos:
+        node = ElementTree.Element('level', attribb=level)       
+        root.append(node)
+
+    tree.write(filename, encoding="utf-8",xml_declaration=True)
 
 def TransfromNotes(bpm, enterTime, notes):
     barInterval = (60.0 / bpm) * 4
@@ -96,6 +90,7 @@ def TransfromNotes(bpm, enterTime, notes):
     return result
 
 def LoadIdolInfo(pathname):
+    #加载心动模式关卡
     text=open(pathname, encoding='utf-8').read()
     xmlparser = ElementTree.XMLParser(encoding='utf-8')
     tree = ElementTree.fromstring(text)
@@ -106,7 +101,6 @@ def LoadIdolInfo(pathname):
     bpm = float(node.text)
     node = levelInfo.find('EnterTimeAdjust')
     et = float(node.text) / 1000.0
-
     
     notesNode = root.find('NoteInfo').find('Normal')
     notes = []
@@ -116,8 +110,8 @@ def LoadIdolInfo(pathname):
         if e.tag == 'CombineNote':
             n = e[0]
         
-        bar = int(n.attrib['Bar'])
-        pos = int(n.attrib['Pos'])
+        bar = int(n.attribb['Bar'])
+        pos = int(n.attribb['Pos'])
         notes.append((bar, pos))
         # print(bar, pos)
 
@@ -136,6 +130,7 @@ def ReadAndOffset(fmt, buffer, offset):
 
 
 def LoadRhythmMasterLevel(pathname):
+    #加载节奏大师关卡
     with open(pathname, 'rb') as file:
         data = file.read()
         
@@ -166,6 +161,7 @@ def LoadRhythmMasterLevel(pathname):
     longNote = 0x02
 
     notes = []
+    combineNode = []
     for i in range(numNote):
         r, offset = ReadAndOffset('=BBiBi', data, offset)
 
@@ -178,9 +174,26 @@ def LoadRhythmMasterLevel(pathname):
         #     continue
 
         if (op & combineNoteFlag == combineNoteFlag):
-            if op & op & cnBegin:
-                notes.append((time, 3, 0))
-               # print("combine note %x time %f" % (op, time))
+            
+            if op & cnBegin == cnBegin:
+                pass
+                # notes.append((time, 3, 0))
+                # print("c%d begin time %d" % (i, time))
+
+            if op & slideNote == slideNote:
+                combineNode.append((time, 1, 0))
+                #print('c%d slide time %d' % (i, time))
+
+            if op & longNote == longNote:
+                combineNode.append((time, 2, val))
+                #print('c%d long time %d last %d' % (i, time, val))
+                
+            if op & cnEnd == cnEnd:
+                notes.append((combineNode[0][0], 3, combineNode))
+                #print('combine note with %d elements' % (len(combineNode)))
+                combineNode = []
+                #print('c%d end time %d' % (i, time))
+
             continue
         
         if op & slideNote == slideNote:
@@ -196,11 +209,12 @@ def LoadRhythmMasterLevel(pathname):
         notes.append((time, 0, 0))
         #print("touch note %d %x %x" % (i, op, val))
         
-    notes = list(set(notes))
+    #notes = list(set(notes))
     return notes
     
 
 def SaveInstantValue(beats, filename, postfix = ''):
+    #保存时间点数据
     outname = os.path.splitext(filename)[0]
     outname = outname + postfix + '.csv'
     with open(outname, 'w') as file:
@@ -210,22 +224,89 @@ def SaveInstantValue(beats, filename, postfix = ''):
     return True
 
 def SaveNote(notes, filename, postfix = ''):
+    #保存音符数据
     outname = os.path.splitext(filename)[0]
     outname = outname + postfix + '.csv'
     print('save', outname)
     with open(outname, 'w') as file:
         for v in notes:
-            time, type, last = v[0], v[1] * 4 + 10, v[2]
+            time, type, last = v[0], v[1], v[2]
+            if type == 3:
+                continue
             if last == 0:
-                last = 50
-            s = '%d,%d,%d\n' % (time, type, last)
+                last = 30
+            s = '%d,%d,%d\n' % (time, type * 6 + 20, last)
             file.write(s)
-            if type == 14:
-                s = '%d,%d,%d\n' % (time, 13, last)
+            if type == 1:
+                s = '%d,%d,%d\n' % (time, type * 6 + 18, last)
                 file.write(s)
-                s = '%d,%d,%d\n' % (time, 12, last)
+                s = '%d,%d,%d\n' % (time, type * 6 + 22, last)
                 file.write(s)
         print('done')
+
+
+
+def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
+    #保存到心动模式关卡文件
+    text=open(r'D:\librosa\MusicLevelAutoGen\idol_template.xml', encoding='utf-8').read()
+    xmlparser = ElementTree.XMLParser(encoding='utf-8')
+    tree = ElementTree.fromstring(text)
+
+    lastNote = notes[-1]
+    lastBar = lastNote[0]
+
+    totalBar  = lastBar + 1
+
+    trackName = ('Left1', 'Left2', 'Right1', 'Right2')
+
+    # 删除前面8小节和最后2小节的音符
+    notes = [note for note in notes if note[0] > 7 and note[0] < lastBar - 1]
+    print('number of notes', len(notes))
+
+    root = tree
+    levelInfo = root.find('LevelInfo')
+    node = levelInfo.find('BPM')
+    node.text = str(bpm)
+    node = levelInfo.find('EnterTimeAdjust')
+    node.text = str(et)    
+    node = levelInfo.find('LevelTime')
+    node.text = str(musicTime)
+    node = levelInfo.find('BarAmount')
+    node.text = str(totalBar)
+    
+    SectionSeq = root.find('SectionSeq')
+    for node in SectionSeq:
+        if node.attrib['type'] == 'note':
+            node.attrib['endbar'] = str(totalBar - 2)
+        if node.attrib['type'] == 'showtime':
+            node.attrib['startbar'] = str(totalBar - 1)
+            node.attrib['endbar'] = str(totalBar)
+
+    notesNode = root.find('NoteInfo').find('Normal')
+    notesNode.clear()
+    for note in notes:
+        e = ElementTree.Element('Note')
+        e.attrib['Bar'] = str(note[0]+1)
+        e.attrib['Pos'] = str(note[1])
+        e.attrib['from_track'] = trackName[note[2]]
+        e.attrib['target_track'] = trackName[note[2]]
+        e.attrib['note_type'] = 'short'
+        notesNode.append(e)
+    
+    camera = root.find('CameraSeq').find('Camera')
+    camera.attrib['end_bar'] = str(totalBar)
+       
+    DancerSort = root.find('DancerSort')
+    DancerSort.clear()
+    for i in range(15, totalBar-2, 2):
+        e = ElementTree.Element('Bar')
+        e.text = str(i)
+        DancerSort.append(e)
+    
+    t = ElementTree.ElementTree(root)
+    t.write(filename, encoding="utf-8",xml_declaration=True)
+
+
 
 if __name__ == '__main__':
     

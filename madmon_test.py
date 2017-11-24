@@ -270,22 +270,31 @@ def doMultiProcess(numWorker = 4):
 
 def study():
     
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1409.ogg'
+    filename = r'd:\librosa\RhythmMaster\4minuteshm\4minuteshm.mp3'
+    filename = r'd:\leveledtior\client\Assets\resources\audio\bgm\4minuteshm.m4a'
+    
     processer = madmom.features.downbeats.RNNDownBeatProcessor()
-    downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, fps=FPS)    
-
+    downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda = 1000, fps=FPS)
     act = processer(filename)
 
-    beatPropo = act[:,0]
-    downbeatPropo = act[:,1]
+    print('samples', act.shape)
 
-    plt.plot(beatPropo)
-    plt.show()
+    beat = downbeatTracking(act)
+    firstBeat, lastBeat = normalizeInterval(beat)
+
+    if firstBeat == -1:
+        print('%s generate error, abnormal rate %f' % (id, lastBeat))
+        r = [id, -1, lastBeat]
+        result.put(r)
+        return
+
+    bpm, etAuto = calcDownBeat(beat, firstBeat, lastBeat)
+    print('bpm', bpm, 'et', etAuto)
 
 
 if __name__ == '__main__':    
-    doMultiProcess(4)
+    #doMultiProcess(4)
     #test()
-    #study()
+    study()
 
 
