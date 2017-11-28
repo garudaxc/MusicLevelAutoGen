@@ -244,6 +244,99 @@ def SaveNote(notes, filename, postfix = ''):
                 file.write(s)
         print('done')
 
+def LoadMidi(filename):
+    with open(filename, 'rb') as file:        
+        data = file.read()
+        
+    offset = 0
+    r, offset = ReadAndOffset('4s', data, offset)
+    if r[0].decode() != 'MThd':
+        print(filename, 'is not midi file')
+    
+    r, offset = ReadAndOffset('>i3H', data, offset)
+    filetype = r[1]
+    numTrack = r[2]
+    tpq = r[3]
+
+    #for i in range(numTrack):
+    r, offset = ReadAndOffset('4s', data, offset)
+    print(r)
+    assert r[0].decode() == 'MTrk'
+    r, offset = ReadAndOffset('>i', data, offset)
+    size = r[0]
+    print(size)
+
+def PackAndOffset(buffer, offset, fmt, *args):
+    pack_into(fmt, buffer, offset, *args)
+    size = calcsize(fmt)
+    return size + offset
+
+def CopyBuffer(target, offset, source):
+    assert type(source) == bytes or type(source) == bytearray
+    size = len(source)
+    target[offset:offset+size] = source
+    return offset + size
+
+def WriteNote(buffer, deltaTime):
+    pass
+
+def MultibyteLength(n):
+    numBytes = 1
+    i = n // 128
+    while i > 0:
+        numBytes += 1
+        i = i // 128
+    r = bytearray(numBytes)
+    for i in range(numBytes):
+        r[-1-i] = ((n >> (i * 7)) & 0x7f) | 0x80
+    r[-1] &= 0x7f
+    print(r.hex())
+    return r
+    
+
+def SaveMidi(filename, notes, bpm = 120.0):
+    beatInterval = 60000 / (bpm * 960)
+    noteLen = int(960 / 8)
+
+    with open(filename, 'wb') as file:
+        file.write('MThd'.encode())
+        file.write(pack('>iHHH', 6, 1, 2, 960))
+
+        buffer = bytearray(8192)
+        file.write('MTrk'.encode())
+
+        # track 0
+        size = 0
+        size = CopyBuffer(buffer, size, bytes.fromhex('00ff03'))
+        trackname = 'meta track'
+        size = PackAndOffset(buffer, size, 'b', len(trackname))
+        size = CopyBuffer(buffer, size, trackname.encode())
+        size = CopyBuffer(buffer, size, bytes.fromhex('00ff2f00'))
+        file.write(pack('>i', size))
+        file.write(buffer[:size])
+
+        # track 1
+        file.write('MTrk'.encode())
+        size = 0
+        # write a empty string
+        size = CopyBuffer(buffer, size, bytes.fromhex('00ff03'))
+        size = PackAndOffset(buffer, size, 'b', 0)
+        timepoint = 0
+        for note in notes:
+            t = int(note[0] / beatInterval)
+            deltaT = t - timepoint
+            size = CopyBuffer(buffer, size, MultibyteLength(deltaT))
+            # key press 9 chanel 0 note C4(48) velocity 127
+            size = CopyBuffer(buffer, size, bytes.fromhex('90307f'))
+
+            size = CopyBuffer(buffer, size, MultibyteLength(noteLen))
+            # key press 9 chanel 0 note C4(48) velocity 127
+            size = CopyBuffer(buffer, size, bytes.fromhex('903000'))
+            timepoint = t + noteLen
+        
+        file.write(pack('>i', size))
+        file.write(buffer[:size])
+        file.flush()            
 
 
 def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
@@ -325,42 +418,27 @@ if __name__ == '__main__':
         madmon_test.save_file(notes, pathname, '_notes')
 
 
-    
-    path = '/Users/xuchao/Documents/rhythmMaster/'
-    if os.name == 'nt':
-        path = 'D:/librosa/RhythmMaster/'
+    if False:    
+        path = '/Users/xuchao/Documents/rhythmMaster/'
+        if os.name == 'nt':
+            path = 'D:/librosa/RhythmMaster/'
 
-    songName = '4minuteshm'
+        songName = '4minuteshm'
 
-    pathname = '%s%s/%s_4k_nm.imd' % (path, songName, songName)
+        pathname = '%s%s/%s_4k_nm.imd' % (path, songName, songName)
 
-    notes = LoadRhythmMasterLevel(pathname)
-    SaveNote(notes, pathname, '_notes')
+        notes = LoadRhythmMasterLevel(pathname)
+        SaveNote(notes, pathname, '_notes')
     # SaveInstantValue(notes, filename, '_time')
 
 
-    # test1(path)
+    filename = r'd:/miditest_out.mid'
+    # LoadMidi(filename)
 
-    #load_levelinfo_file(path + 'level-infos.xml')
-
-    # dir = os.listdir('/Users/xuchao/Documents/python/MusicLevelAutoGen/level')
-    # for f in dir:
-    #     print(os.path.join('/Users/xuchao/Documents/python/MusicLevelAutoGen/level', f))
-    # print(dir)
-
-
-    # with open('eggs.csv', 'w', newline='') as csvfile:
-    #     spamwriter = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-    #     spamwriter.writerow(['Spam'] * 5 + ['Baked Beans'])
-    #     spamwriter.writerow(['Spam', 'Lovely Spam', 'Wonderful Spam'])
-
-    #     a = [[1, 2], [3, 4]]
-    #     list(map(spamwriter.writerow, a))
+    MultibyteLength(7680)
+    MultibyteLength(480)
+    MultibyteLength(0)
+    # SaveMidi(filename, None)
 
     # a = input()
     # print(a)
-
-    # scipy six decorator scikit-learn audioread numpy, resampy, joblib
-
-
-    

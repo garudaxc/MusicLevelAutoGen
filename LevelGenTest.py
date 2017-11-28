@@ -253,7 +253,10 @@ def Evaluate2():
     if useSoftmax:
         predicts = predicts[:,1]
 
-    notes = postprocess.TrainDataToLevelData(predicts, 0, acceptThrehold)    
+    notes = postprocess.TrainDataToLevelData(predicts, 0, acceptThrehold)
+
+    LevelInfo.SaveMidi('d:/test_out.midi', notes)
+    return
 
     bpm = 124.973963758
     et = 1937
