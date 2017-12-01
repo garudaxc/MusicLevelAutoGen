@@ -198,7 +198,7 @@ def LoadRhythmMasterLevel(pathname):
         
         if op & slideNote == slideNote:
             notes.append((time, 1, 0))
-            #print('slide note track ', track)
+            # print('slide note track ', track)
             continue
             
         if op & longNote == longNote:
@@ -213,7 +213,7 @@ def LoadRhythmMasterLevel(pathname):
     return notes
     
 
-def SaveInstantValue(beats, filename, postfix = ''):
+def SaveInstantValue(beats, filename, postfix=''):
     #保存时间点数据
     outname = os.path.splitext(filename)[0]
     outname = outname + postfix + '.csv'
@@ -222,6 +222,7 @@ def SaveInstantValue(beats, filename, postfix = ''):
             file.write(str(obj) + '\n')
 
     return True
+
 
 def SaveNote(notes, filename, postfix = ''):
     #保存音符数据

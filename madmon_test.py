@@ -2,7 +2,7 @@ import madmom
 import numpy as np
 from os import listdir
 import os.path
-import librosa
+# import librosa
 import LevelInfo
 import logger
 import multiprocessing as mp
@@ -10,15 +10,20 @@ import time
 import logger
 import calc_bpm
 import matplotlib.pyplot as plt
-import time
 
 
 FPS = 100
 
-def save_file(beats, mp3filename, postfix = ''):
-    outname = os.path.splitext(mp3filename)[0]
+def SaveInstantValue(beats, filename, postfix = ''):
+    #保存时间点数据
+    outname = os.path.splitext(filename)[0]
     outname = outname + postfix + '.csv'
-    librosa.output.times_csv(outname, beats)
+    with open(outname, 'w') as file:
+        for obj in beats:
+            file.write(str(obj) + '\n')
+
+    return True
+
 
 def list_file(path):
     files = [os.path.join(path, f) for f in listdir(path) if os.path.splitext(f)[1] in ('.mp3', '.m4a', '.ogg')]
@@ -291,10 +296,26 @@ def study():
     bpm, etAuto = calcDownBeat(beat, firstBeat, lastBeat)
     print('bpm', bpm, 'et', etAuto)
 
+def OnsetTest():
+    onsetPorc = madmom.features.onsets.CNNOnsetProcessor()
+    
+    filename = r'd:\librosa\RhythmMaster\4minuteshm\4minuteshm.mp3'
+    samples = onsetPorc(filename)
+
+    picker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=0.99, smooth=0.0, fps=100)
+    onsettime = picker(samples)
+    print(len(onsettime))
+    # print(onsettime)
+
+    SaveInstantValue(onsettime, filename, '_onset')    
+
+
+
 
 if __name__ == '__main__':    
     #doMultiProcess(4)
     #test()
-    study()
+    # study()
+    OnsetTest()
 
 

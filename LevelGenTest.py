@@ -6,7 +6,7 @@ import numpy as np
 import lstm.myprocesser
 import keras
 from keras.models import Sequential
-from keras.layers import LSTM, Dense, Dropout
+from keras.layers import LSTM, Dense, Dropout, RNN, SimpleRNN
 from keras.layers import Bidirectional
 from sklearn.metrics import mean_squared_error
 
@@ -118,6 +118,42 @@ def BuildLSTM(data_dim = 16, batch_size = 64, fitSize = 1, useSoftmax = False):
         #model.compile(loss='mean_squared_error', optimizer='sgd')
 
     return model
+
+
+def BuildRNN(data_dim = 16, batch_size = 64, fitSize = 1, useSoftmax = False):
+    
+    timesteps = 1
+    units = 30
+    stateful = False
+
+    # Expected input batch shape: (batch_size, timesteps, data_dim)
+    # Note that we have to provide the full batch_input_shape since the network is stateful.
+    # the sample of index i in batch k is the follow-up for the sample i in batch k-1.
+    model = Sequential()
+    model.add(Bidirectional(SimpleRNN(units, return_sequences=True, stateful=stateful,
+                ), batch_input_shape=(batch_size, timesteps, data_dim)))
+
+    model.add(Bidirectional(SimpleRNN(units, return_sequences=True, stateful=stateful)))
+    model.add(Bidirectional(SimpleRNN(units, stateful=stateful)))
+    #model.add(Dropout(0.5))
+
+    if useSoftmax:
+        opti = keras.optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=1e-08, decay=0.0)
+        opti = keras.optimizers.Adam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+        model.add(Dense(fitSize, activation='softmax')) 
+        model.compile(loss='binary_crossentropy',
+                    optimizer='adam', metrics=['mae', 'acc'])
+        # model.compile(loss='binary_crossentropy',
+        #             optimizer='rmsprop', metrics=['mae', 'acc'])
+        print('build network with softmax activation')
+    else:
+        model.add(Dense(fitSize, activation='sigmoid'))
+
+        #            metrics=['accuracy']
+        model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mae', 'acc'])
+        #model.compile(loss='mean_squared_error', optimizer='sgd')
+
+    return model
     
 def FillNote(data, note):
     index = note[0] // 10
@@ -175,7 +211,7 @@ def Test():
     batch_size = 512
     useSoftmax = False
     units = 30
-    epochs = 100
+    epochs = 120
 
     trainx, trainy = PrepareTrainData(songList, batch_size, useSoftmax)
     
@@ -186,6 +222,7 @@ def Test():
     fitsize = trainy.shape[1]
 
     model = BuildLSTM(data_dim = 314, batch_size = batch_size, fitSize = fitsize, useSoftmax = useSoftmax)
+    # model = BuildRNN(data_dim = 314, batch_size = batch_size, fitSize = fitsize, useSoftmax = useSoftmax)
     
     stopCallback = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=20, verbose=1, mode='min')
     
@@ -197,13 +234,10 @@ def Test():
         model.reset_states()
         print('epoch ', i)
 
-    keras.models.save_model(model, 'd:/mymodel.mdl')
+    keras.models.save_model(model, 'd:/rnn_model.mdl')
+    Evaluate(model)
+    
 
-    Evaluate(model)
-    
-    model = keras.models.load_model('d:/mymodel.mdl')
-    
-    Evaluate(model)
 
 
 def Evaluate(model):
@@ -266,8 +300,8 @@ def Evaluate2():
 
 
 if __name__ == '__main__':                                                                                                                                                                
-    # Test()
+    Test()
         
     # model = keras.models.load_model('d:/mymodel.mdl')    
     # Evaluate(model)
-    Evaluate2()
+    # Evaluate2()
