@@ -127,7 +127,7 @@ def SaveDownbeat(bpm, et, lastBeat, filename):
     downbeatInter = 240.0 / bpm
     numBar = ((lastBeat - et) // downbeatInter) + 1
     downbeat = np.arange(numBar) * downbeatInter + et
-    save_file(downbeat, filename, '_downbeat')
+    SaveInstantValue(downbeat, filename, '_downbeat')
 
 
 
@@ -217,10 +217,10 @@ def doMultiProcess(numWorker = 4):
     filelist = list_file(r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music')
     filelist = filelist[300:330]
 
-    idlist = [1254, 1400, 1446, 1447, 1449, 1462, 1463, 1465, 1475, 1478, 1488, 1491] #拍子减半
     idlist = [1262, 1279, 1374, 1391] #差两拍
-    idlist = [1245] #bpm有点不准
     idlist = []
+    idlist = [1254, 1400, 1446, 1447, 1449, 1462, 1463, 1465, 1475, 1478, 1488, 1491] #拍子减半
+    idlist = [1245] #bpm有点不准
 
     path = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_%d.ogg'
     if os.name == 'posix':
@@ -313,9 +313,9 @@ def OnsetTest():
 
 
 if __name__ == '__main__':    
-    #doMultiProcess(4)
+    doMultiProcess(1)
     #test()
     # study()
-    OnsetTest()
+    # OnsetTest()
 
 

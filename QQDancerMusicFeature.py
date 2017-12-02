@@ -138,19 +138,17 @@ def CalcDownbeat(filename):
 
     print('begin')
     startTime = time.time()
-    y, sr = librosa.load(filename, mono=True, offset=20, duration=100, sr=44100)
+    y, sr = librosa.load(filename, mono=True, offset=20, duration=100, sr=44100) 
+    print('time in %.1f' % ((time.time() - startTime)))
 
+    beatProba = RNNDownBeatProcessor(num_threads=4)(y)
     print('time in %.1f' % ((time.time() - startTime)))
-    beatProba = RNNDownBeatProcessor()(y)
-    
-    print('time in %.1f' % ((time.time() - startTime)))
+
     beatIndex = DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda=1000, fps=100)(beatProba)
     
-    print('time in %.1f' % ((time.time() - startTime)))
     firstBeat, lastBeat = normalizeInterval(beatIndex)
     
     print('time in %.1f' % ((time.time() - startTime)))
-
 
     if firstBeat == -1:        
         print('%s generate error, abnormal rate %f' % (id, lastBeat))
@@ -184,3 +182,5 @@ if __name__ == '__main__':
     filename = r'f:\music\英语听力 - 大卫·科波菲尔04.mp3'
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1351.ogg'
     CalcDownbeat(filename)
+
+    # import madmom.ml.nn.layers

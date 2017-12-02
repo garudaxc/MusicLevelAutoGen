@@ -63,7 +63,7 @@ def load_levelinfo_file(filename):
     root = tree.getroot()
     infos = {}
     for l in root.iter('level'):
-        attrib = l.attribb
+        attrib = l.attrib
         #print(attrib)
         id = attrib['id']
         infos[id] = [attrib['bpm'], attrib['et']]
