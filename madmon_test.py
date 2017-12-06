@@ -10,6 +10,7 @@ import time
 import logger
 import calc_bpm
 import matplotlib.pyplot as plt
+import librosa
 
 
 FPS = 100
@@ -76,6 +77,88 @@ def do_work(filelist, levelInfo, processer, downbeatTracking, result):
         SaveDownbeat(bpm, etAuto, lastBeat, file)
 
 
+
+
+def do_work2(filelist, levelInfo, processer, downbeatTracking, result):
+    print('process ', os.getpid())
+    for file in filelist:
+        id = os.path.basename(file).split('.')[0]
+        id = id.split('_')[-1]
+
+        try:            
+            level = levelInfo[id]
+        except:
+            r = [id, -1, 0]
+            result.put(r)
+            continue
+
+        level = levelInfo[id]
+        etManual = float(level[1]) / 1000.0
+
+        print('id', id)
+            
+        y, sr = librosa.load(file, mono=True, sr=44100)
+        duration = librosa.get_duration(y=y, sr=sr)
+        start = int(duration * 0.3)
+        clipTime = np.array([start, start+90])
+        print('duration', duration, 'start', start)
+        clip = librosa.time_to_samples(clipTime, sr=sr)
+        print('total', y.shape, 'clip', clip)
+        yy = y[clip[0]:clip[1]]
+
+
+        act = processer(yy)
+        beat = downbeatTracking(act)
+        firstBeat, lastBeat = CalcAbnormal(beat)        
+
+        if firstBeat == -1:
+            print('%s generate error, abnormal rate %f' % (id, lastBeat))
+            r = [id, -1, lastBeat, 0, 0, 0, 0, 0]
+            result.put(r)
+            continue
+
+        # first 10 seconds samples
+        yy = y[:441000]
+        act = processer(yy)
+        beginBeat = downbeatTracking(act)                    
+        firstBeatTime = beginBeat[0, 0]
+
+        # newBeat = beat[firstBeat:lastBeat]
+        newBeat = beat
+        downbeat = madmom.features.downbeats.filter_downbeats(newBeat)
+        
+        downbeat = downbeat + start
+        barInter, etAuto = calc_bpm.CalcBarInterval2(downbeat)
+
+        #et = downbeat[0]
+        print('first down beat', etAuto)
+        if abs(etAuto - firstBeatTime) > barInter:
+            etAuto += ((firstBeatTime - etAuto) // barInter + 1) * barInter
+
+        assert abs(etAuto - firstBeatTime) < barInter
+        
+        bpm = 240.0 / barInter
+
+        beatInter = 60.0 / bpm
+        # beat = beat[:,0]
+        # # save_file(beat, filename, '_beat')
+
+        if levelInfo != None:
+            barManual = 240.0 / float(level[0])
+            barAuto = beatInter * 4
+
+            etDiff = abs(etAuto - etManual) % barAuto
+            if etDiff > (0.5 * barAuto):
+                etDiff = barAuto - etDiff    
+            r2 = [id, bpm, float(level[0]), barAuto, barManual, etAuto, etManual, etDiff]
+            result.put(r2)
+
+        lastBeat = beat[-1, 0]
+        SaveDownbeat(bpm, etAuto, lastBeat, file)
+
+
+
+
 def normalizeInterval(beat, threhold = 0.03):
     interval = beat[1:,0] - beat[:-1, 0]
 
@@ -106,12 +189,30 @@ def normalizeInterval(beat, threhold = 0.03):
 
     return count0, len(beat) - count1
 
+
+
+def CalcAbnormal(beat, threhold = 0.02):
+    interval = beat[1:,0] - beat[:-1, 0]
+
+    aver = np.average(interval)
+    diff = np.abs(interval - aver)
+
+    abnormal = np.nonzero(diff > threhold)[0]
+    print('abnormal count', abnormal.size, abnormal)
+
+    if abnormal.size > beat.shape[0] / 3:
+        # 拍子均匀程度太低，自动生成失败
+        return -1, abnormal.size / beat.shape[0]
+
+    return 0, len(beat)
+
+
+
 def calcDownBeat(beat, firstBeat, lastBeat):
     firstBeatTime = beat[0, 0]
     newBeat = beat[firstBeat:lastBeat]
     downbeat = madmom.features.downbeats.filter_downbeats(newBeat)
 
-    newBeat = newBeat[:,0]
     barInter, et = calc_bpm.CalcBarInterval(downbeat)
 
     #et = downbeat[0]
@@ -215,12 +316,12 @@ def doMultiProcess(numWorker = 4):
     err1Log = logger.Logger('error1.log', to_console=True)
 
     filelist = list_file(r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music')
-    filelist = filelist[300:330]
+    filelist = filelist[1000:1100]
 
     idlist = [1262, 1279, 1374, 1391] #差两拍
-    idlist = []
     idlist = [1254, 1400, 1446, 1447, 1449, 1462, 1463, 1465, 1475, 1478, 1488, 1491] #拍子减半
     idlist = [1245] #bpm有点不准
+    idlist = [1374, 1370]
 
     path = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_%d.ogg'
     if os.name == 'posix':
@@ -244,17 +345,20 @@ def doMultiProcess(numWorker = 4):
 
     for i in range(numWorker):
         if len(lists[i]) > 0:
-            t = mp.Process(target=do_work, args=(lists[i], levelInfo, processer, downbeatTracking, queue))
+            t = mp.Process(target=do_work2, args=(lists[i], levelInfo, processer, downbeatTracking, queue))
             processes.append(t)
             t.start()
 
+    header = 'id\tbpm\tlevelbpm\tbarAuto\tbarManual\tetAuto\tetManual\tetDiff'
+    err0Log.info(header)
+    err1Log.info(header)
     for i in range(len(filelist)):
         r = queue.get(True)
         if r[1] == -1:
             s = str.format('{0}, too many abnormal rate {1}', r[0], r[2])
             err0Log.info(s)
         else :
-            s = str.format('{0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}', *r) 
+            s = str.format('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}', *r) 
             # 小节时长差别应该小于1毫秒
 
             if abs(r[3] - r[4]) > 0.001:
@@ -313,7 +417,7 @@ def OnsetTest():
 
 
 if __name__ == '__main__':    
-    doMultiProcess(1)
+    doMultiProcess(8)
     #test()
     # study()
     # OnsetTest()

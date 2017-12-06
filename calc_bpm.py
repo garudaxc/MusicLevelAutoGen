@@ -128,6 +128,22 @@ def CalcBarInterval(beat_times):
     return a, b
 
 
+
+def CalcBarInterval2(beat_times):
+    numBeats = len(beat_times)
+    itvals = beat_intervals(beat_times)
+    #logger.info('mean ' + str(mean))
+
+    #最小二乘计算固定间隔拍子·
+    a, b = MSL(beat_times)  
+    compensate = int(min(0, b//a))
+    b -= compensate * a
+
+    # new_beat_times = np.arange(numBeats) * a + b
+    return a, b
+
+
+
 def doWork():
     logger.init('calc_bpm.log', to_console=False)
     

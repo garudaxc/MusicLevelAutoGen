@@ -245,22 +245,29 @@ def Evaluate(model):
     batch_size = 512
     acceptThrehold = 0.2
 
+    t = time.time()
     songList = ['4minuteshm']
     pathname = MakeMp3Pathname(songList[0])
     testx, testy = PrepareTrainData(songList, batch_size, useSoftmax)
     
+    print('t', time.time() - t)
     predicts = model.predict(testx, batch_size=batch_size)
     predicts = np.array(predicts)
+    print('t', time.time() - t)
 
     predicts = postprocess.pick(predicts)
+    print('t', time.time() - t)
 
     postprocess.SaveResult(predicts, testy, 0, r'D:\librosa\result.log')
+    print('t', time.time() - t)
 
     if useSoftmax:
         predicts = predicts[:,1]
 
     notes = postprocess.TrainDataToLevelData(predicts, 0, acceptThrehold)
+    print('t', time.time() - t)
     LevelInfo.SaveNote(notes, pathname, '_predict')
+    print('t', time.time() - t)
 
 
 
@@ -281,6 +288,7 @@ def Evaluate2():
     
     predicts = model.predict(trainx, batch_size=batch_size)
     predicts = np.array(predicts)
+    
 
     predicts = postprocess.pick(predicts)
 
@@ -298,10 +306,12 @@ def Evaluate2():
     levelNotes = postprocess.ConvertToLevelNote(notes, bpm, et)
     LevelInfo.GenerateIdolLevel('d:/test.xml', levelNotes, bpm, et, musicTime)
 
+import time
 
 if __name__ == '__main__':                                                                                                                                                                
-    Test()
-        
-    # model = keras.models.load_model('d:/mymodel.mdl')    
-    # Evaluate(model)
+    # Test()
+
+    model = keras.models.load_model('d:/mymodel.mdl')   
+
+    Evaluate(model)  
     # Evaluate2()
