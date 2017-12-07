@@ -62,14 +62,18 @@ def TensorOper():
     t = time.time()
     b = a * 4.5 
     print('t0', time.time() - t)
-    
-    node1 = tf.constant(a, dtype=tf.float32)
+       
+
+    node1 = tf.constant(a, dtype=tf.float32)    
+
     node2 = tf.constant(4.5) # also tf.float32 implicitly
     c = tf.multiply(node1, node2)
     print(type(node1))
     print(c)
 
     sess = tf.Session()
+
+    sess.run(node1)
     
     t = time.time()
     d = sess.run(c)
@@ -116,8 +120,8 @@ if __name__ == '__main__':
 
     if True:
         # Do()
-        # TensorOper()
-        TFRnn()
+        TensorOper()
+        # TFRnn()
         
 
     if False:

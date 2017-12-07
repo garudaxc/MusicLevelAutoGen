@@ -97,7 +97,7 @@ def CalcBarInterval(beat_times):
     return a, b
 
 
-def normalizeInterval(beat, threhold = 0.02):
+def normalizeInterval(beat, threhold = 0.02, abThrehold=0.333):
     # 截掉前后不太准的beat
     interval = beat[1:,0] - beat[:-1, 0]
 
@@ -107,7 +107,7 @@ def normalizeInterval(beat, threhold = 0.02):
     abnormal = np.nonzero(diff > threhold)[0]
     print('abnormal count', abnormal.size, abnormal)
 
-    if abnormal.size > beat.shape[0] / 3:
+    if abnormal.size > beat.shape[0] * abThrehold:
         # 拍子均匀程度太低，自动生成失败
         return -1, abnormal.size / beat.shape[0]
 
@@ -128,46 +128,45 @@ def normalizeInterval(beat, threhold = 0.02):
     return 0, len(beat)
 
 
-def CalcDownbeat(y=None, sr=None):
+def CalcDownbeat(y, sr, **args):
     # calc downbeat entertime
-    analysisLength = 60
+    analysisLength = args['-duration']
     minimumMusicLength = 165
     maximumMusicLength = 360
-    numThread = 1
+    numThread = args['-thread']
+    threhold = args['-threhold']
+    abThrehold = args['-abThrehold']
 
 
-    print('begin')
     startTime = time.time()
     
     duration = librosa.get_duration(y=y, sr=sr)
 
     if duration < minimumMusicLength:
         print('music is too short! duration:', duration)
-        return
+        return 0, 0
 
     if duration > maximumMusicLength:
         print('music is too long! duration:', duration)
-        return
+        return 0, 0
 
     start = int(duration * 0.3)
     clipTime = np.array([start, start+analysisLength])      
-    print('duration', duration, 'start', start)
+    # print('duration', duration, 'start', start)
     clip = librosa.time_to_samples(clipTime, sr=sr)
-    print('total', y.shape, 'clip', clip)
+    # print('total', y.shape, 'clip', clip)
     yy = y[clip[0]:clip[1]]
 
-    print('time in %.1f' % ((time.time() - startTime)))
     processer = RNNDownBeatProcessor(num_threads=numThread)
     downbeatTracking = DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda=1000, fps=100)
     beatProba = processer(yy)
-    print('time in %.1f' % ((time.time() - startTime)))
 
     beatIndex = downbeatTracking(beatProba)
     
-    firstBeat, lastBeat = normalizeInterval(beatIndex)
+    firstBeat, lastBeat = normalizeInterval(beatIndex, threhold=threhold, abThrehold=abThrehold)
     if firstBeat == -1:        
         print('generate error,numbeat %d, abnormal rate %f' % (len(beatIndex), lastBeat))
-        return
+        return 0, 0
 
     newBeat = beatIndex[firstBeat:lastBeat]
     downbeat = madmom.features.downbeats.filter_downbeats(newBeat)
@@ -187,16 +186,12 @@ def CalcDownbeat(y=None, sr=None):
     assert abs(etAuto - firstBeatTime) < barInter
     
     bpm = 240.0 / barInter
-    print('bpm', bpm)
 
     return bpm, etAuto
     
 
 
-
-
-
-def calc_segment(y, sr, beats, k = 5):
+def CalcSegmentation(y, sr, beats, k = 4):
     # Next, we'll compute and plot a log-power CQT
     BINS_PER_OCTAVE = 12 * 3
     N_OCTAVES = 7
@@ -205,17 +200,7 @@ def calc_segment(y, sr, beats, k = 5):
                                             n_bins=N_OCTAVES * BINS_PER_OCTAVE),
                                 ref=np.max)    
  
-    # To reduce dimensionality, we'll beat-synchronous the CQT
-    # tempo, beats = librosa.beat.beat_track(y=y, sr=sr, trim=False)
-    # Csync = librosa.util.sync(C, beats, aggregate=np.median)
     Csync = librosa.util.sync(C, beats, aggregate=np.median)
-
-    # For plotting purposes, we'll need the timing of the beats
-    # we fix_frames to include non-beat frames 0 and C.shape[1] (final frame)
-    # beat_times = librosa.frames_to_time(librosa.util.fix_frames(beats,
-    #                                                             x_min=0,
-    #                                                             x_max=C.shape[1]),
-    #                                     sr=sr)
 
     R = librosa.segment.recurrence_matrix(Csync, width=3, mode='affinity',
                                         sym=True)
@@ -286,58 +271,29 @@ def calc_segment(y, sr, beats, k = 5):
                                         x_min=None,
                                         x_max=C.shape[1]-1)
 
-    # sphinx_gallery_thumbnail_number = 5
-
-    # from os import listdir
-    # import os.path
-    # def save_file(beats, mp3filename, postfix = ''):
-    #     outname = os.path.splitext(mp3filename)[0]
-    #     outname = outname + postfix + '.csv'
-    #     librosa.output.times_csv(outname, beats)
-    #     logger.info('output beat time file ' + outname)
-
     bound_times = librosa.frames_to_time(bound_frames, sr=sr)
 
-    # freqs = librosa.cqt_frequencies(n_bins=C.shape[0],
-    #                                 fmin=librosa.note_to_hz('C1'),
-    #                                 bins_per_octave=BINS_PER_OCTAVE)
-
-    # librosa.display.specshow(C, y_axis='cqt_hz', sr=sr,
-    #                         bins_per_octave=BINS_PER_OCTAVE,
-    #                         x_axis='time')
-    # ax = plt.gca()
-
-    # for interval, label in zip(zip(bound_times, bound_times[1:]), bound_segs):
-    #     ax.add_patch(patches.Rectangle((interval[0], freqs[0]),
-    #                                 interval[1] - interval[0],
-    #                                 freqs[-1],
-    #                                 facecolor=colors(label),
-    #                                 alpha=0.50))
-
-    # plt.tight_layout()
     return my_bound_frames, bound_segs
 
 
 
-def CalcSegmentProbability(segments, duration, neighbourhood=0.167):
-    # 计算每个候选分段点的概率，三分之一和三分之二处的概率最高
+def PickSegmentation(segments, duration, neighbourhood=0.167):
+    # 在三分之一和三分之二附近挑选两个分段点
     points = segments / duration
+    def f(a):
+        p = np.argmin(np.abs(points - a))
+        p = points[p]
+        if abs(p-a) > neighbourhood:
+            p = a
+        return p * duration
 
-    def f(x):
-        if x > 0.5:
-            x = 1 - x
-        a = 1 / neighbourhood
-        y0 = a * (x-(0.3333-neighbourhood))
-        y1 = -a * (x-(0.3333+neighbourhood))
-        y = min(max(0.0, y0), max(0.0, y1))
-        return y
-
-    y = [f(a) for a in points]
-    return np.array(y)
+    result = np.array([f(0.3333), f(0.6666)])
+    return result
 
 
-import os
+
 def SaveInstantValue(beats, filename, postfix = ''):
+    import os
     #保存时间点数据
     outname = os.path.splitext(filename)[0]
     outname = outname + postfix + '.csv'
@@ -348,49 +304,124 @@ def SaveInstantValue(beats, filename, postfix = ''):
     return True
 
 
+def AnalysisMusicFeature(filename, **args):
+    '''
+    计算音乐文件的特征数据
+    返回值 tuple(a, b)
+    a： True / False 计算成功还是失败，失败的原因有：
+        音乐长度不合规范
+        特征分析过程中发现可能不是音乐
+    b:  是一个字典，里面记录具体特征数据，包括
+        bpm
+        EnterTime
+        Seg0
+        Seg1
+    '''
+    
+    print('start load', filename)
+    t = time.time()
+    try:
+        y, sr = librosa.load(filename, mono=True, sr=44100)
+    except:
+        print('load music file error ', filename)
+        return (False, None)
+
+    print('loaded', time.time() - t)
+
+    bpm, et = CalcDownbeat(y, sr, **args)
+    if bpm == 0:
+        return (False, None)
+        
+    duration = librosa.get_duration(y=y, sr=sr)
+    beatInter = 60.0 / bpm
+    barInterval = beatInter * 4
+    numBeats = int((duration-et) / beatInter)
+    beatTimes = np.arange(numBeats) * beatInter + et
+    beatFrames = librosa.time_to_frames(beatTimes, sr=sr)
+
+    print('analysis segmentation', time.time() - t)
+    frames, _ = CalcSegmentation(y, sr, beatFrames)
+    times = librosa.frames_to_time(frames, sr=sr)
+    segTimes = PickSegmentation(times, duration)
+    # align to downbeat
+    segTimes = np.round((segTimes-et)/barInterval) * barInterval + et
+
+    print('AnalysisMusicFeature done', time.time() - t)
+    result = {}
+    result['bpm'] = bpm
+    result['EnterTime'] = et
+    result['seg0'] = segTimes[0]
+    result['seg1'] = segTimes[1]
+    return (True, result)
+
+
+
 def TestSegm():
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0178.ogg'
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1351.ogg'
     y, sr = librosa.load(filename, mono=True, sr=44100)
     print('loaded')
     t = time.time()
 
     bpm, et = CalcDownbeat(y, sr)    
     duration = librosa.get_duration(y=y, sr=sr)
-    downbeatInter = 60.0 / bpm
-    numDownBeats = int((duration-et) / downbeatInter)
-    downbeatTimes = np.arange(numDownBeats) * downbeatInter + et
-    # SaveInstantValue(downbeatTimes, filename, '_down')
+    beatInter = 60.0 / bpm
+    barInterval = beatInter * 4
+    numBeats = int((duration-et) / beatInter)
+    beatTimes = np.arange(numBeats) * beatInter + et
+
+    numDownbeats = int((duration-et) / barInterval)
+    downBeatTimes = np.arange(numDownbeats) * barInterval + et
+    SaveInstantValue(downBeatTimes, filename, '_downbeat')
     # return
 
-    downbeatFrames = librosa.time_to_frames(downbeatTimes, sr=sr)
-
-    frames, segs = calc_segment(y, sr, downbeatFrames)
-
+    beatFrames = librosa.time_to_frames(beatTimes, sr=sr)
+    frames, _ = calc_segment(y, sr, beatFrames)
     times = librosa.frames_to_time(frames, sr=sr)
+
+    segTimes = PickSegmentation(times, duration)
+    # align to downbeat
+    segTimes = np.round((segTimes-et)/barInterval) * barInterval + et
+
+    print('seg times', segTimes)
+
     SaveInstantValue(times, filename, '_seg')
+    SaveInstantValue(segTimes, filename, '_seg2')
 
     print('t0', time.time() - t)
-
 
 
 
 if __name__ == '__main__':
     
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1351.ogg'
+    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0178.ogg'
+    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0201.ogg'
+    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0858.ogg'
+    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1196.ogg'
     filename = r'd:\librosa\炫舞自动关卡生成\郭德纲 - 做推车.mp3'
-    filename = r'f:\music\英语听力 - 大卫·科波菲尔04.mp3'
     filename = r'f:\music\有声小说 - 书读至乐，物观化境.mp3'
-    filename = r'f:\music\侯宝林,郭启儒 - 抬杠.mp3'
     filename = r'f:\music\K One - 爱情蜜语.mp3'
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0178.ogg'
+    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1229.ogg'
+    filename = r'f:\music\英语听力 - 大卫·科波菲尔04.mp3'
+    filename = r'f:\music\侯宝林,郭启儒 - 抬杠.mp3'
 
+    if len(sys.argv) > 1:
+        filename = sys.argv[-1]
+
+    args = {}
+    args['-thread'] = 1
+    args['-duration'] = 60     #用来做分析的音乐长度
+    args['-threhold'] = 0.02    #判断节拍不准的阈值
+    args['-abThrehold'] = 0.333 #判断为不是音乐的比例阈值
+
+
+    for i in range(len(sys.argv)):
+        if sys.argv[i] in args:
+            name = sys.argv[i]
+            valType = type(args[name])
+            args[name] = valType(sys.argv[i+1])
+
+    print(args)
     
-    # TestSegm()
-
-    CalcSegmentProbability(None, None)
-
-
-    # CalcDownbeat(filename)
-
-    # import madmom.ml.nn.layers
+    res = AnalysisMusicFeature(filename, **args)
+    print(res)
