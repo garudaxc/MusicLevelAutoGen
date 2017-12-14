@@ -55,10 +55,11 @@ def TestWrite(pathname):
     print(type(d))
     print (d.shape)
 
-    # with open('d:/test.pk', 'wb') as file:
+    # with open('d:/work/signal_data.pk', 'wb') as file:
     #     pickle.dump(d, file)
 
     return d
+
 
 def LoadAndProcessAudio(pathname):
     pre_processor = CreateProcesser()
