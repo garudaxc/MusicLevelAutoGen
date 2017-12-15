@@ -96,6 +96,9 @@ def TFTest():
     print(v)
     v = v[:]
     print(v.shape)
+
+    # v = tf.reverse(v0, [0])
+    v = tf.concat([v0, v1], axis=1)
 	
     # s = v.shape
     # print(s[0])
@@ -109,6 +112,25 @@ def TFTest():
 
 
 if __name__ == '__main__':
-	# TFTest()
+	TFTest()
     # LoopTest()
-    TensorArrayTest()
+    # TensorArrayTest()
+
+
+    # if False:
+    #     a = TestClass()
+    #     c = TestClass()
+    #     c.z = 12
+
+    #     c.foo()
+
+    #     print(TestClass.__dict__)    
+    #     print(TestClass.__name__)
+
+
+    #     print(type(c.foo))
+
+    #     # print(c.__str__)
+    #     # print(c.__class__)
+
+    #     # print(dir(c))

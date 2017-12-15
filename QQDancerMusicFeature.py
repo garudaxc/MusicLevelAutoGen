@@ -7,6 +7,18 @@ import numpy as np
 import time
 import sklearn.cluster
 import scipy
+import os.path
+import QQDancerLog
+import LevelMaker
+
+# 错误 code
+MUSIC_FILE_ERROR = 1    #打开音乐文件错误
+MUSIC_TOO_LONG = 2      #音乐文件太长
+MUSIC_TOO_SHORT = 3     #音乐文件太短
+PROBABLY_NOT_MUSIC = 4  #音乐文件的内容可能不是歌曲
+
+
+logger = None
 
 
 # 计算音乐bpm entertime和分段
@@ -105,7 +117,7 @@ def normalizeInterval(beat, threhold = 0.02, abThrehold=0.333):
     diff = np.abs(interval - aver)
 
     abnormal = np.nonzero(diff > threhold)[0]
-    print('abnormal count', abnormal.size, abnormal)
+    logger.info('abnormal count', abnormal.size, abnormal)
 
     if abnormal.size > beat.shape[0] * abThrehold:
         # 拍子均匀程度太低，自动生成失败
@@ -123,7 +135,7 @@ def normalizeInterval(beat, threhold = 0.02, abThrehold=0.333):
     # for i in range(-1, -1-len(abnormal), -1):
     #     if len(interval) + i == abnormal[i]:
     #         count1 = count1 + 1
-    # print('del %d items form begining %d items form end' % (count0, count1))
+    # logger.info('del %d items form begining %d items form end' % (count0, count1))
 
     return 0, len(beat)
 
@@ -137,24 +149,23 @@ def CalcDownbeat(y, sr, **args):
     threhold = args['-threhold']
     abThrehold = args['-abThrehold']
 
-
     startTime = time.time()
     
     duration = librosa.get_duration(y=y, sr=sr)
 
     if duration < minimumMusicLength:
-        print('music is too short! duration:', duration)
+        logger.error(MUSIC_TOO_SHORT, 'music is too short! duration:', duration)
         return 0, 0
 
     if duration > maximumMusicLength:
-        print('music is too long! duration:', duration)
+        logger.error(MUSIC_TOO_LONG, 'music is too long! duration:', duration)
         return 0, 0
 
     start = int(duration * 0.3)
     clipTime = np.array([start, start+analysisLength])      
-    # print('duration', duration, 'start', start)
+    # logger.info('duration', duration, 'start', start)
     clip = librosa.time_to_samples(clipTime, sr=sr)
-    # print('total', y.shape, 'clip', clip)
+    # logger.info('total', y.shape, 'clip', clip)
     yy = y[clip[0]:clip[1]]
 
     processer = RNNDownBeatProcessor(num_threads=numThread)
@@ -165,7 +176,7 @@ def CalcDownbeat(y, sr, **args):
     
     firstBeat, lastBeat = normalizeInterval(beatIndex, threhold=threhold, abThrehold=abThrehold)
     if firstBeat == -1:        
-        print('generate error,numbeat %d, abnormal rate %f' % (len(beatIndex), lastBeat))
+        logger.error(PROBABLY_NOT_MUSIC, 'generate error,numbeat %d, abnormal rate %f' % (len(beatIndex), lastBeat))
         return 0, 0
 
     newBeat = beatIndex[firstBeat:lastBeat]
@@ -189,7 +200,6 @@ def CalcDownbeat(y, sr, **args):
 
     return bpm, etAuto
     
-
 
 def CalcSegmentation(y, sr, beats, k = 4):
     # Next, we'll compute and plot a log-power CQT
@@ -276,7 +286,6 @@ def CalcSegmentation(y, sr, beats, k = 4):
     return my_bound_frames, bound_segs
 
 
-
 def PickSegmentation(segments, duration, neighbourhood=0.167):
     # 在三分之一和三分之二附近挑选两个分段点
     points = segments / duration
@@ -289,7 +298,6 @@ def PickSegmentation(segments, duration, neighbourhood=0.167):
 
     result = np.array([f(0.3333), f(0.6666)])
     return result
-
 
 
 def SaveInstantValue(beats, filename, postfix = ''):
@@ -312,21 +320,22 @@ def AnalysisMusicFeature(filename, **args):
         音乐长度不合规范
         特征分析过程中发现可能不是音乐
     b:  是一个字典，里面记录具体特征数据，包括
+        duration
         bpm
         EnterTime
         Seg0
         Seg1
     '''
     
-    print('start load', filename)
+    logger.info('start load', filename)
     t = time.time()
     try:
         y, sr = librosa.load(filename, mono=True, sr=44100)
     except:
-        print('load music file error ', filename)
+        logger.error(MUSIC_FILE_ERROR, 'load music file error ', filename)
         return (False, None)
 
-    print('loaded', time.time() - t)
+    logger.info('loaded', time.time() - t)
 
     bpm, et = CalcDownbeat(y, sr, **args)
     if bpm == 0:
@@ -339,15 +348,16 @@ def AnalysisMusicFeature(filename, **args):
     beatTimes = np.arange(numBeats) * beatInter + et
     beatFrames = librosa.time_to_frames(beatTimes, sr=sr)
 
-    print('analysis segmentation', time.time() - t)
+    logger.info('analysis segmentation', time.time() - t)
     frames, _ = CalcSegmentation(y, sr, beatFrames)
     times = librosa.frames_to_time(frames, sr=sr)
     segTimes = PickSegmentation(times, duration)
     # align to downbeat
     segTimes = np.round((segTimes-et)/barInterval) * barInterval + et
 
-    print('AnalysisMusicFeature done', time.time() - t)
+    logger.info('AnalysisMusicFeature done', time.time() - t)
     result = {}
+    result['duration'] = duration
     result['bpm'] = bpm
     result['EnterTime'] = et
     result['seg0'] = segTimes[0]
@@ -355,10 +365,9 @@ def AnalysisMusicFeature(filename, **args):
     return (True, result)
 
 
-
 def TestSegm():
     y, sr = librosa.load(filename, mono=True, sr=44100)
-    print('loaded')
+    logger.info('loaded')
     t = time.time()
 
     bpm, et = CalcDownbeat(y, sr)    
@@ -381,19 +390,37 @@ def TestSegm():
     # align to downbeat
     segTimes = np.round((segTimes-et)/barInterval) * barInterval + et
 
-    print('seg times', segTimes)
+    logger.info('seg times', segTimes)
 
     SaveInstantValue(times, filename, '_seg')
     SaveInstantValue(segTimes, filename, '_seg2')
 
-    print('t0', time.time() - t)
+    logger.info('t0', time.time() - t)
 
 
+def GenerateLevelFile(filename, musicInfo, logger):
+    '''
+    生成音乐关卡文件
+    parameter:
+    filename : 输出关卡文件的完整的路径+文件名
+    musicInfo： 音乐文件信息， 是一个字典，里面记录具体特征数据，包括
+        diffculty
+        duration
+        bpm
+        EnterTime
+        Seg0
+        Seg1
+        时间相关的数据单位都为秒
 
-if __name__ == '__main__':
-    
+    logger: 用于输出日志，可以输出一些debug信息,如果发生会导致生成关卡文件失败的错误
+    则必须调用logger.error接口输出错误码和错误信息，以供服务进程分析错误原因，并返回
+    合适的信息
+    '''
+    pass
+    print('call GenerateLevelFile')
+
+def Test():
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1351.ogg'
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0178.ogg'
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0201.ogg'
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0858.ogg'
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1196.ogg'
@@ -404,15 +431,24 @@ if __name__ == '__main__':
     filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1229.ogg'
     filename = r'f:\music\英语听力 - 大卫·科波菲尔04.mp3'
     filename = r'f:\music\侯宝林,郭启儒 - 抬杠.mp3'
+    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0178.ogg'
 
     if len(sys.argv) > 1:
         filename = sys.argv[-1]
+
+    print('argv', sys.argv)
+
+    outdir = os.path.dirname(filename)
+    levelFile = os.path.splitext(filename)[0] + '.xml'
+
+    globals()['logger'] = QQDancerLog.Logger(outdir)
 
     args = {}
     args['-thread'] = 1
     args['-duration'] = 60     #用来做分析的音乐长度
     args['-threhold'] = 0.02    #判断节拍不准的阈值
     args['-abThrehold'] = 0.333 #判断为不是音乐的比例阈值
+    args['-diffculty'] = 6      #难度
 
 
     for i in range(len(sys.argv)):
@@ -421,7 +457,21 @@ if __name__ == '__main__':
             valType = type(args[name])
             args[name] = valType(sys.argv[i+1])
 
-    print(args)
+    logger.info('args', args)
     
-    res = AnalysisMusicFeature(filename, **args)
-    print(res)
+    success, info = AnalysisMusicFeature(filename, **args)
+
+    if success:
+        info['diffculty'] = args['-diffculty']
+        LevelMaker.GenerateLevelFile(levelFile, info, logger)
+        #GenerateLevelFile(levelFile, info, logger)
+    
+    logger.info('result', info)
+
+
+if __name__ == '__main__':
+    
+    # logger.info(vars())
+
+    Test()
+    
