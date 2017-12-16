@@ -4,6 +4,7 @@ from madmom.models import DOWNBEATS_BLSTM
 import pickle
 import tensorflow as tf
 import numpy as np
+import os
 
 
 class TensorLayer():
@@ -106,7 +107,8 @@ def RunLayer(tensorLayer, data, data_size):
         dd = data[_i]
 
         v = tf.concat([dd, _prev, _state, one], 0)
-        v = tf.reshape(v, (1, v.shape[0]))
+        l = tf.shape(v)
+        v = tf.reshape(v, (1, l[0]))
 
         i = tf.sigmoid(tf.matmul(v, ig))
         f = tf.sigmoid(tf.matmul(v, fg))
@@ -115,7 +117,7 @@ def RunLayer(tensorLayer, data, data_size):
 
         v = tf.concat([dd, _prev, newState[0], one], 0)
 
-        v = tf.reshape(v, (1, v.shape[0]))
+        v = tf.reshape(v, (1, l[0]))
         o = tf.sigmoid(tf.matmul(v, og))
 
         newPrev = tf.tanh(newState) * o
@@ -243,7 +245,10 @@ def Test4(layer):
     import pickle
     import time
 
-    with open('d:/work/signal_data.pk', 'rb') as file:
+    fillename = 'd:/work/signal_data.pk'
+    if os.name != 'nt':
+        fillename = '/Users/xuchao/Documents/work/signal_data.pk'
+    with open(fillename, 'rb') as file:
         input_data = pickle.load(file)
     
     print('file loaded', type(input_data), input_data.shape, input_data.dtype)
@@ -256,7 +261,7 @@ def Test4(layer):
 
     w = ConvertBidirectionLayer(layer)
     data = tf.Variable(input_data)
-    out = RunBidirectionLayer(w, data)
+    out = RunBidirectionLayer(w, data, len(input_data))
     with tf.Session() as sess:        
         sess.run(tf.global_variables_initializer())
         t = time.time()
@@ -270,7 +275,10 @@ def Test5(network):
     import pickle
     import time
 
-    with open('d:/work/signal_data.pk', 'rb') as file:
+    fillename = 'd:/work/signal_data.pk'
+    if os.name != 'nt':
+        fillename = '/Users/xuchao/Documents/work/signal_data.pk'
+    with open(fillename, 'rb') as file:
         input_data = pickle.load(file)
     
     print('file loaded', type(input_data), input_data.shape, input_data.dtype)
@@ -347,8 +355,8 @@ def Do():
     # Test1(lstmLayer.input_gate)
     # Test2(lstmLayer)
     # Test3(lstmLayer)
-    # Test4(layer)
-    Test5(network)
+    Test4(layer)
+    # Test5(network)
 
     # GateParameter(lstmLayer.cell)
     # GateParameter(lstmLayer.input_gate)

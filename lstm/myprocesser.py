@@ -55,8 +55,12 @@ def TestWrite(pathname):
     print(type(d))
     print (d.shape)
 
-    # with open('d:/work/signal_data.pk', 'wb') as file:
-    #     pickle.dump(d, file)
+    output = 'd:/work/signal_data.pk'
+    if os.name != 'nt':
+        output = '/Users/xuchao/Documents/work/signal_data.pk'
+
+    with open(output, 'wb') as file:
+        pickle.dump(d, file)
 
     return d
 
