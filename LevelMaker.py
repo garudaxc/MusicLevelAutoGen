@@ -3,8 +3,7 @@ import xml.dom.minidom
 import random
 import math
 from enum import Enum
-
-
+import os.path
 #动作
 class DanceClip:
 	def __init__(self):
@@ -164,13 +163,13 @@ class GeneratorResult(Enum):
 
 #关卡生成器
 class Generator:
-	def __init__(self,inputData,ruler):
+	def __init__(self,inputData,ruler,logger):
 		self.__document = LevelDocument()
 		self.__generatorInput = inputData
 		self.__ruler = ruler
 		self.__camer_get_index = 0
 		self.__fixed_camera_shot_container =[]
-
+		self.__Logger = logger
 		for cameraShot in self.__ruler["camera_shot"]["fixed_shot_container"]:
   			self.__fixed_camera_shot_container.append(cameraShot)
 
@@ -375,8 +374,10 @@ class Generator:
 		dif = self.__document.LevelInfo["Difficulty"] 
 		danceLen = len(danceList)
 		segment_ruler = self.__ruler["level"]["dif"+str(dif)]["Segment_"+str(segmentType)]
+		# print(segment_ruler,"dif"+str(dif))
 		beginArea = segment_ruler["begin"]
 		endArea = segment_ruler["end"]
+
 		area_1_range_num = segment_ruler["area_1"]["range_num"]
 		area_1_range_weights = segment_ruler["area_1"]["weights"]
 		area_1_weight = segment_ruler["area_1"]["weight"]
@@ -385,37 +386,75 @@ class Generator:
 		area_2_range_weights = segment_ruler["area_2"]["weights"]
 		area_2_weight = segment_ruler["area_2"]["weight"]
 
+		beginLen = len(beginArea)
+		rn_1 = len(area_1_range_num)
+		rn_2 = len(area_2_range_num)
+		endLen = len(endArea)
+
 		levelList =[]
 
-		area_1_num =round(danceLen *area_1_weight)
+		minLen = rn_1 + rn_2+beginLen +endLen
 
-		area_2_num = danceLen -area_1_num-len(beginArea)-len(endArea)
+		if minLen >=danceLen:
+			levelList += beginArea
+			for item in area_1_range_num:
+				levelList.append(item)
+			for item in area_2_range_num:
+				levelList.append(item)
+
+			levelList +=endArea
+			for i in range(danceLen):
+				danceList[i].level = levelList[i]
+			if minLen>danceLen:
+				self.__Logger.info("some level may be lost "+str(minLen)+" "+str(danceLen))
+			return
+
+
+		otherLen = danceLen -minLen
+
+		area_1_num = round(otherLen *area_1_weight)
+		area_2_num = otherLen -area_1_num
+
 
 		levelList += beginArea
 
+		# print(danceLen,area_1_num,area_2_num,area_1_weight)
 		levelList += self.__rangeLevelGenerator(area_1_range_num,area_1_range_weights,area_1_num)
 
 		levelList += self.__rangeLevelGenerator(area_2_range_num,area_2_range_weights,area_2_num)
 
 		levelList += endArea
 
+
+		# news_ids = list(set(levelList))
+		# news_ids.sort()
+		# print(news_ids)
+		# if segmentType == 1 and len(news_ids)!=9:
+		# 	print("________________________",levelList)
+
+		# print (levelList,len(levelList),danceLen)
 		for i in range(danceLen):
 			danceList[i].level = levelList[i]
 
 
 	def __rangeLevelGenerator(self,range_num,weights,num):
 		levelList =[]
-	
+		# print(range_num,weights)
 		for i in range(len(range_num)-1):
 			rn = round(num * weights[i])
 			for k in range(rn):
 				levelList.append(range_num[i])
-		lastNum =num -len(levelList)
+			levelList.append(range_num[i])
+
+		rangeLen = len(range_num)
+
+		lastNum =rangeLen + num -len(levelList)
 
 		for i in range(lastNum):
-			levelList.append(range_num[len(range_num)-1])
+			levelList.append(range_num[rangeLen-1])
 
-		levelList = levelList[:num]
+
+		# levelList = levelList[:num]
 		
 		return levelList
 
@@ -511,21 +550,33 @@ class Generator:
 		else:
 			curBeginBar = curBeginBar +fix_shot_length
 
+
+
 		# 添加固定镜头
+
 		curEndClip = self.__document.CameraSequence[len(self.doument.CameraSequence)-1]
 		beginID = curEndClip.id
 		endID = move_shot.id
 		curSpaceBarNum =curEndBar -curBeginBar
-		fixedShotLengthNum = round(curSpaceBarNum/fix_shot_length)
-		fixedShotBarNum =math.ceil(curSpaceBarNum/fixedShotLengthNum)
 
-		for i in range(0,fixedShotLengthNum):
-			new_fix_shot = CameraClip()
-			new_fix_shot.bar = curBeginBar
-			new_fix_shot.id = self.__GetCamerShot(beginID)
-			beginID = new_fix_shot.id
-			self.__document.CameraSequence.append(new_fix_shot)
-			curBeginBar  =new_fix_shot.bar+ fixedShotBarNum
+		if curSpaceBarNum>0:
+			# print(curSpaceBarNum,curBeginBar,curEndBar, fix_shot_length)
+			fixedShotLengthNum = round(curSpaceBarNum/fix_shot_length)
+			if fixedShotLengthNum>0:
+				fixedShotBarNum =math.ceil(curSpaceBarNum/fixedShotLengthNum)
+				for i in range(0,fixedShotLengthNum-1):
+					new_fix_shot = CameraClip()
+					new_fix_shot.bar = curBeginBar
+					new_fix_shot.id = self.__GetCamerShot(beginID)
+					beginID = new_fix_shot.id
+					self.__document.CameraSequence.append(new_fix_shot)
+					curBeginBar  =new_fix_shot.bar+ fixedShotBarNum
+
+				new_fix_segEnd_shot = CameraClip()
+				new_fix_segEnd_shot.bar = curBeginBar
+				new_fix_segEnd_shot.id = self.__GetCamerShot(beginID,endID)    # 段落中最后一个固定镜头
+				self.__document.CameraSequence.append(new_fix_segEnd_shot)
+
 
 		self.__document.CameraSequence.append(move_shot)
 
@@ -536,19 +587,36 @@ class Generator:
 		for cameraShot in self.__ruler["camera_shot"]["fixed_shot_container"]:
 			self.__fixed_camera_shot_container.append(cameraShot)
 
-	def __GetCamerShot(self,shot_A):
+	def __GetCamerShot(self,shot_A,shot_B=None):
 		if self.__camer_get_index>=3:
 			self.__resetCameraContainer()
 		else:
 			self.__camer_get_index += 1
-		distances = [ self.__DistanceCamerShot(shot_A,p) for p in self.__fixed_camera_shot_container ]
-		index = distances.index(max(distances))
-		result  = self.__fixed_camera_shot_container[index]
+
+		distancesA = [ self.__DistanceCamerShot(shot_A,p) for p in self.__fixed_camera_shot_container ]
+		if shot_B is None:
+			index = distancesA.index(max(distancesA))
+			result  = self.__fixed_camera_shot_container[index]
+		else:
+			distancesB = [ self.__DistanceCamerShot(p,shot_B) for p in self.__fixed_camera_shot_container ]
+			distancesN = [a*b for a,b in zip(distancesA,distancesB)]
+			# print(self.__fixed_camera_shot_container,shot_A,shot_B)
+			# print(self.__document.LevelInfo["Difficulty"], distancesA,distancesB,distancesN)
+			index = distancesN.index(max(distancesN))
+			result  = self.__fixed_camera_shot_container[index]
+
 		del self.__fixed_camera_shot_container[index]
 		return result
 
 	def __DistanceCamerShot(self,shot_A,shot_B):
 		# print ("C ",shot_A,shot_B)
+		adata = shot_A.split("_")
+		bdata = shot_B.split("_")
+		if len(adata)== 4:
+			shot_A = adata[2]+"_02"
+		if len(bdata)== 4:
+			shot_B = bdata[0]+"_"+bdata[1]
+
 		if "special" in shot_A:
 			pos_A = self.__ruler["camera_shot"]["special_shot_container_pos"]["x"+shot_A[-1:]]
 		else:
@@ -558,6 +626,8 @@ class Generator:
 			pos_B = self.__ruler["camera_shot"]["special_shot_container_pos"]["x"+shot_B[-1:]]
 		else:
 			pos_B = self.__ruler["camera_shot"]["fixed_shot_container_pos"][shot_B]
+
+		# print (pos_A,shot_A,pos_B,shot_B,abs(pos_A[0]-pos_B[0])*abs(pos_A[1]-pos_B[1]))
 		
 		return abs(pos_A[0]-pos_B[0])*abs(pos_A[1]-pos_B[1])
 
@@ -1064,7 +1134,7 @@ GeneratorRuler = dict(
 			"front_02",
 			"right_02",
 			"left_01",
-			"front_01",
+			# "front_01",                            # front_01 只出现在第五小节
 			"right_01",
 			"left_03",
 			"front_03",
@@ -1128,14 +1198,14 @@ GeneratorRuler = dict(
 				),
 			left_04 =
 				(
-				"front_01_left_04",
+				# "front_01_left_04",
 				"right_01_left_04",
 				"front_03_left_04",
 				"right_03_left_04"
 				),
 	        right_04 = 	
 				(
-				"front_01_right_04",
+				# "front_01_right_04",
 				"left_01_right_04",
 				"front_03_right_04",
 				"left_03_right_04"
@@ -1166,7 +1236,9 @@ def GenerateLevelFile(filename,musicInfo,logger):
 	GeneratorInput["musicSectionBreakPointTwo"]=musicInfo["seg1"]*1000
 	GeneratorInput["muiscDifficult"] = musicInfo["diffculty"]
 
-	creator =  Generator(GeneratorInput,GeneratorRuler)
+	GeneratorInput["musicTitle"] = os.path.splitext( os.path.basename(filename))[0]
+
+	creator =  Generator(GeneratorInput,GeneratorRuler,logger)
 	result =creator.run()
 	if result is  GeneratorResult.SUCCESS:
 		convertor = XmlConverter(creator.doument)

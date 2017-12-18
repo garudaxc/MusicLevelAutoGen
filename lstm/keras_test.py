@@ -65,6 +65,34 @@ def LoopTest():
     print(y)
 
 
+def CatTest():
+    v0 = tf.Variable([[4, 6], [1, 2]], dtype=tf.float32)
+
+    v1 = tf.Variable([[1, 9]], dtype=tf.float32)
+
+    v = v0+v1
+
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
+    y = sess.run(v)
+    print(y)
+
+
+def CatTest2():
+    v0 = tf.Variable([[4, 6], [1, 2]], dtype=tf.float32)
+
+    v1 = tf.Variable([[1, 9]], dtype=tf.float32)
+
+    v = tf.concat([v1, v1], axis=1)
+
+    # v = tf.zeros([5], dtype=tf.float32)
+    # v = tf.constant([[1.0]])
+
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
+    y = sess.run(v)
+    print(y)
+
 
 def TFTest():
     sess = tf.Session()
@@ -112,7 +140,8 @@ def TFTest():
 
 
 if __name__ == '__main__':
-	TFTest()
+    CatTest()
+	# TFTest()
     # LoopTest()
     # TensorArrayTest()
 

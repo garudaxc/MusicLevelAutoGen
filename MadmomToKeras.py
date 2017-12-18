@@ -7,10 +7,22 @@ import numpy as np
 import os
 
 
-class TensorLayer():
-    def __init__(self, tensor, stride):
-        self.tensor = tensor
-        self.stride = stride
+
+profile = False
+
+def GetActiviationFn(func):
+    
+    if func.__name__ == 'tanh':
+        fn = tf.tanh
+    elif func.__name__ == 'sigmoid':
+        fn = tf.sigmoid
+    elif func.__name__ == 'softmax':
+        fn = tf.nn.softmax
+    else:
+        assert False
+
+    return fn
+
 
 
 def GateParameter(gate):
@@ -36,6 +48,84 @@ def GateParameter(gate):
     mat = np.vstack((gate.weights, gate.recurrent_weights, peephole_mat, gate.bias))
     return mat
 
+
+class Gate():
+    def __init__(self, weight, bias, recurrent, peephole, activite_fn):
+        self.weight = weight
+        self.bias = bias
+        self.recurrent = recurrent
+        self.peephole = peephole
+        self.activate = activite_fn
+
+    def activate(self, data, prev, state):
+        pass
+
+
+class LSTMLayer():
+    def __init__(self, _input, forget, cell, output, stride):
+        self.input = _input
+        self.forget = forget
+        self.cell = cell
+        self.output = output
+        self.stride = stride
+
+
+class FeedForwardLayer():
+    def __init__(self, weights, bais, activiation_fn):
+        self.weights = weights
+        self.bais = bais
+        self.activate_fn = activiation_fn
+
+    def Activiate(self, data, data_size):
+        val = tf.matmul(data, self.weights) + self.bais
+        val = self.activate_fn(val)
+        return val
+
+class BidirectionalLayer():
+    def __init__(self, fwd, bwd):
+        self.fwd = fwd
+        self.bwd = bwd
+            
+    def Activiate(self, input_data, data_size):
+
+        data0 = input_data
+        data1 = tf.reverse(data0, [0])
+        res0 = RunLayer(self.fwd, data0, data_size)
+        res1 = RunLayer(self.bwd, data1, data_size)
+        res1 = tf.reverse(res1, [0])
+
+        result = tf.concat([res0, res1], axis=1)
+        
+        return result
+
+
+def ConvertGate(gate):
+    assert type(gate) == madmom.ml.nn.layers.Gate or type(gate) == madmom.ml.nn.layers.Cell
+
+    weight = tf.Variable(gate.weights)
+    bias = tf.Variable(gate.bias)
+    reccurrent = tf.Variable(gate.recurrent_weights)
+    if gate.peephole_weights is not None:
+        peephole = tf.Variable(gate.peephole_weights)
+    else:
+        peephole = None
+
+    fn = GetActiviationFn(gate.activation_fn)    
+    newGate = Gate(weight, bias, reccurrent, fn)
+    return newGate
+    
+def ConvertLayer(Layer):
+    mi = ConvertGate(layer.input_gate)
+    mf = ConvertGate(layer.forget_gate)
+    mc = ConvertGate(layer.cell)
+    mo = ConvertGate(layer.output_gate)
+
+    layer = LSTMLayer(mi, mf, mc, mo)
+
+    return layer
+
+
+
 def ConvertLayerWeight(layer):
     mi = GateParameter(layer.input_gate)
     mf = GateParameter(layer.forget_gate)
@@ -46,17 +136,19 @@ def ConvertLayerWeight(layer):
     tforget = tf.Variable(mf)
     tc = tf.Variable(mc)
     to = tf.Variable(mo)
-    
-    w = tf.concat([ti, tforget, tc, to], 1, name='lstm_layer')
 
     stride = layer.input_gate.bias.shape[0]
-    l = TensorLayer(w, stride)
-
+    l = LSTMLayer(ti, tforget, tc, to, stride)
+ 
     return l
 
-# def ConvertForwardLayer(layer):
-#     assert type(layer) == madmom.ml.nn.layers.FeedForwardLayer
-
+def ConvertForwardLayer(layer):
+    assert type(layer) == madmom.ml.nn.layers.FeedForwardLayer
+    weights = tf.Variable(layer.weights)
+    bias = tf.Variable(layer.bias)
+    fn = GetActiviationFn(layer.activation_fn)
+    newLayer = FeedForwardLayer(weights, bias, fn)
+    return newLayer
 
 
 def ConvertBidirectionLayer(layer):
@@ -65,7 +157,8 @@ def ConvertBidirectionLayer(layer):
     fwd_tensor = ConvertLayerWeight(layer.fwd_layer)
     back_tensor = ConvertLayerWeight(layer.bwd_layer)
 
-    return [fwd_tensor, back_tensor]
+    newLayer = BidirectionalLayer(fwd_tensor, back_tensor)
+    return newLayer
 
 def ConvertMultiLayerNetwrok(network):
     assert type(network) == madmom.ml.nn.NeuralNetwork
@@ -75,11 +168,12 @@ def ConvertMultiLayerNetwrok(network):
     newLayers.append(ConvertBidirectionLayer(layers[0]))
     newLayers.append(ConvertBidirectionLayer(layers[1]))
     newLayers.append(ConvertBidirectionLayer(layers[2]))
+    newLayers.append(ConvertForwardLayer(layers[3]))
     return newLayers
 
 def RunMultiLayerNetwrok(network, data, data_size):
     for layer in network:
-        data = RunBidirectionLayer(layer, data, data_size)
+        data = layer.Activiate(data, data_size)
 
     return data
 
@@ -87,20 +181,20 @@ def RunMultiLayerNetwrok(network, data, data_size):
 
 def RunLayer(tensorLayer, data, data_size):
 
-    tensor = tensorLayer.tensor
+    ig = tensorLayer.input
+    fg = tensorLayer.forget
+    cg = tensorLayer.cell
+    og = tensorLayer.output
     nStride = tensorLayer.stride
 
-    ig = tensor[:,0*nStride:1*nStride]
-    fg = tensor[:,1*nStride:2*nStride]
-    cg = tensor[:,2*nStride:3*nStride]
-    og = tensor[:,3*nStride:4*nStride]
-
-    data_type = tensor.dtype
-    prev = tf.zeros([nStride], dtype=data_type)
+    data_type = tensorLayer.input.dtype
+    prev = tf.zeros([nStride], dtype=data_type)    
+    prev = tf.expand_dims(prev, axis=0)
     state = tf.zeros([nStride], dtype=data_type)
+    state = tf.expand_dims(state, axis=0)
     # print(prev.shape)
     # print(state.shape)
-    one = tf.constant([1.0], dtype=data_type)
+    one = tf.constant([[1.0]], dtype=data_type)
 
     count = data_size
     
@@ -109,26 +203,23 @@ def RunLayer(tensorLayer, data, data_size):
     cond = lambda i, *_:tf.less(i, count)
 
     def body(_i, _prev, _state, _out):
-        dd = data[_i]
+        dd = data[_i:_i+1]
 
-        v = tf.concat([dd, _prev, _state, one], 0)
-        l = tf.shape(v)
-        v = tf.reshape(v, (1, l[0]))
+        v = tf.concat([dd, _prev, _state, one], axis=1)
 
         i = tf.sigmoid(tf.matmul(v, ig))
         f = tf.sigmoid(tf.matmul(v, fg))
         c = tf.tanh(tf.matmul(v, cg))
         newState = c * i + _state * f
 
-        v = tf.concat([dd, _prev, newState[0], one], 0)
+        v = tf.concat([dd, _prev, newState, one], axis=1)
 
-        v = tf.reshape(v, (1, l[0]))
         o = tf.sigmoid(tf.matmul(v, og))
 
         newPrev = tf.tanh(newState) * o
         newOut = _out.write(_i, newPrev[0])
 
-        return tf.add(_i, 1), newPrev[0], newState[0], newOut
+        return tf.add(_i, 1), newPrev, newState, newOut
 
     ii = tf.constant(0, dtype=tf.int32)
     a, b, c, d = tf.while_loop(cond, body, [ii, prev, state, out])
@@ -137,18 +228,6 @@ def RunLayer(tensorLayer, data, data_size):
     return d
 
 
-def RunBidirectionLayer(tensors, input_data, data_size):
-    data_type = tensors[0].tensor.dtype
-
-    data0 = input_data
-    data1 = tf.reverse(data0, [0])
-    res0 = RunLayer(tensors[0], data0, data_size)
-    res1 = RunLayer(tensors[1], data1, data_size)
-    res1 = tf.reverse(res1, [0])
-
-    result = tf.concat([res0, res1], axis=1)
-    
-    return result
 
 
 def Test1(gate):
@@ -242,15 +321,24 @@ def Test3(layer):
         options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         run_metadata = tf.RunMetadata()      
         
-        t = time.time()        
-        r = sess.run(out, options=options, run_metadata=run_metadata)
-        print(r[-1], time.time() - t)    
+        t = time.time()     
+        if profile:
+            r = sess.run(out, options=options, run_metadata=run_metadata)
+            print(r[-1], time.time() - t)
 
-        from tensorflow.python.client import timeline
-        fetched_timeline = timeline.Timeline(run_metadata.step_stats, graph=sess.graph)
-        chrome_trace = fetched_timeline.generate_chrome_trace_format()
-        with open('timeline_01.json', 'w') as f:
-            f.write(chrome_trace)
+            train_writer = tf.summary.FileWriter('d:/work/train', sess.graph)
+            # train_writer.add_graph(g)
+            # train_writer.add_summary(summary)
+            train_writer.close()
+
+            from tensorflow.python.client import timeline
+            fetched_timeline = timeline.Timeline(run_metadata.step_stats, graph=sess.graph)
+            chrome_trace = fetched_timeline.generate_chrome_trace_format()
+            with open('timeline_01.json', 'w') as f:
+                f.write(chrome_trace)
+        else:
+            r = sess.run(out)
+            print(r[-1], time.time() - t)
 
 
 
@@ -315,20 +403,24 @@ def Test5(network):
         options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         run_metadata = tf.RunMetadata()      
         
-        t = time.time()        
-        r = sess.run(out, options=options, run_metadata=run_metadata)
-        print(r[-1], time.time() - t)
+        t = time.time()  
+        if profile:
+            r = sess.run(out, options=options, run_metadata=run_metadata)
+            print(r[-1], time.time() - t)
 
-        train_writer = tf.summary.FileWriter('d:/work/train', sess.graph)
-        # train_writer.add_graph(g)
-        # train_writer.add_summary(summary)
-        train_writer.close()
+            train_writer = tf.summary.FileWriter('d:/work/train', sess.graph)
+            # train_writer.add_graph(g)
+            # train_writer.add_summary(summary)
+            train_writer.close()
 
-        from tensorflow.python.client import timeline
-        fetched_timeline = timeline.Timeline(run_metadata.step_stats, graph=sess.graph)
-        chrome_trace = fetched_timeline.generate_chrome_trace_format()
-        with open('timeline_01.json', 'w') as f:
-            f.write(chrome_trace)
+            from tensorflow.python.client import timeline
+            fetched_timeline = timeline.Timeline(run_metadata.step_stats, graph=sess.graph)
+            chrome_trace = fetched_timeline.generate_chrome_trace_format()
+            with open('timeline_01.json', 'w') as f:
+                f.write(chrome_trace)
+        else:
+            r = sess.run(out)
+            print(r[-1], time.time() - t)
 
 
 
@@ -374,7 +466,7 @@ def Do():
     PrintFwdLayer(BiLayers[3])
     print(type(BiLayers))
     # print(BiLayers[3])  # a feedForwardLayer
-    BiLayers.pop()
+    # BiLayers.pop()
     # return
 
     layer = BiLayers[0]
@@ -386,16 +478,20 @@ def Do():
 
     # Test1(lstmLayer.input_gate)
     # Test2(lstmLayer)
-    Test3(lstmLayer)
+    # Test3(lstmLayer)
     # Test4(layer)
-    # Test5(network)
+    Test5(network)
 
     # GateParameter(lstmLayer.cell)
     # GateParameter(lstmLayer.input_gate)
     # GateParameter(lstmLayer.forget_gate)
     # GateParameter(lstmLayer.output_gate)
    
-    print(type(lstmLayer.cell))
+    print(type(lstmLayer.cell.activation_fn))
+
+    print(lstmLayer.cell.activation_fn.__name__)
+    # print(lstmLayer.cell.activation_fn == )
+    print(lstmLayer.input_gate.activation_fn)
     print(lstmLayer.activation_fn)
     
 
