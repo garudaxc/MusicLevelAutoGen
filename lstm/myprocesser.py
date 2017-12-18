@@ -2,10 +2,6 @@
 import numpy as np
 
 import os
-if os.name == 'nt':
-    import sys
-    sys.path.append(r'D:\librosa\madmom')
-
 import madmom
 # import librosa
 # import librosa.display
@@ -93,8 +89,9 @@ def MainTest():
     path = '/Users/xuchao/Documents/rhythmMaster/'
     if os.name == 'nt':
         path = 'D:/librosa/RhythmMaster/'
+        path = r'D:/work/rythmmaster/'
 
-    songName = 'aiqingfadeguang'
+    songName = '4minuteshm'
 
     pathname = '%s%s/%s.mp3' % (path, songName, songName)
 

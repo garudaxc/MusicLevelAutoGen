@@ -1,103 +1,18 @@
-import numpy as np
+import tensorflow as tf
+from tensorflow.python.client import timeline
 
-from lstm import LstmParam, LstmNetwork
+a = tf.random_normal([2000, 5000])
+b = tf.random_normal([5000, 1000])
+res = tf.matmul(a, b)
 
+with tf.Session() as sess:
+    # add additional options to trace the session execution
+    options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+    run_metadata = tf.RunMetadata()
+    sess.run(res, options=options, run_metadata=run_metadata)
 
-class ToyLossLayer:
-    """
-    Computes square loss with first element of hidden layer array.
-    """
-    @classmethod
-    def loss(self, pred, label):
-        return (pred[0] - label) ** 2
-
-    @classmethod
-    def bottom_diff(self, pred, label):
-        diff = np.zeros_like(pred)
-        diff[0] = 2 * (pred[0] - label)
-        return diff
-
-
-def example_0():
-    # learns to repeat simple sequence from random inputs
-    np.random.seed(0)
-
-    # parameters for input data dimension and lstm cell count
-    mem_cell_ct = 100
-    x_dim = 50
-    lstm_param = LstmParam(mem_cell_ct, x_dim)
-    lstm_net = LstmNetwork(lstm_param)
-    y_list = [-0.5, 0.2, 0.1, -0.5]
-    #y_list = np.array([[-0.5, 1], [0.2, 2], [0.1, 3], [-0.5, -1]])
-    input_val_arr = [np.random.random(x_dim) for _ in y_list]
-
-    for cur_iter in range(100):
-        print("iter", "%2s" % str(cur_iter), end=": ")
-        for ind in range(len(y_list)):
-            lstm_net.x_list_add(input_val_arr[ind])
-
-        print("y_pred = [" +
-              ", ".join(["% 2.5f" % lstm_net.lstm_node_list[ind].state.h[0] for ind in range(len(y_list))]) +
-              "]", end=", ")
-
-        loss = lstm_net.y_list_is(y_list, ToyLossLayer)
-        print("loss:", "%.3e" % loss)
-        lstm_param.apply_diff(lr=0.1)
-        lstm_net.x_list_clear()
-
-
-
-def fx(x):
-    y = (np.sin(x * 0.01) + np.sin(x * 0.00345 + 2)) * 0.5
-    return y
-
-
-
-
-import matplotlib.pyplot as plt
-def example_1():
-    x = np.arange(2005)
-    y = np.array([fx(i) for i in x])
-
-    kernel0 = np.array([0.2, 0.6, 0.2])
-    kernel1 = np.array([0.0625, 0.25, 0.375, 0.25, 0.0625])
-    kernel2 = np.array([0.25, 0.5, 0.25])
-
-    x_data = [[y[i], 
-    np.dot(kernel0, y[i-1:i+2]), 
-    np.dot(kernel1, y[i-2:i+3]),
-    np.dot(kernel2, y[i-1:i+2]),
-    np.dot(kernel0, y[i-1:i+2])] for i in range(2,2002)]
-    
-    mem_cell_ct = 200
-    x_dim = 5
-    lstm_param = LstmParam(mem_cell_ct, x_dim)
-    lstm_net = LstmNetwork(lstm_param)
-
-    y_list = y[10:2000]
-    input_val_arr = x_data[:-10]
-
-    for cur_iter in range(100):
-        print("iter", "%2s" % str(cur_iter), end=": ")
-        for ind in range(len(y_list)):
-            lstm_net.x_list_add(input_val_arr[ind])
-
-        # print("y_pred = [" +
-        #       ", ".join(["% 2.5f" % lstm_net.lstm_node_list[ind].state.h[0] for ind in range(len(y_list))]) +
-        #       "]", end=", ")
-
-        loss = lstm_net.y_list_is(y_list, ToyLossLayer)
-        print("loss:", "%.3e" % loss)
-        lstm_param.apply_diff(lr=0.1)
-        lstm_net.x_list_clear()
-
-
-    plt.plot(x, y)
-    plt.show()
-
-
-
-if __name__ == "__main__":
-    #example_0()
-    example_1()
-
+    # Create the Timeline object, and write it to a json file
+    fetched_timeline = timeline.Timeline(run_metadata.step_stats)
+    chrome_trace = fetched_timeline.generate_chrome_trace_format()
+    with open('timeline_01.json', 'w') as f:
+        f.write(chrome_trace)

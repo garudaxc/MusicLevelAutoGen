@@ -47,12 +47,17 @@ def ConvertLayerWeight(layer):
     tc = tf.Variable(mc)
     to = tf.Variable(mo)
     
-    w = tf.concat([ti, tforget, tc, to], 1)
+    w = tf.concat([ti, tforget, tc, to], 1, name='lstm_layer')
 
     stride = layer.input_gate.bias.shape[0]
     l = TensorLayer(w, stride)
 
     return l
+
+# def ConvertForwardLayer(layer):
+#     assert type(layer) == madmom.ml.nn.layers.FeedForwardLayer
+
+
 
 def ConvertBidirectionLayer(layer):
     assert type(layer) == madmom.ml.nn.layers.BidirectionalLayer
@@ -216,6 +221,7 @@ def Test3(layer):
 
     with open('d:/work/signal_data.pk', 'rb') as file:
         input_data = pickle.load(file)
+        input_data = input_data[:1000]
     
     print('file loaded', type(input_data), input_data.shape, input_data.dtype)
     data_type = layer.input_gate.weights.dtype
@@ -229,12 +235,22 @@ def Test3(layer):
     w = ConvertLayerWeight(layer)
 
     data = tf.Variable(input_data)
-    out = RunLayer(w, data)
+    out = RunLayer(w, data, len(input_data))
     with tf.Session() as sess:        
         sess.run(tf.global_variables_initializer())
-        t = time.time()
-        r = sess.run(out)
-        print(r[-1], time.time() - t)
+
+        options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        run_metadata = tf.RunMetadata()      
+        
+        t = time.time()        
+        r = sess.run(out, options=options, run_metadata=run_metadata)
+        print(r[-1], time.time() - t)    
+
+        from tensorflow.python.client import timeline
+        fetched_timeline = timeline.Timeline(run_metadata.step_stats, graph=sess.graph)
+        chrome_trace = fetched_timeline.generate_chrome_trace_format()
+        with open('timeline_01.json', 'w') as f:
+            f.write(chrome_trace)
 
 
 
@@ -290,13 +306,29 @@ def Test5(network):
     print('aaa')
 
     w = ConvertMultiLayerNetwrok(network)
-    data = tf.Variable(input_data)
+    data = tf.Variable(input_data, name='input_data')
     out = RunMultiLayerNetwrok(w, data, len(input_data))
+
     with tf.Session() as sess:        
         sess.run(tf.global_variables_initializer())
-        t = time.time()
-        r = sess.run(out)
+
+        options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        run_metadata = tf.RunMetadata()      
+        
+        t = time.time()        
+        r = sess.run(out, options=options, run_metadata=run_metadata)
         print(r[-1], time.time() - t)
+
+        train_writer = tf.summary.FileWriter('d:/work/train', sess.graph)
+        # train_writer.add_graph(g)
+        # train_writer.add_summary(summary)
+        train_writer.close()
+
+        from tensorflow.python.client import timeline
+        fetched_timeline = timeline.Timeline(run_metadata.step_stats, graph=sess.graph)
+        chrome_trace = fetched_timeline.generate_chrome_trace_format()
+        with open('timeline_01.json', 'w') as f:
+            f.write(chrome_trace)
 
 
 
@@ -354,8 +386,8 @@ def Do():
 
     # Test1(lstmLayer.input_gate)
     # Test2(lstmLayer)
-    # Test3(lstmLayer)
-    Test4(layer)
+    Test3(lstmLayer)
+    # Test4(layer)
     # Test5(network)
 
     # GateParameter(lstmLayer.cell)
