@@ -16,10 +16,17 @@ MUSIC_FILE_ERROR = 1    #打开音乐文件错误
 MUSIC_TOO_LONG = 2      #音乐文件太长
 MUSIC_TOO_SHORT = 3     #音乐文件太短
 PROBABLY_NOT_MUSIC = 4  #音乐文件的内容可能不是歌曲
+SEGMENT_ERROR = 5       #时长太短，或bpm太低，无法正常分段
 
 
 logger = None
+genDebugFile = False
 
+# 允许的最小bpm，如果如果算得小于该值，则需要自动翻倍
+MinimumBPM = 60
+
+# 分段时可允许的偏移范围，范围越大，越容易分到音乐的变化处，但会导致段落的长度变化较大
+Segment_Neighbourhood = 0.2
 
 # 计算音乐bpm entertime和分段
 
@@ -109,7 +116,7 @@ def CalcBarInterval(beat_times):
     return a, b
 
 
-def normalizeInterval(beat, threhold = 0.02, abThrehold=0.333):
+def NormalizeInterval(beat, threhold = 0.02, abThrehold=0.333):
     # 截掉前后不太准的beat
     interval = beat[1:,0] - beat[:-1, 0]
 
@@ -140,7 +147,7 @@ def normalizeInterval(beat, threhold = 0.02, abThrehold=0.333):
     return 0, len(beat)
 
 
-def CalcDownbeat(y, sr, **args):
+def CalcDownbeat(y, sr, duration, **args):
     # calc downbeat entertime
     analysisLength = args['-duration']
     minimumMusicLength = 165
@@ -149,9 +156,7 @@ def CalcDownbeat(y, sr, **args):
     threhold = args['-threhold']
     abThrehold = args['-abThrehold']
 
-    startTime = time.time()
-    
-    duration = librosa.get_duration(y=y, sr=sr)
+    startTime = time.time()    
 
     if duration < minimumMusicLength:
         logger.error(MUSIC_TOO_SHORT, 'music is too short! duration:', duration)
@@ -174,34 +179,26 @@ def CalcDownbeat(y, sr, **args):
 
     beatIndex = downbeatTracking(beatProba)
     
-    firstBeat, lastBeat = normalizeInterval(beatIndex, threhold=threhold, abThrehold=abThrehold)
+    firstBeat, lastBeat = NormalizeInterval(beatIndex, threhold=threhold, abThrehold=abThrehold)
     if firstBeat == -1:        
         logger.error(PROBABLY_NOT_MUSIC, 'generate error,numbeat %d, abnormal rate %f' % (len(beatIndex), lastBeat))
         return 0, 0
 
     newBeat = beatIndex[firstBeat:lastBeat]
     downbeat = madmom.features.downbeats.filter_downbeats(newBeat)
-    downbeat = downbeat + start
+    downbeat = downbeat + librosa.samples_to_time(clip, sr = sr)[0]
 
     barInter, etAuto = CalcBarInterval(downbeat)
-
-    # first 10 seconds samples to find first beat
-    yy = y[:441000]
-    act = processer(yy)
-    beginBeat = downbeatTracking(act)                    
-    firstBeatTime = beginBeat[0, 0]
-
-    if abs(etAuto - firstBeatTime) > barInter:
-        etAuto += ((firstBeatTime - etAuto) // barInter + 1) * barInter
-
-    assert abs(etAuto - firstBeatTime) < barInter
     
+    # enter time is less than a bar interval
+    etAuto = etAuto % barInter
+
     bpm = 240.0 / barInter
 
     return bpm, etAuto
     
 
-def CalcSegmentation(y, sr, beats, k = 4):
+def LaplacianSegmentation(y, sr, beats, k = 4):
     # Next, we'll compute and plot a log-power CQT
     BINS_PER_OCTAVE = 12 * 3
     N_OCTAVES = 7
@@ -285,10 +282,11 @@ def CalcSegmentation(y, sr, beats, k = 4):
 
     return my_bound_frames, bound_segs
 
-
-def PickSegmentation(segments, duration, neighbourhood=0.167):
+# neighbourhood=0.167
+def PickSegmentation(segments, duration, offset=0, neighbourhood=0.1):
     # 在三分之一和三分之二附近挑选两个分段点
     points = segments / duration
+    offset = offset / duration
     def f(a):
         p = np.argmin(np.abs(points - a))
         p = points[p]
@@ -296,9 +294,90 @@ def PickSegmentation(segments, duration, neighbourhood=0.167):
             p = a
         return p * duration
 
-    result = np.array([f(0.3333), f(0.6666)])
+    p0 = (1.0 - offset) * 0.3333 + offset
+    p1 = (1.0 - offset) * 0.6666 + offset
+    result = np.array([f(p0), f(p1)])
     return result
 
+def PickSegmentation2(pos, seg_points, neighbourhood):
+    '''
+    查找pos附近最近的点，范围不能超过neightbourhood
+    '''
+    p = np.argmin(np.abs(seg_points - pos))
+    p = seg_points[p]
+    if abs(p-pos) > neighbourhood * 0.5:
+        p = None
+    return p
+
+
+def Segmentation(y, sr, duration, bpm, et):
+    '''
+    计算分段点
+    分段最短长度16小节    
+    '''
+    beatInter = 60.0 / bpm
+    barInterval = beatInter * 4
+    numBeats = int((duration-et) / beatInter)
+    beatTimes = np.arange(numBeats) * beatInter + et
+    beatFrames = librosa.time_to_frames(beatTimes, sr=sr)
+
+    logger.info('duration', duration, 'bpm', bpm)
+
+    # 分段点要偏移四小节
+    offset = (et + barInterval * 4) / duration
+    # 允许的，最早的分段点
+    mininumBarsPerSeg = (10 * barInterval) / duration
+    firstSeg = offset + mininumBarsPerSeg
+    logger.info('firstSeg', firstSeg)
+
+    p0 = (1.0 - offset) * 0.3333 + offset
+    p1 = (1.0 - offset) * 0.6666 + offset
+
+    if firstSeg > p0:
+        logger.error(SEGMENT_ERROR, 'first seg', firstSeg, 'seg0', p0, 'bpm', bpm)
+        return None
+            
+    neighbourhood = min((p0 - firstSeg), Segment_Neighbourhood)
+    logger.info('segment neighbourhood', neighbourhood)
+
+    seg = [None, None]
+    for k in range(3, 6):
+        if seg[0] != None and seg[1] != None:
+            break
+
+        logger.info('LaplacianSegmentation for k=', k)
+
+        seg_frames, _ = LaplacianSegmentation(y, sr, beatFrames, k = k)
+        times = librosa.frames_to_time(seg_frames, sr=sr)
+
+        if genDebugFile:
+            name = r'd:\ab\QQX5_Mainland\exe\resources\media\audio\Music\seg%d.csv' % k
+            SaveInstantValue(times, name, '_segment')
+
+        seg_point = times / duration
+        
+        if seg[0] == None:
+            seg[0] = PickSegmentation2(p0, seg_point, neighbourhood)
+
+        if seg[0] != None and (seg[0] + mininumBarsPerSeg + neighbourhood * 0.5) > p1:
+            p1 = seg[0] + mininumBarsPerSeg + neighbourhood * 0.5
+        
+        if seg[1] == None:
+            seg[1] = PickSegmentation2(p1, seg_point, neighbourhood)
+        
+        logger.info('seg', seg)
+
+    if seg[0] == None:
+        seg[0] = p0
+
+    if seg[1] == None:
+        seg[1] = p1
+
+    seg = np.array(seg) * duration    
+
+    # align to downbeat
+    segTimes = np.round((seg-et)/barInterval) * barInterval + et
+    return segTimes
 
 def SaveInstantValue(beats, filename, postfix = ''):
     import os
@@ -310,6 +389,29 @@ def SaveInstantValue(beats, filename, postfix = ''):
             file.write(str(obj) + '\n')
 
     return True
+
+def GenDebugFile(filename, duration, bpm, et, seg = None):
+    
+    def SaveInstantValue(beats, filename, postfix = ''):
+        import os
+        #保存时间点数据
+        outname = os.path.splitext(filename)[0]
+        outname = outname + postfix + '.csv'
+        with open(outname, 'w') as file:
+            for obj in beats:
+                file.write(str(obj) + '\n')
+
+        return True
+        
+    beatInter = 60.0 / bpm
+    barInterval = beatInter * 4
+
+    numDownbeats = int((duration-et) / barInterval)
+    downBeatTimes = np.arange(numDownbeats) * barInterval + et
+    SaveInstantValue(downBeatTimes, filename, '_downbeat')
+    
+    if seg is not None:
+        SaveInstantValue(seg, filename, '_seg')
 
 
 def AnalysisMusicFeature(filename, **args):
@@ -336,24 +438,20 @@ def AnalysisMusicFeature(filename, **args):
         return (False, None)
 
     logger.info('loaded', time.time() - t)
-
-    bpm, et = CalcDownbeat(y, sr, **args)
-    if bpm == 0:
-        return (False, None)
-        
+    
     duration = librosa.get_duration(y=y, sr=sr)
-    beatInter = 60.0 / bpm
-    barInterval = beatInter * 4
-    numBeats = int((duration-et) / beatInter)
-    beatTimes = np.arange(numBeats) * beatInter + et
-    beatFrames = librosa.time_to_frames(beatTimes, sr=sr)
 
-    logger.info('analysis segmentation', time.time() - t)
-    frames, _ = CalcSegmentation(y, sr, beatFrames)
-    times = librosa.frames_to_time(frames, sr=sr)
-    segTimes = PickSegmentation(times, duration)
-    # align to downbeat
-    segTimes = np.round((segTimes-et)/barInterval) * barInterval + et
+    bpm, et = CalcDownbeat(y, sr, duration, **args)
+    if bpm == 0:
+        return (False, None)        
+    if bpm < MinimumBPM:
+        logger.info('bpm too low')
+        bpm = bpm * 2
+            
+    logger.info('analysis segmentation', time.time() - t)    
+    segTimes = Segmentation(y, sr, duration, bpm, et)
+    if segTimes[0] == 0:
+        return (False, None)
 
     logger.info('AnalysisMusicFeature done', time.time() - t)
     result = {}
@@ -362,6 +460,10 @@ def AnalysisMusicFeature(filename, **args):
     result['EnterTime'] = et
     result['seg0'] = segTimes[0]
     result['seg1'] = segTimes[1]
+
+    if genDebugFile:
+        GenDebugFile(filename, duration, bpm, et, segTimes)
+
     return (True, result)
 
 
@@ -419,19 +521,25 @@ def GenerateLevelFile(filename, musicInfo, logger):
     pass
     print('call GenerateLevelFile')
 
-def Test():
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1351.ogg'
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0201.ogg'
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0858.ogg'
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1196.ogg'
-    filename = r'd:\librosa\炫舞自动关卡生成\郭德纲 - 做推车.mp3'
-    filename = r'f:\music\有声小说 - 书读至乐，物观化境.mp3'
-    filename = r'f:\music\K One - 爱情蜜语.mp3'
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0178.ogg'
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1229.ogg'
-    filename = r'f:\music\英语听力 - 大卫·科波菲尔04.mp3'
-    filename = r'f:\music\侯宝林,郭启儒 - 抬杠.mp3'
-    filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0178.ogg'
+def Run(filename = None):
+    # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1351.ogg'
+    # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0201.ogg'
+    # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0858.ogg'
+    # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1196.ogg'
+    # filename = r'd:\librosa\炫舞自动关卡生成\郭德纲 - 做推车.mp3'
+    # filename = r'f:\music\有声小说 - 书读至乐，物观化境.mp3'
+    # filename = r'f:\music\K One - 爱情蜜语.mp3'
+    # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0178.ogg'
+    # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1229.ogg'
+    # filename = r'f:\music\英语听力 - 大卫·科波菲尔04.mp3'
+    # filename = r'f:\music\侯宝林,郭启儒 - 抬杠.mp3'
+    # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0178.ogg'
+    # filename = r'f:\music\song_1698.ogg'
+
+
+    # if (len(sys.argv)) < 2:
+    #     print('missing music file(ogg) name as input!')
+    #     exit(1)
 
     if len(sys.argv) > 1:
         filename = sys.argv[-1]
@@ -469,9 +577,53 @@ def Test():
     logger.info('result', info)
 
 
+def do_work(filelist, dummy):
+    print('filelist', filelist)
+    for file in filelist:
+        if not os.path.exists(file):
+            print(file, 'not exists!')
+        else:
+            Run(file)
+
+
+
+def BatchTest():
+    import multiprocessing as mp
+    numWorker = 6
+
+    idlist = [1, 4, 6, 16, 22, 130, 168, 378, 520, 1392, 25, 34, 60, 83, 98, 118, 134, 156, 177, 204, 212, 236, 254, 310, 323, 61, 487, 823, 1005, 1044, 1462, 1549, 217, 1688, 1842, 956, 975, 152, 514, 150]
+    idlist2 = [1, 4, 6, 16, 34, 60, 61, 83, 98, 130, 134, 150, 152, 156, 177, 178, 204, 212, 236, 254, 310, 323, 378, 514, 520, 956, 1005, 1044, 1392, 1462, 1489, 1549, 1688, 1842]
+
+    a = [i for i in idlist if i not in idlist2]
+
+    idlist = [184, 336, 461, 515, 784, 937, 1080, 1233, 1303, 1422]
+
+    path = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_%04d.ogg'
+
+    if len(idlist) > 0:
+        filelist = [path % i for i in idlist]
+    
+    lists = [filelist[i::numWorker] for i in range(numWorker)]
+    startTime = time.time()
+    processes = []
+
+    for i in range(numWorker):
+        if len(lists[i]) > 0:
+            print('thread ', i)
+            t = mp.Process(target=do_work, args=(lists[i], 1))
+            processes.append(t)
+            t.start()
+    
+    for t in processes:
+        t.join()    
+
+    print()
+    print('done in %.1f minute' % ((time.time() - startTime) / 60.0))
+
 if __name__ == '__main__':
     
-    # logger.info(vars())
+    # Run()
+    BatchTest()
 
-    Test()
+
     

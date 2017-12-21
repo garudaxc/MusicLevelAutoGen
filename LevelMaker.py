@@ -228,7 +228,7 @@ class Generator:
 		self.__sectionTwoBarAmount = math.floor((self.__generatorInput["musicSectionBreakPointTwo"] -self.__sectionOneBarAmount*self.__barTime)/self.__barTime)
 		self.__sectionThereBarAoumt =math.floor((self.__generatorInput["musicLength"] -(self.__sectionOneBarAmount+self.__sectionTwoBarAmount)*self.__barTime)/self.__barTime) -1 # 留出1个空白
 		# print("bartime = ",self.__barTime,"BarAmount = ",self.__barAmount)
-		# print("段落","[",self.__sectionOneBarAmount,self.__sectionTwoBarAmount,self.__sectionThereBarAoumt,"]")
+		print("段落","[",self.__sectionOneBarAmount,self.__sectionTwoBarAmount,self.__sectionThereBarAoumt,"]")
 
 		maxBarAmountForInTwoAndThere = max(self.__sectionTwoBarAmount,self.__sectionThereBarAoumt)
 		halfMaxBar =math.floor(maxBarAmountForInTwoAndThere/2)
@@ -635,8 +635,8 @@ class Generator:
 GeneratorRuler = dict(
 	mini_music_length = 165000,    						#歌曲时长范围最短不能短于2分45秒
 	max_music_length = 3600000,    						#最长不能超过六分钟
-	mini_section_barAmount  = 16,  						#段落最短不能低于16小节
-	begin_blank_space_barAmount = (5,11),        		#关卡的第一个动作前必须空出不少于4小节、不大于12小节的歌曲
+	mini_section_barAmount  = 12,  						#段落最短不能低于16小节
+	begin_blank_space_barAmount = (4,6),        		#关卡的第一个动作前必须空出不少于4小节、不大于12小节的歌曲
 
 	one_segment_actionLevel_range = (4,5,6),			#情绪为4，5，6
 	two_segment_actionLevel_range = (4,5,6,7),			#情绪为4，5，6，7
@@ -1235,6 +1235,11 @@ def GenerateLevelFile(filename,musicInfo,logger):
 	GeneratorInput["musicSectionBreakPointOne"]=musicInfo["seg0"]*1000
 	GeneratorInput["musicSectionBreakPointTwo"]=musicInfo["seg1"]*1000
 	GeneratorInput["muiscDifficult"] = musicInfo["diffculty"]
+
+	path = os.path.dirname(GeneratorInput["filePath"])
+	name = os.path.basename(filename)
+	outfile = path + os.path.sep + os.path.splitext(name)[0] + '.ogg'
+	GeneratorInput["filePath"] = outfile
 
 	GeneratorInput["musicTitle"] = os.path.splitext( os.path.basename(filename))[0]
 
