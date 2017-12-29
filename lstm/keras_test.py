@@ -23,6 +23,20 @@ import tensorflow as tf
 #     # print(weights)
 #     # print(layer.count_params())
 
+
+def BaseTest():
+    x = tf.Variable([[1, 2], [3, 4]])
+    y = tf.Variable([7, -2])
+    y = x + y
+
+    
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
+    y = sess.run(y)
+    print(y)
+
+
+
 def TensorArrayTest():
     # array = tf.TensorArray(dtype = tf.float32, size=2)
     # array = array.write(0, [1.2, 2.0])
@@ -83,7 +97,9 @@ def CatTest2():
 
     v1 = tf.Variable([[1, 9]], dtype=tf.float32)
 
-    v = tf.concat([v1, v1], axis=1)
+    v = tf.concat([v1, v1], axis=0)
+
+    # v = tf.stack([v1[0], v1[0]])
 
     # v = tf.zeros([5], dtype=tf.float32)
     # v = tf.constant([[1.0]])
@@ -103,7 +119,6 @@ def TFTest():
     v3 = tf.Variable([4, 9, 0, 3, 6], dtype=tf.float32)
 
     print(v0.shape)
-
 
     # v0 = tf.reshape(v0, [2, 1])
     # v1 = tf.reshape(v1, [1, 2])
@@ -140,7 +155,9 @@ def TFTest():
 
 
 if __name__ == '__main__':
-    CatTest()
+    CatTest2()
+    # BaseTest()
+    # CatTest()
 	# TFTest()
     # LoopTest()
     # TensorArrayTest()

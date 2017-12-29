@@ -11,6 +11,59 @@ from tensorflow.contrib import rnn
 
 
 
+numHidden = 25
+batcSize = 8
+numSteps = 128
+inputDim = 314
+outputDim = 2
+
+
+
+def FillNote(data, note):
+    index = note[0] // 10
+    type = note[1]
+
+    data[index, 0] = 1.0
+    if type == 1:
+        data[index, 1] = 1.0
+    if type == 2:
+        last = note[2] // 10
+        data[index:index+last, 2] = 1.0
+
+
+def LevelDataToTrainData(LevelData, numSamples):
+    # 关卡数据转换训练数据
+    # 关卡数据（时刻，类型，时长），训练数据为每个采样点是否有值
+    # 尝试每个样本三个输出，代表是否有该类型音符，（点击、滑动、长按）
+    result = [[0.0, 0.0, 0.0]] * numSamples
+    result = np.array(result)
+    for l in LevelData:
+        # time in ms, sample rate is 100 samples per second
+        type = l[1]
+        if type == 3:
+            notes = l[2]
+            for n in notes:
+                FillNote(result, n)
+            continue
+
+        FillNote(result, l)
+
+    result = result[:,0:1]
+    return result
+
+def LevelToTrainDataSoftmax(levelData, numSamples):
+    result = LevelDataToTrainData(levelData, numSamples)
+    r = []
+    dim = result.shape[1]
+    for i in range(numSamples):
+        if result[i, 0] == 1.0:
+            r.append([0.0, 1.0])
+        else:
+            r.append([1.0, 0.0])
+    r = np.array(r)
+    return r
+
+
 def LoadLevelData(pathname, numSample):
     #加载心动关卡，转为训练数据
     notes = LevelInfo.LoadIdolInfo(pathname)
@@ -74,37 +127,98 @@ def PrepareTrainData(songList, batchSize = 32, useSoftmax = False):
     trainx = trainx[:-n]
     trainy = trainy[:-n]
 
-    trainx = trainx.reshape(trainx.shape[0], 1, trainx.shape[1])
-
     return trainx, trainy
 
 
-def BuildNetwork(x):
+class TrainData():
+    def __init__(self, x, y):
+        assert x.ndim == 2
+        self.batchSize = batchSize
+        self.numSteps = numSteps
+
+        count = x.shape[0]
+        self.numBatches = count // (self.batchSize * self.numSteps)
+        print(self.numBatches)
+
+        count = self.numBatches * (self.batchSize * self.numSteps)
+        x = x[:count]
+        y = y[:count]
+
+        xDim = x.shape[1]
+        yDim = y.shape[1]
+
+        # 重组数据，数据项 shape=(step, batchsize, inputsize)
+        x = x.reshape(self.batchSize, self.numBatches, self.numSteps, xDim)
+        self._x = x.transpose(1, 2, 0, 3)
+
+        y = y.reshape(self.batchSize, self.numBatches, self.numSteps, yDim)
+        self._y = y.transpose(1, 2, 0, 3)
+
+
+    def GetBatch(self, n):
+        x = self._x[n]
+        y = self._y[n]
+        return x, y
+
+
+def BuildNetwork():
     
-    num_hidden = 25
+    x = tf.placeholder(dtype=tf.float32, shape=(numSteps, batcSize, inputDim))
+    x = tf.unstack(x, axis=0)
 
     # Define lstm cells with tensorflow
     # Forward direction cell
-    lstm_fw_cell = rnn.LSTMCell(num_hidden, use_peepholes=True, forget_bias=1.0)
+    lstm_fw_cell = [
+        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
+        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
+        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
+
     # Backward direction cell
-    lstm_bw_cell = rnn.LSTMCell(num_hidden, use_peepholes=True, forget_bias=1.0)
+    lstm_bw_cell = [
+        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
+        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
+        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
 
     # Get lstm cell output
     
-    outputs, _, _ = rnn.static_bidirectional_rnn(lstm_fw_cell, lstm_bw_cell, x,
-                                              dtype=tf.float32)
+    output, _, _ = rnn.stack_bidirectional_rnn(lstm_fw_cell, lstm_bw_cell, x, dtype=tf.float32)
+    
+    weights = tf.Variable(tf.random_normal(shape=[2 * numHidden, outputDim]))
+    bais = tf.Variable(tf.random_normal(shape=[outputDim]))
 
-    print(outputs)
+    logits = [tf.matmul(o, weights) + bais for o in output]
+    logits = tf.stack(logits)
+
+    prediction = tf.nn.softmax(logits)
+
+    # Define loss and optimizer
+    loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
+        logits=logits, labels=Y))
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
+    train_op = optimizer.minimize(loss_op)
+
+
+
+
+    print(out[0])
 
 
 def Test():
-    timestep = 1
-    num_input = 15
+    timestep = 128
+    num_input = 314
     num_hidden = 10
-    batch_size = 5
+    batch_size = 8
 
-    x = tf.placeholder(dtype=tf.float32, shape=(batch_size, num_input))
-    x = tf.Variable(validate_shape=(batch_size, num_input), dtype=tf.float32)
+    x = tf.placeholder(dtype=tf.float32, shape=(timestep, batch_size, num_input))
+    x = tf.unstack(x, axis=0)
+
+
+    print(x)
+    return
+
+    # x = tf.Variable(validate_shape=(batch_size, num_input), dtype=tf.float32)
+    # x = tf.random_normal(shape=(batch_size, num_input))
+
     x = [x]
 
     # Define lstm cells with tensorflow
@@ -119,9 +233,8 @@ def Test():
     print(outputs)
     print(outputs[0])
 
-    weight = tf.Variable(validate_shape=(2*num_hidden, 2), dtype=tf.float32)
+    weight = tf.Variable(tf.random_normal(shape=(2*num_hidden, 2), dtype=tf.float32))
     out = tf.matmul(outputs[-1], weight)
-
 
     # Initialize the variables (i.e. assign their default value)
     init = tf.global_variables_initializer()
@@ -131,10 +244,11 @@ def Test():
     with tf.Session() as sess:
         # Run the initializer
         sess.run(init)
-
         y = sess.run(out)
         print(y)
 
+        y = sess.run(out)
+        print(y)
 
         
 
@@ -151,4 +265,29 @@ def Run():
 
 
 if __name__ == '__main__':
-    Test()
+    # Test()
+    # BuildNetwork()
+
+    # x, y = PrepareTrainData(['4minuteshm'], batchSize = 32, useSoftmax=True)
+    # print(x.shape, y.shape)
+
+    # a = TrainData(x, y)
+
+    # x, y = a.GetBatch(1)
+    # print(x.shape)
+    # print(y.shape)
+    
+
+    # x = np.arange(1, 25)
+    # x = x.reshape(24, 1)
+    # x = np.hstack((x, x, x))
+
+    # x = x.reshape(3, 4, 2, 3)
+    # x = x.transpose(1, 2, 0, 3)   
+
+    # x = x.reshape(3, 2 * 4, 3)
+    # x = x.transpose(1, 0, 2)
+
+    # x = x.reshape(4, 2, 3, 3)
+    # print(x)
+
