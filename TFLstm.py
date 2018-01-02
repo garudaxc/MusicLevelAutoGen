@@ -11,11 +11,12 @@ from tensorflow.contrib import rnn
 
 
 
-numHidden = 25
-batcSize = 8
-numSteps = 128
+numHidden = 20
+batchSize = 4
+numSteps = 256
 inputDim = 314
 outputDim = 2
+learning_rate = 0.005
 
 
 
@@ -107,7 +108,6 @@ def PrepareTrainData(songList, batchSize = 32, useSoftmax = False):
         inputData = lstm.myprocesser.LoadAndProcessAudio(pathname)
         trainx.append(inputData)
         numSample = len(inputData)
-
         pathname = MakeLevelPathname(song)
         level = LevelInfo.LoadRhythmMasterLevel(pathname)
 
@@ -131,7 +131,7 @@ def PrepareTrainData(songList, batchSize = 32, useSoftmax = False):
 
 
 class TrainData():
-    def __init__(self, x, y):
+    def __init__(self, x, y, batchSize, numSteps):
         assert x.ndim == 2
         self.batchSize = batchSize
         self.numSteps = numSteps
@@ -161,20 +161,20 @@ class TrainData():
         return x, y
 
 
-def BuildNetwork():
-    
-    x = tf.placeholder(dtype=tf.float32, shape=(numSteps, batcSize, inputDim))
-    x = tf.unstack(x, axis=0)
+def BuildNetwork(X, Y):
+    x = tf.unstack(X, axis=0)
 
     # Define lstm cells with tensorflow
     # Forward direction cell
     lstm_fw_cell = [
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
+        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
 
     # Backward direction cell
     lstm_bw_cell = [
+        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
@@ -188,19 +188,29 @@ def BuildNetwork():
 
     logits = [tf.matmul(o, weights) + bais for o in output]
     logits = tf.stack(logits)
+    # print(logits)
 
     prediction = tf.nn.softmax(logits)
+    print(prediction)
 
-    # Define loss and optimizer
-    loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-        logits=logits, labels=Y))
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
+    # # Define loss and optimizer
+    crossEntropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y)
+    print(crossEntropy)
+    loss_op = tf.reduce_mean(crossEntropy)
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)    
+    # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
     train_op = optimizer.minimize(loss_op)
 
+    print(train_op)
 
+    return train_op, loss_op
 
+    # loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
+    #     logits=logits, labels=Y))
+    # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
+    # train_op = optimizer.minimize(loss_op)
 
-    print(out[0])
+    # print(out[0])
 
 
 def Test():
@@ -251,31 +261,62 @@ def Test():
         print(y)
 
         
-
 def Run():
-    batch_size = 512
-    useSoftmax = False
-    units = 30
-    epochs = 120
     
-    songList = ['4minuteshm']
-    pathname = MakeMp3Pathname(songList[0])
-    testx, testy = PrepareTrainData(songList, batch_size, useSoftmax)
+    useSoftmax = True
+
+    songList = ['4minuteshm', '2differenttears', 'abracadabra']
+    testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
+    
+    data = TrainData(testx, testy, batchSize, numSteps)
+    numBatches = data.numBatches
+    print('numbatchs', numBatches)    
+    
+    X = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, inputDim))
+    Y = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, outputDim))
+    train_op, loss_op = BuildNetwork(X, Y)
+
+    # Initialize the variables (i.e. assign their default value)
+    init = tf.global_variables_initializer()
 
 
+    # Start training
+    with tf.Session() as sess:
+        # Run the initializer
+        sess.run(init)
+        epch = 100
+
+        for j in range(epch):
+            loss = 0
+
+            for i in range(numBatches):
+                xData, yData = data.GetBatch(i)
+
+                if i % 10 == 0:
+                    l = sess.run(loss_op, feed_dict={X:xData, Y:yData})
+                    loss = loss + l
+                else:
+                    sess.run(train_op, feed_dict={X:xData, Y:yData})
+    
+            print('epch', j, 'loss', loss)
 
 if __name__ == '__main__':
     # Test()
     # BuildNetwork()
 
+    Run()
+
+
     # x, y = PrepareTrainData(['4minuteshm'], batchSize = 32, useSoftmax=True)
     # print(x.shape, y.shape)
 
-    # a = TrainData(x, y)
+    # a = TrainData(x, y, batcSize, numSteps)
 
     # x, y = a.GetBatch(1)
     # print(x.shape)
     # print(y.shape)
+
+
     
 
     # x = np.arange(1, 25)
