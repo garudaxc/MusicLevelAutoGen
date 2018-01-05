@@ -1,7 +1,10 @@
 
 import tensorflow as tf
 
-
+runList = []
+def run(r):
+    runList.append(r)
+    return r
 
 # def KerasLayers():
 #     import keras
@@ -109,6 +112,21 @@ def CatTest2():
     y = sess.run(v)
     print(y)
 
+@run
+def calc_accurate():
+    a = tf.Variable([[[1.0, 2.0], [3.0, 4.0], [9.0, 8.0]], [[1.0, 2.0], [3.0, 4.0], [9.0, 8.0]]])
+    y = tf.argmax(a, axis = 2)
+
+    y = tf.equal(y, y)
+    y = tf.cast(y, tf.float32)
+
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
+    y = sess.run(y)
+    print(y)
+
+
+
 
 def TFTest():
     sess = tf.Session()
@@ -155,13 +173,8 @@ def TFTest():
 
 
 if __name__ == '__main__':
-    CatTest2()
-    # BaseTest()
-    # CatTest()
-	# TFTest()
-    # LoopTest()
-    # TensorArrayTest()
-
+    for func in runList:
+        func()
 
     # if False:
     #     a = TestClass()

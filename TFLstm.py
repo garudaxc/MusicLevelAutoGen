@@ -7,17 +7,21 @@ import lstm.myprocesser
 from lstm import postprocess
 import tensorflow as tf
 from tensorflow.contrib import rnn
+from lstm import postprocess
 
 
+runList = []
+def run(r):
+    runList.append(r)
+    return r
 
 
-numHidden = 20
+numHidden = 24
 batchSize = 4
 numSteps = 256
 inputDim = 314
 outputDim = 2
-learning_rate = 0.005
-
+learning_rate = 0.002
 
 
 def FillNote(data, note):
@@ -123,10 +127,6 @@ def PrepareTrainData(songList, batchSize = 32, useSoftmax = False):
     # if not useSoftmax:
     #     trainy = trainy[:,0]
 
-    n = len(trainx) % batchSize
-    trainx = trainx[:-n]
-    trainy = trainy[:-n]
-
     return trainx, trainy
 
 
@@ -138,7 +138,7 @@ class TrainData():
 
         count = x.shape[0]
         self.numBatches = count // (self.batchSize * self.numSteps)
-        print(self.numBatches)
+        print('numbatches', self.numBatches)
 
         count = self.numBatches * (self.batchSize * self.numSteps)
         x = x[:count]
@@ -153,6 +153,7 @@ class TrainData():
 
         y = y.reshape(self.batchSize, self.numBatches, self.numSteps, yDim)
         self._y = y.transpose(1, 2, 0, 3)
+        print('y shape', self._y.shape)
 
 
     def GetBatch(self, n):
@@ -169,12 +170,10 @@ def BuildNetwork(X, Y):
     lstm_fw_cell = [
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
-        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
 
     # Backward direction cell
     lstm_bw_cell = [
-        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
         rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
@@ -190,20 +189,24 @@ def BuildNetwork(X, Y):
     logits = tf.stack(logits)
     # print(logits)
 
-    prediction = tf.nn.softmax(logits)
+    prediction = tf.nn.softmax(logits, name='prediction')
     print(prediction)
+
+    # return prediction
+
+    correct = tf.equal(tf.argmax(prediction, axis=2), tf.argmax(Y, axis=2))
+    accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
 
     # # Define loss and optimizer
     crossEntropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y)
-    print(crossEntropy)
     loss_op = tf.reduce_mean(crossEntropy)
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)    
     # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
     train_op = optimizer.minimize(loss_op)
 
-    print(train_op)
+    print('ready to train')
 
-    return train_op, loss_op
+    return train_op, loss_op, accuracy, prediction
 
     # loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
     #     logits=logits, labels=Y))
@@ -212,100 +215,8 @@ def BuildNetwork(X, Y):
 
     # print(out[0])
 
-
+# @run
 def Test():
-    timestep = 128
-    num_input = 314
-    num_hidden = 10
-    batch_size = 8
-
-    x = tf.placeholder(dtype=tf.float32, shape=(timestep, batch_size, num_input))
-    x = tf.unstack(x, axis=0)
-
-
-    print(x)
-    return
-
-    # x = tf.Variable(validate_shape=(batch_size, num_input), dtype=tf.float32)
-    # x = tf.random_normal(shape=(batch_size, num_input))
-
-    x = [x]
-
-    # Define lstm cells with tensorflow
-    # Forward direction cell
-    lstm_fw_cell = rnn.LSTMCell(num_hidden, use_peepholes=True, forget_bias=1.0)
-    # Backward direction cell
-    lstm_bw_cell = rnn.LSTMCell(num_hidden, use_peepholes=True, forget_bias=1.0)
-
-    # Get lstm cell output
-    
-    outputs, _, _ = rnn.static_bidirectional_rnn(lstm_fw_cell, lstm_bw_cell, x, dtype=tf.float32)
-    print(outputs)
-    print(outputs[0])
-
-    weight = tf.Variable(tf.random_normal(shape=(2*num_hidden, 2), dtype=tf.float32))
-    out = tf.matmul(outputs[-1], weight)
-
-    # Initialize the variables (i.e. assign their default value)
-    init = tf.global_variables_initializer()
-
-
-    # Start training
-    with tf.Session() as sess:
-        # Run the initializer
-        sess.run(init)
-        y = sess.run(out)
-        print(y)
-
-        y = sess.run(out)
-        print(y)
-
-        
-def Run():
-    
-    useSoftmax = True
-
-    songList = ['4minuteshm', '2differenttears', 'abracadabra']
-    testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
-    
-    data = TrainData(testx, testy, batchSize, numSteps)
-    numBatches = data.numBatches
-    print('numbatchs', numBatches)    
-    
-    X = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, inputDim))
-    Y = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, outputDim))
-    train_op, loss_op = BuildNetwork(X, Y)
-
-    # Initialize the variables (i.e. assign their default value)
-    init = tf.global_variables_initializer()
-
-
-    # Start training
-    with tf.Session() as sess:
-        # Run the initializer
-        sess.run(init)
-        epch = 100
-
-        for j in range(epch):
-            loss = 0
-
-            for i in range(numBatches):
-                xData, yData = data.GetBatch(i)
-
-                if i % 10 == 0:
-                    l = sess.run(loss_op, feed_dict={X:xData, Y:yData})
-                    loss = loss + l
-                else:
-                    sess.run(train_op, feed_dict={X:xData, Y:yData})
-    
-            print('epch', j, 'loss', loss)
-
-if __name__ == '__main__':
-    # Test()
-    # BuildNetwork()
-
-    Run()
-
 
     # x, y = PrepareTrainData(['4minuteshm'], batchSize = 32, useSoftmax=True)
     # print(x.shape, y.shape)
@@ -316,19 +227,201 @@ if __name__ == '__main__':
     # print(x.shape)
     # print(y.shape)
 
+    x = np.arange(1, 25)
+    x = x.reshape(24, 1)
+    x = np.hstack((x, x, x))
+    print(x.shape)
 
-    
-
-    # x = np.arange(1, 25)
-    # x = x.reshape(24, 1)
-    # x = np.hstack((x, x, x))
-
-    # x = x.reshape(3, 4, 2, 3)
-    # x = x.transpose(1, 2, 0, 3)   
+    x = x.reshape(3, 4, 2, 3)
+    x = x.transpose(1, 2, 0, 3)   
+    x = x.transpose(2, 0, 1, 3)   
+    x = x.reshape(24, 3)
 
     # x = x.reshape(3, 2 * 4, 3)
     # x = x.transpose(1, 0, 2)
 
     # x = x.reshape(4, 2, 3, 3)
-    # print(x)
+    print(x)
+
+    # # Start training
+    # with tf.Session() as sess:
+    #     # Run the initializer
+    #     sess.run(init)
+    #     y = sess.run(out)
+    #     print(y)
+
+    #     y = sess.run(out)
+    #     print(y)
+
+
+def SaveModel(sess):
+    saver = tf.train.Saver()
+    saver.save(sess, 'd:/work/model.ckpt')
+    print('model saved')
+
+def LoadModel():
+    saver = tf.train.Saver()
+    with tf.Session() as sess:
+        saver.restore(sess, 'd:/work/model.ckpt')
+
+        # tf.get_default_graph().get_operation_by_name
+
+        # tf.get_default_graph().get_tensor_by_name("v1:0"))
+
+
+# @run
+def GenerateLevelTest(sess=None, train_op=None):
+    useSoftmax = True
+
+    songList = ['4minuteshm']
+    testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
+    print('testy', testy.shape)
+    
+    data = TrainData(testx, testy, batchSize, numSteps)
+
+    print('numbatch', data.numBatches)
+    
+    X = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, inputDim))
+    Y = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, outputDim))
+    prediction = BuildNetwork(X, Y)
+
+    if sess == None:
+        sess = tf.Session()
+    
+    sess.run(tf.global_variables_initializer())
+
+    evaluate = []
+    for i in range(data.numBatches):
+        xData, yData = data.GetBatch(i)
+        t = sess.run(prediction, feed_dict={X:xData, Y:yData})
+        evaluate.append(t)
+
+    evaluate = np.array(evaluate)
+    print('result', evaluate.shape)
+
+    evaluate = evaluate.transpose(2, 0, 1, 3)
+    predicts = np.reshape(evaluate, (-1, 2))
+    
+    predicts = postprocess.pick(predicts)
+
+    postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
+
+    if useSoftmax:
+        predicts = predicts[:,1]
+
+    acceptThrehold = 0.5
+    notes = postprocess.TrainDataToLevelData(predicts, 0, acceptThrehold)
+    notes = np.asarray(notes)
+    notes[0]
+    notes = notes[:,0]
+
+    return notes
+    
+
+
+
+def GenerateLevel(sess, prediction, X, Y):
+    useSoftmax = True
+
+    songList = ['4minuteshm']
+    songList = ['hangengxman']
+    testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
+    print('testy', testy.shape)
+    
+    data = TrainData(testx, testy, batchSize, numSteps)
+
+    print('numbatch', data.numBatches)    
+
+    # if sess == None:
+    #     sess = tf.Session()
+    
+    evaluate = []
+    for i in range(data.numBatches):
+        xData, yData = data.GetBatch(i)
+        t = sess.run(prediction, feed_dict={X:xData, Y:yData})
+        evaluate.append(t)
+
+    evaluate = np.array(evaluate)
+    print('result', evaluate.shape)
+
+    evaluate = evaluate.transpose(2, 0, 1, 3)
+    predicts = np.reshape(evaluate, (-1, 2))
+    
+    predicts = postprocess.pick(predicts)
+
+    # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
+
+    if useSoftmax:
+        predicts = predicts[:,1]
+
+    acceptThrehold = 0.9
+    notes = postprocess.TrainDataToLevelData(predicts, 0, acceptThrehold)
+    notes = np.asarray(notes)
+    notes[0]
+    notes = notes[:,0]
+
+    pathname = MakeMp3Pathname(songList[0])
+    LevelInfo.SaveInstantValue(notes, pathname, '_predict')
+    
+
+@run
+def Run():
+    
+    useSoftmax = True
+
+    songList = ['4minuteshm', '2differenttears', 'abracadabra', 'hangengxman', 'aiqingkele']
+    testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
+    print('test shape', testx.shape)
+    
+    data = TrainData(testx, testy, batchSize, numSteps)
+    numBatches = data.numBatches
+    print('numbatchs', numBatches)    
+    
+    X = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, inputDim))
+    Y = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, outputDim))
+    train_op, loss_op, accuracy, prediction = BuildNetwork(X, Y)
+
+    # Initialize the variables (i.e. assign their default value)
+    ttt = tf.ones(shape=[numSteps, batchSize, inputDim])
+    init = tf.global_variables_initializer()
+
+    # Start training
+    with tf.Session() as sess:
+        # Run the initializer
+        sess.run(init)
+        epch = 2
+
+        for j in range(epch):
+            loss = []
+            acc = []
+
+            for i in range(numBatches):
+                xData, yData = data.GetBatch(i)
+
+                if i % 10 == 0:
+                    l, a = sess.run([loss_op, accuracy], feed_dict={X:xData, Y:yData})
+                    loss.append(l)
+                    acc.append(a)
+                else:
+                    t = sess.run(train_op, feed_dict={X:xData, Y:yData})
+    
+            print('epch', j, 'loss', sum(loss) / len(loss), 'accuracy', sum(acc) / len(acc))
+
+        print('gen level')
+
+        
+        r = sess.run(prediction, feed_dict={X:ttt})
+        print('test', r)
+        SaveModel(sess)
+        # GenerateLevel(sess, prediction, X, Y)
+
+
+if __name__ == '__main__':
+    # Test()
+    # BuildNetwork()
+
+    # Run()
+    for fun in runList:
+        fun()
+
 
