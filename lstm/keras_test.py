@@ -1,5 +1,6 @@
 
 import tensorflow as tf
+import numpy as np
 
 runList = []
 def run(r):
@@ -112,7 +113,7 @@ def CatTest2():
     y = sess.run(v)
     print(y)
 
-@run
+# @run
 def calc_accurate():
     a = tf.Variable([[[1.0, 2.0], [3.0, 4.0], [9.0, 8.0]], [[1.0, 2.0], [3.0, 4.0], [9.0, 8.0]]])
     y = tf.argmax(a, axis = 2)
@@ -125,7 +126,18 @@ def calc_accurate():
     y = sess.run(y)
     print(y)
 
+@run
+def tile_test():
+    a = np.array([[1, 2, 3], [4, 5, 6]])
+    # a = np.array([1, 2, 3])
+    print(a)
+    print('reshape')
 
+    a = np.repeat(a, 3, axis=0)
+    a = a.reshape((-1, 3, 3))
+    a = a[:, 0, :]
+    # a = np.tile(a, (3, 1))
+    print(a)
 
 
 def TFTest():

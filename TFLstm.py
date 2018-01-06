@@ -17,11 +17,11 @@ def run(r):
 
 
 numHidden = 24
-batchSize = 4
+batchSize = 6
 numSteps = 256
 inputDim = 314
 outputDim = 2
-learning_rate = 0.002
+learning_rate = 0.001
 
 
 def FillNote(data, note):
@@ -254,19 +254,63 @@ def Test():
     #     print(y)
 
 
+# @run
+def SaveTest():
+    X = tf.placeholder(dtype=tf.float32, shape=[2], name='X')
+    print(X)
+    a = tf.Variable([1.0, 2.0])
+    c = X + a
+    print(c)
+
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
+    b = [3.0, 4.0]
+    y = sess.run(c, feed_dict={X:b})
+    print(y)
+
+    SaveModel(sess)
+
+
 def SaveModel(sess):
     saver = tf.train.Saver()
     saver.save(sess, 'd:/work/model.ckpt')
     print('model saved')
 
+# @run
 def LoadModel():
-    saver = tf.train.Saver()
+    
+    saver = saver = tf.train.import_meta_graph("d:/work/model2.ckpt.meta")
+
     with tf.Session() as sess:
-        saver.restore(sess, 'd:/work/model.ckpt')
+        
+        saver.restore(sess, 'd:/work/model2.ckpt')
+
+        print('model loaded')
 
         # tf.get_default_graph().get_operation_by_name
 
-        # tf.get_default_graph().get_tensor_by_name("v1:0"))
+        # predict = tf.get_default_graph().get_tensor_by_name("prediction:0")
+        # print('tensor',predict)
+
+        g = tf.get_default_graph()
+        opers = g.get_operations()
+        print(opers)
+
+        # collections = g.get_all_collection_keys()
+        # print(collections)
+
+        # coll = g.get_collection('variables')
+        # print(coll)
+
+        # X = tf.get_default_graph().get_tensor_by_name('X:0')
+        X = g.get_operation_by_name('X')
+        
+        print('X', type(X), X)
+        # ttt = np.ones(shape=[numSteps, batchSize, inputDim])
+        # r = sess.run(prediction, feed_dict={X:ttt})
+        # print('test', r)
+
+
 
 
 # @run
@@ -276,6 +320,25 @@ def GenerateLevelTest(sess=None, train_op=None):
     songList = ['4minuteshm']
     testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
     print('testy', testy.shape)
+
+
+    testx = np.repeat(testx, batchSize, axis=0)
+    count = len(testx)
+    yu = count % (batchSize * numSteps)
+    testx = testx[0:-yu]
+
+    testx = testx.reshape(-1, numSteps, batchSize, inputDim)
+    print('num batches', len(testx))
+
+    b = testx[2]
+    print('batch shape', b.shape)
+
+    print('step 0, batch 0 1', b[0, 0, 0:2], b[0, 1, 0:2])
+    
+    print('step 1 2, batch 0', b[1, 0, 0:2], b[2, 0, 0:2])    
+
+    return
+
     
     data = TrainData(testx, testy, batchSize, numSteps)
 
@@ -326,26 +389,36 @@ def GenerateLevel(sess, prediction, X, Y):
     songList = ['4minuteshm']
     songList = ['hangengxman']
     testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
-    print('testy', testy.shape)
-    
-    data = TrainData(testx, testy, batchSize, numSteps)
+    print('testy', testy.shape)    
 
-    print('numbatch', data.numBatches)    
+    testx = np.repeat(testx, batchSize, axis=0)
+    count = len(testx)
+    yu = count % (batchSize * numSteps)
+    testx = testx[0:-yu]
 
+    testx = testx.reshape(-1, numSteps, batchSize, inputDim)
+    numBatches = len(testx)
+
+    print('numbatch', numBatches)  
     # if sess == None:
     #     sess = tf.Session()
     
     evaluate = []
-    for i in range(data.numBatches):
-        xData, yData = data.GetBatch(i)
-        t = sess.run(prediction, feed_dict={X:xData, Y:yData})
+    for i in range(numBatches):
+        xData = testx[i]
+        t = sess.run(prediction, feed_dict={X:xData})
         evaluate.append(t)
 
     evaluate = np.array(evaluate)
     print('result', evaluate.shape)
 
-    evaluate = evaluate.transpose(2, 0, 1, 3)
-    predicts = np.reshape(evaluate, (-1, 2))
+    # evaluate = evaluate.transpose(2, 0, 1, 3)
+    # predicts = np.reshape(evaluate, (-1, 2))
+
+    evaluate = evaluate.reshape(-1, batchSize, 2)
+    # print('result step 0 batch 0 1', evaluate[0, 0], evaluate[0, 1])
+    # print('result step 0 1 batch 0', evaluate[0, 0], evaluate[1, 0])
+    predicts = evaluate[:, 0, :]
     
     predicts = postprocess.pick(predicts)
 
@@ -354,7 +427,7 @@ def GenerateLevel(sess, prediction, X, Y):
     if useSoftmax:
         predicts = predicts[:,1]
 
-    acceptThrehold = 0.9
+    acceptThrehold = 0.7
     notes = postprocess.TrainDataToLevelData(predicts, 0, acceptThrehold)
     notes = np.asarray(notes)
     notes[0]
@@ -369,7 +442,7 @@ def Run():
     
     useSoftmax = True
 
-    songList = ['4minuteshm', '2differenttears', 'abracadabra', 'hangengxman', 'aiqingkele']
+    songList = ['inthegame', 'isthisall', 'huashuo', '4minuteshm', '2differenttears', 'abracadabra', 'hangengxman', 'aiqingkele']
     testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
     print('test shape', testx.shape)
     
@@ -377,19 +450,19 @@ def Run():
     numBatches = data.numBatches
     print('numbatchs', numBatches)    
     
-    X = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, inputDim))
-    Y = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, outputDim))
+    X = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, inputDim), name='X')
+    Y = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, outputDim), name='Y')
     train_op, loss_op, accuracy, prediction = BuildNetwork(X, Y)
 
     # Initialize the variables (i.e. assign their default value)
-    ttt = tf.ones(shape=[numSteps, batchSize, inputDim])
+
     init = tf.global_variables_initializer()
 
     # Start training
     with tf.Session() as sess:
         # Run the initializer
         sess.run(init)
-        epch = 2
+        epch = 20
 
         for j in range(epch):
             loss = []
@@ -407,13 +480,14 @@ def Run():
     
             print('epch', j, 'loss', sum(loss) / len(loss), 'accuracy', sum(acc) / len(acc))
 
-        print('gen level')
 
-        
-        r = sess.run(prediction, feed_dict={X:ttt})
-        print('test', r)
-        SaveModel(sess)
-        # GenerateLevel(sess, prediction, X, Y)
+        # ttt = np.ones(shape=[numSteps, batchSize, inputDim])
+        # r = sess.run(prediction, feed_dict={X:ttt})
+        # print('test', r)
+        # print('save model')
+        # SaveModel(sess)
+        print('gen level')
+        GenerateLevel(sess, prediction, X, Y)
 
 
 if __name__ == '__main__':
