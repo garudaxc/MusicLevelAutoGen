@@ -8,6 +8,7 @@ from lstm import postprocess
 import tensorflow as tf
 from tensorflow.contrib import rnn
 from lstm import postprocess
+import time
 
 
 runList = []
@@ -163,7 +164,10 @@ class TrainData():
 
 
 def BuildNetwork(X, Y):
+    t = time.time()
+
     x = tf.unstack(X, axis=0)
+    print('unstack', time.time() - t)
 
     # Define lstm cells with tensorflow
     # Forward direction cell
@@ -181,6 +185,7 @@ def BuildNetwork(X, Y):
     # Get lstm cell output
     
     output, _, _ = rnn.stack_bidirectional_rnn(lstm_fw_cell, lstm_bw_cell, x, dtype=tf.float32)
+    print('stack_bidirectional_rnn', time.time() - t)
     
     weights = tf.Variable(tf.random_normal(shape=[2 * numHidden, outputDim]))
     bais = tf.Variable(tf.random_normal(shape=[outputDim]))
@@ -200,9 +205,17 @@ def BuildNetwork(X, Y):
     # # Define loss and optimizer
     crossEntropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y)
     loss_op = tf.reduce_mean(crossEntropy)
+
+    print('get loss op', time.time() - t)
+
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)    
+
+    print('optimizer', time.time() - t)
+
     # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
     train_op = optimizer.minimize(loss_op)
+
+    print('train op', time.time() - t)
 
     print('ready to train')
 
@@ -216,16 +229,17 @@ def BuildNetwork(X, Y):
     # print(out[0])
 
 # @run
+def TestBuildTime():
+    
+    X = tf.placeholder(dtype=tf.float32, shape=(10, batchSize, inputDim), name='X')
+    Y = tf.placeholder(dtype=tf.float32, shape=(10, batchSize, outputDim), name='Y')
+    train_op, loss_op, accuracy, prediction = BuildNetwork(X, Y)
+
+
+
+
+# @run
 def Test():
-
-    # x, y = PrepareTrainData(['4minuteshm'], batchSize = 32, useSoftmax=True)
-    # print(x.shape, y.shape)
-
-    # a = TrainData(x, y, batcSize, numSteps)
-
-    # x, y = a.GetBatch(1)
-    # print(x.shape)
-    # print(y.shape)
 
     x = np.arange(1, 25)
     x = x.reshape(24, 1)
@@ -241,34 +255,7 @@ def Test():
     # x = x.transpose(1, 0, 2)
 
     # x = x.reshape(4, 2, 3, 3)
-    print(x)
-
-    # # Start training
-    # with tf.Session() as sess:
-    #     # Run the initializer
-    #     sess.run(init)
-    #     y = sess.run(out)
-    #     print(y)
-
-    #     y = sess.run(out)
-    #     print(y)
-
-
-# @run
-def SaveTest():
-    X = tf.placeholder(dtype=tf.float32, shape=[2], name='X')
-    print(X)
-    a = tf.Variable([1.0, 2.0])
-    c = X + a
-    print(c)
-
-    sess = tf.Session()
-    sess.run(tf.global_variables_initializer())
-    b = [3.0, 4.0]
-    y = sess.run(c, feed_dict={X:b})
-    print(y)
-
-    SaveModel(sess)
+   
 
 
 def SaveModel(sess):
@@ -437,7 +424,7 @@ def GenerateLevel(sess, prediction, X, Y):
     LevelInfo.SaveInstantValue(notes, pathname, '_predict')
     
 
-@run
+# @run
 def Run():
     
     useSoftmax = True

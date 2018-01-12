@@ -126,7 +126,7 @@ def calc_accurate():
     y = sess.run(y)
     print(y)
 
-@run
+# @run
 def tile_test():
     a = np.array([[1, 2, 3], [4, 5, 6]])
     # a = np.array([1, 2, 3])
@@ -138,6 +138,20 @@ def tile_test():
     a = a[:, 0, :]
     # a = np.tile(a, (3, 1))
     print(a)
+
+@run
+def accuracy_test():
+    v0 = tf.Variable([[4, 6], [1, 2], [4, 5]], dtype=tf.float32)
+    v1 = tf.Variable([[4, 6], [3, 2], [6, 5]], dtype=tf.float32)
+
+    correct = tf.equal(tf.argmax(v0, axis=1), tf.argmax(v1, axis=1))
+    accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
+
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
+    y = sess.run(accuracy)
+    print(y)
+    
 
 
 def TFTest():
