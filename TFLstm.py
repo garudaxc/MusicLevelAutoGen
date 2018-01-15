@@ -1,4 +1,3 @@
-
 import pickle
 import os
 import LevelInfo
@@ -209,6 +208,7 @@ def BuildNetwork(X, Y):
     print('get loss op', time.time() - t)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)    
+    # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
 
     print('optimizer', time.time() - t)
 
@@ -240,7 +240,6 @@ def TestBuildTime():
 
 # @run
 def Test():
-
     x = np.arange(1, 25)
     x = x.reshape(24, 1)
     x = np.hstack((x, x, x))
@@ -266,36 +265,24 @@ def SaveModel(sess):
 # @run
 def LoadModel():
     
-    saver = saver = tf.train.import_meta_graph("d:/work/model2.ckpt.meta")
+    saver = saver = tf.train.import_meta_graph("d:/work/model.ckpt.meta")
 
     with tf.Session() as sess:
         
-        saver.restore(sess, 'd:/work/model2.ckpt')
-
+        saver.restore(sess, 'd:/work/model.ckpt')
         print('model loaded')
 
-        # tf.get_default_graph().get_operation_by_name
-
-        # predict = tf.get_default_graph().get_tensor_by_name("prediction:0")
-        # print('tensor',predict)
-
-        g = tf.get_default_graph()
-        opers = g.get_operations()
-        print(opers)
-
-        # collections = g.get_all_collection_keys()
-        # print(collections)
-
-        # coll = g.get_collection('variables')
-        # print(coll)
-
-        # X = tf.get_default_graph().get_tensor_by_name('X:0')
-        X = g.get_operation_by_name('X')
+        predict = tf.get_default_graph().get_tensor_by_name("prediction:0")
+        print('tensor',predict)
+         
+        X = tf.get_default_graph().get_tensor_by_name('X:0')
+        # X = tf.get_default_graph().get_operation_by_name('X')
         
         print('X', type(X), X)
-        # ttt = np.ones(shape=[numSteps, batchSize, inputDim])
-        # r = sess.run(prediction, feed_dict={X:ttt})
-        # print('test', r)
+
+        ttt = np.ones(shape=[numSteps, batchSize, inputDim])
+        r = sess.run(predict, feed_dict={X:ttt})
+        print('test', r)
 
 
 
@@ -368,10 +355,12 @@ def GenerateLevelTest(sess=None, train_op=None):
     return notes
     
 
-
-
 def GenerateLevel(sess, prediction, X, Y):
+    
+    print('gen level')
+
     useSoftmax = True
+    saveRawData = True
 
     songList = ['4minuteshm']
     songList = ['hangengxman']
@@ -397,17 +386,14 @@ def GenerateLevel(sess, prediction, X, Y):
         evaluate.append(t)
 
     evaluate = np.array(evaluate)
-    print('result', evaluate.shape)
-
-    # evaluate = evaluate.transpose(2, 0, 1, 3)
-    # predicts = np.reshape(evaluate, (-1, 2))
-
     evaluate = evaluate.reshape(-1, batchSize, 2)
-    # print('result step 0 batch 0 1', evaluate[0, 0], evaluate[0, 1])
-    # print('result step 0 1 batch 0', evaluate[0, 0], evaluate[1, 0])
-    predicts = evaluate[:, 0, :]
+    evaluate = evaluate[:, 0, :]
     
-    predicts = postprocess.pick(predicts)
+    if saveRawData:
+        with open('d:/work/evaluate_data.raw', 'wb') as file:
+            pickle.dump(evaluate, file)
+
+    predicts = postprocess.pick(evaluate)
 
     # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
 
@@ -424,12 +410,14 @@ def GenerateLevel(sess, prediction, X, Y):
     LevelInfo.SaveInstantValue(notes, pathname, '_predict')
     
 
-# @run
+@run
 def Run():
     
     useSoftmax = True
 
     songList = ['inthegame', 'isthisall', 'huashuo', '4minuteshm', '2differenttears', 'abracadabra', 'hangengxman', 'aiqingkele']
+    # songList = ['inthegame', 'isthisall']
+
     testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
     print('test shape', testx.shape)
     
@@ -445,11 +433,14 @@ def Run():
 
     init = tf.global_variables_initializer()
 
+    minLoss = 10000.0
+    maxAcc = 0.0
+    notDecreaseCount = 0
     # Start training
     with tf.Session() as sess:
         # Run the initializer
         sess.run(init)
-        epch = 20
+        epch = 100
 
         for j in range(epch):
             loss = []
@@ -465,15 +456,22 @@ def Run():
                 else:
                     t = sess.run(train_op, feed_dict={X:xData, Y:yData})
     
-            print('epch', j, 'loss', sum(loss) / len(loss), 'accuracy', sum(acc) / len(acc))
+            lossValue = sum(loss) / len(loss)
+            accValue = sum(acc) / len(acc)
 
+            notDecreaseCount += 1
+            if lossValue < minLoss:
+                minLoss = lossValue
+                notDecreaseCount = 0
+            if accValue > maxAcc:
+                maxAcc = accValue
+                notDecreaseCount = 0
+            
+            print('epch', j, 'loss', lossValue, 'accuracy', accValue, 'not decrease', notDecreaseCount)
+            if notDecreaseCount > 10:
+                break            
 
-        # ttt = np.ones(shape=[numSteps, batchSize, inputDim])
-        # r = sess.run(prediction, feed_dict={X:ttt})
-        # print('test', r)
-        # print('save model')
-        # SaveModel(sess)
-        print('gen level')
+        SaveModel(sess)
         GenerateLevel(sess, prediction, X, Y)
 
 
