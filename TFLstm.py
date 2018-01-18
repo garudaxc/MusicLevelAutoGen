@@ -170,20 +170,29 @@ def BuildNetwork(X, Y):
 
     # Define lstm cells with tensorflow
     # Forward direction cell
-    lstm_fw_cell = [
-        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
-        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
-        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
 
-    # Backward direction cell
-    lstm_bw_cell = [
-        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
-        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
-        rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
+    numLayers = 3
+    cells = []
+    for i in range(numLayers * 2):
+        c = rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)
+        c = tf.nn.rnn_cell.DropoutWrapper(c, output_keep_prob=0.6)
+        cells.append(c)
+
+
+    # lstm_fw_cell = [
+    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
+    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
+    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
+
+    # # Backward direction cell
+    # lstm_bw_cell = [
+    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
+    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
+    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
 
     # Get lstm cell output
     
-    output, _, _ = rnn.stack_bidirectional_rnn(lstm_fw_cell, lstm_bw_cell, x, dtype=tf.float32)
+    output, _, _ = rnn.stack_bidirectional_rnn(cells[0:numLayers], cells[numLayers:], x, dtype=tf.float32)
     print('stack_bidirectional_rnn', time.time() - t)
     
     weights = tf.Variable(tf.random_normal(shape=[2 * numHidden, outputDim]))
@@ -236,10 +245,17 @@ def TestBuildTime():
     train_op, loss_op, accuracy, prediction = BuildNetwork(X, Y)
 
 
-
-
 # @run
 def Test():
+
+    state_size = 10
+    num_layers = 3
+    cell = tf.nn.rnn_cell.LSTMCell(state_size, state_is_tuple=True)
+    cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=0.5)
+    cell = tf.nn.rnn_cell.MultiRNNCell([cell] * num_layers, state_is_tuple=True)
+    print(cell)
+    return
+
     x = np.arange(1, 25)
     x = x.reshape(24, 1)
     x = np.hstack((x, x, x))
@@ -249,6 +265,10 @@ def Test():
     x = x.transpose(1, 2, 0, 3)   
     x = x.transpose(2, 0, 1, 3)   
     x = x.reshape(24, 3)
+
+    
+    with open('d:/work/evaluate_data.raw', 'wb') as file:
+        pickle.dump(x, file)
 
     # x = x.reshape(3, 2 * 4, 3)
     # x = x.transpose(1, 0, 2)
@@ -262,7 +282,7 @@ def SaveModel(sess):
     saver.save(sess, 'd:/work/model.ckpt')
     print('model saved')
 
-# @run
+@run
 def LoadModel():
     
     saver = saver = tf.train.import_meta_graph("d:/work/model.ckpt.meta")
@@ -277,14 +297,9 @@ def LoadModel():
          
         X = tf.get_default_graph().get_tensor_by_name('X:0')
         # X = tf.get_default_graph().get_operation_by_name('X')
+
+        GenerateLevel(sess, predict, X)
         
-        print('X', type(X), X)
-
-        ttt = np.ones(shape=[numSteps, batchSize, inputDim])
-        r = sess.run(predict, feed_dict={X:ttt})
-        print('test', r)
-
-
 
 
 # @run
@@ -355,15 +370,15 @@ def GenerateLevelTest(sess=None, train_op=None):
     return notes
     
 
-def GenerateLevel(sess, prediction, X, Y):
+def GenerateLevel(sess, prediction, X):
     
     print('gen level')
 
     useSoftmax = True
     saveRawData = True
 
-    songList = ['4minuteshm']
     songList = ['hangengxman']
+    songList = ['4minuteshm']
     testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
     print('testy', testy.shape)    
 
@@ -400,7 +415,7 @@ def GenerateLevel(sess, prediction, X, Y):
     if useSoftmax:
         predicts = predicts[:,1]
 
-    acceptThrehold = 0.7
+    acceptThrehold = 0.6
     notes = postprocess.TrainDataToLevelData(predicts, 0, acceptThrehold)
     notes = np.asarray(notes)
     notes[0]
@@ -410,20 +425,46 @@ def GenerateLevel(sess, prediction, X, Y):
     LevelInfo.SaveInstantValue(notes, pathname, '_predict')
     
 
-@run
+# @run
+def LoadRawData(useSoftmax = True):
+    
+    songList = ['hangengxman']
+
+    with open('d:/work/evaluate_data.raw', 'rb') as file:
+        evaluate = pickle.load(file)
+        print(type(evaluate))
+        predicts = postprocess.pick(evaluate)
+
+    # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
+
+        if useSoftmax:
+            predicts = predicts[:,1]
+
+        acceptThrehold = 0.51
+        notes = postprocess.TrainDataToLevelData(predicts, 0, acceptThrehold)
+        notes = np.asarray(notes)
+        notes[0]
+        notes = notes[:,0]
+
+        pathname = MakeMp3Pathname(songList[0])
+        LevelInfo.SaveInstantValue(notes, pathname, '_predict')
+
+    
+
+# @run
 def Run():
     
     useSoftmax = True
 
-    songList = ['inthegame', 'isthisall', 'huashuo', '4minuteshm', '2differenttears', 'abracadabra', 'hangengxman', 'aiqingkele']
-    # songList = ['inthegame', 'isthisall']
+    songList = ['inthegame', 'isthisall', 'huashuo', 'haodan', '2differenttears', 'abracadabra', 'tictic', 'aiqingkele']
+    # songList = ['4minuteshm', 'hangengxman']
 
     testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
     print('test shape', testx.shape)
     
     data = TrainData(testx, testy, batchSize, numSteps)
     numBatches = data.numBatches
-    print('numbatchs', numBatches)    
+    print('numbatchs', numBatches)
     
     X = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, inputDim), name='X')
     Y = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, outputDim), name='Y')
@@ -433,9 +474,8 @@ def Run():
 
     init = tf.global_variables_initializer()
 
-    minLoss = 10000.0
     maxAcc = 0.0
-    notDecreaseCount = 0
+    notIncreaseCount = 0
     # Start training
     with tf.Session() as sess:
         # Run the initializer
@@ -449,7 +489,7 @@ def Run():
             for i in range(numBatches):
                 xData, yData = data.GetBatch(i)
 
-                if i % 10 == 0:
+                if i % 6 == 0:
                     l, a = sess.run([loss_op, accuracy], feed_dict={X:xData, Y:yData})
                     loss.append(l)
                     acc.append(a)
@@ -459,20 +499,17 @@ def Run():
             lossValue = sum(loss) / len(loss)
             accValue = sum(acc) / len(acc)
 
-            notDecreaseCount += 1
-            if lossValue < minLoss:
-                minLoss = lossValue
-                notDecreaseCount = 0
+            notIncreaseCount += 1
             if accValue > maxAcc:
                 maxAcc = accValue
-                notDecreaseCount = 0
+                notIncreaseCount = 0
             
-            print('epch', j, 'loss', lossValue, 'accuracy', accValue, 'not decrease', notDecreaseCount)
-            if notDecreaseCount > 10:
+            print('epch', j, 'loss', lossValue, 'accuracy', accValue, 'not increase', notIncreaseCount)
+            if notIncreaseCount > 10:
                 break            
 
         SaveModel(sess)
-        GenerateLevel(sess, prediction, X, Y)
+        GenerateLevel(sess, prediction, X)
 
 
 if __name__ == '__main__':

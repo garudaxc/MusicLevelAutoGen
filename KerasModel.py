@@ -1,5 +1,4 @@
 # coding=UTF-8
-import pickle
 import os
 import LevelInfo
 import numpy as np
