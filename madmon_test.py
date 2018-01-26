@@ -2,7 +2,6 @@ import madmom
 import numpy as np
 from os import listdir
 import os.path
-# import librosa
 import LevelInfo
 import logger
 import multiprocessing as mp
@@ -58,7 +57,7 @@ def do_work(filelist, levelInfo, processer, downbeatTracking, result):
             result.put(r)
             continue
 
-        bpm, etAuto = calcDownBeat(beat, firstBeat, lastBeat)
+        bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
         beatInter = 60.0 / bpm
         # beat = beat[:,0]
         # # save_file(beat, filename, '_beat')
@@ -75,8 +74,6 @@ def do_work(filelist, levelInfo, processer, downbeatTracking, result):
 
         lastBeat = beat[-1, 0]
         SaveDownbeat(bpm, etAuto, lastBeat, file)
-
-
 
 
 def do_work2(filelist, levelInfo, processer, downbeatTracking, result):
@@ -208,7 +205,7 @@ def CalcAbnormal(beat, threhold = 0.02):
 
 
 
-def calcDownBeat(beat, firstBeat, lastBeat):
+def CalcBPM(beat, firstBeat, lastBeat):
     firstBeatTime = beat[0, 0]
     newBeat = beat[firstBeat:lastBeat]
     downbeat = madmom.features.downbeats.filter_downbeats(newBeat)
@@ -229,6 +226,38 @@ def SaveDownbeat(bpm, et, lastBeat, filename):
     numBar = ((lastBeat - et) // downbeatInter) + 1
     downbeat = np.arange(numBar) * downbeatInter + et
     SaveInstantValue(downbeat, filename, '_downbeat')
+
+
+def CalcMusicInfo():
+    filename = r'd:\leveledtior\client\Assets\resources\audio\bgm\jilejingtu.m4a'
+
+    y, sr = librosa.load(filename, mono=True, sr=44100)
+    logger.info('loaded')
+    duration = librosa.get_duration(y=y, sr=sr)
+
+    processer = madmom.features.downbeats.RNNDownBeatProcessor()
+    downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda = 1000, fps=FPS)
+    
+    act = processer(y)
+    beat = downbeatTracking(act)
+    firstBeat, lastBeat = normalizeInterval(beat)
+
+    if firstBeat == -1:
+        print('generate error, abnormal rate %f' % (lastBeat))
+        return
+
+    bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
+    beatInter = 60.0 / bpm
+
+    lastBeat = beat[-1, 0]
+    print('bpm', bpm, 'et', etAuto)
+
+    dir = os.path.dirname(filename) + os.path.sep
+    infoFileName = dir + 'info.txt'
+    with open(infoFileName, 'w') as file:
+        file.write('duration=%f\nbpm=%f\net=%f' % (duration, bpm, etAuto))
+
+    SaveDownbeat(bpm, etAuto, lastBeat, filename)
 
 
 
@@ -291,7 +320,7 @@ def test():
         print('%s generate error, abnormal rate %f' % (id, lastBeat))
         return
 
-    bpm, etAuto = calcDownBeat(beat, firstBeat, lastBeat)
+    bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
     beatInter = 60.0 / bpm
     print('bpm', bpm)
     # beat = beat[:,0]
@@ -397,7 +426,7 @@ def study():
         result.put(r)
         return
 
-    bpm, etAuto = calcDownBeat(beat, firstBeat, lastBeat)
+    bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
     print('bpm', bpm, 'et', etAuto)
 
 def OnsetTest():
@@ -417,9 +446,9 @@ def OnsetTest():
 
 
 if __name__ == '__main__':    
-    doMultiProcess(8)
+    # doMultiProcess(8)
     #test()
-    # study()
     # OnsetTest()
+    CalcMusicInfo()
 
 

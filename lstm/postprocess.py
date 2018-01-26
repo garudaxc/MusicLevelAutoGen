@@ -42,7 +42,6 @@ def TrainDataToLevelData(data, timeOffset, threhold = 0.8):
             start = 0
             last = 0
     
-    print('got number of notes ', len(notes))
     return notes
 
 

@@ -19,28 +19,40 @@ def run(r):
 numHidden = 24
 batchSize = 6
 numSteps = 256
+# numSteps = 128
 inputDim = 314
 outputDim = 2
 learning_rate = 0.001
 
 
 def FillNote(data, note):
+    # 音符数据转化为sample data
     index = note[0] // 10
     type = note[1]
 
-    data[index, 0] = 1.0
-    if type == 1:
-        data[index, 1] = 1.0
-    if type == 2:
+    if type == LevelInfo.slideNote:
+        data[index] = [0.0, 0.0, 1.0, 0.0]
+    elif type == LevelInfo.longNote:
         last = note[2] // 10
-        data[index:index+last, 2] = 1.0
+        data[index:index+last, 3] = 1.0
+    else:        
+        data[index] = [0.0, 1.0, 0.0, 0.0]
+
+def SamplesToSoftmax(samples):
+    '''
+    将样本数据转换为分类数据
+    '''
+    s1 = 1 - samples
+    return np.stack((s1, samples), axis=1)
 
 
 def LevelDataToTrainData(LevelData, numSamples):
-    # 关卡数据转换训练数据
-    # 关卡数据（时刻，类型，时长），训练数据为每个采样点是否有值
-    # 尝试每个样本三个输出，代表是否有该类型音符，（点击、滑动、长按）
-    result = [[0.0, 0.0, 0.0]] * numSamples
+    '''
+    关卡数据转换训练数据
+    关卡数据（时刻，类型，时长），训练数据为每个采样点是否有值
+    尝试每个样本三个输出，代表是否有该类型音符，（点击、滑动、长按）
+    '''
+    result = [[1.0, 0.0, 0.0, 0.0]] * numSamples
     result = np.array(result)
     for l in LevelData:
         # time in ms, sample rate is 100 samples per second
@@ -53,37 +65,8 @@ def LevelDataToTrainData(LevelData, numSamples):
 
         FillNote(result, l)
 
-    result = result[:,0:1]
     return result
 
-def LevelToTrainDataSoftmax(levelData, numSamples):
-    result = LevelDataToTrainData(levelData, numSamples)
-    r = []
-    dim = result.shape[1]
-    for i in range(numSamples):
-        if result[i, 0] == 1.0:
-            r.append([0.0, 1.0])
-        else:
-            r.append([1.0, 0.0])
-    r = np.array(r)
-    return r
-
-
-def LoadLevelData(pathname, numSample):
-    #加载心动关卡，转为训练数据
-    notes = LevelInfo.LoadIdolInfo(pathname)
-    print('load form %s with %d notes' % (pathname, len(notes)))
-
-    lastNote = notes[-1]
-    if lastNote * 100 > numSample:
-        print('level lenth %f not match sample count %d' % (lastNote, numSample))
-    
-    sample = [0.0] * numSample
-    for t in notes:
-        index = int(np.floor(t * 100 + 0.5))
-        sample[index] = 1.0
-
-    return sample
 
 def GetSamplePath():
     path = '/Users/xuchao/Documents/rhythmMaster/'
@@ -97,13 +80,14 @@ def MakeMp3Pathname(song):
     pathname = '%s%s/%s.mp3' % (path, song, song)
     return pathname
 
-def MakeLevelPathname(song, difficulty=0):
+def MakeLevelPathname(song, difficulty=1):
     path = GetSamplePath()
-    pathname = '%s%s/%s_4k_nm.imd' % (path, song, song)
+    diff = ['ez', 'nm', 'hd']
+    pathname = '%s%s/%s_4k_%s.imd' % (path, song, song, diff[difficulty])
     return pathname   
 
 
-def PrepareTrainData(songList, batchSize = 32, useSoftmax = False):
+def PrepareTrainData(songList, batchSize = 32, loadTestData = True):
    
     trainx = []
     trainy = []
@@ -112,22 +96,57 @@ def PrepareTrainData(songList, batchSize = 32, useSoftmax = False):
         inputData = lstm.myprocesser.LoadAndProcessAudio(pathname)
         trainx.append(inputData)
         numSample = len(inputData)
-        pathname = MakeLevelPathname(song)
-        level = LevelInfo.LoadRhythmMasterLevel(pathname)
 
-        if useSoftmax:
-            targetData = LevelToTrainDataSoftmax(level, numSample)
-        else:
+        if loadTestData:
+            pathname = MakeLevelPathname(song)
+            level = LevelInfo.LoadRhythmMasterLevel(pathname)
+
             targetData = LevelDataToTrainData(level, numSample)
-        trainy.append(targetData)
+                
+            trainy.append(targetData)
 
     trainx = np.vstack(trainx)
-    trainy = np.vstack(trainy)
+    if len(trainy) > 0:
+        trainy = np.vstack(trainy)
 
     # if not useSoftmax:
     #     trainy = trainy[:,0]
 
     return trainx, trainy
+
+# @run
+def RhythmMasterLevelPorcess():
+    # pathname = r'd:\librosa\RhythmMaster\hangengxman\hangengxman_4k_nm.imd'
+    # level = LevelInfo.LoadRhythmMasterLevel(pathname)
+    # print(type(level))
+    # count = 0
+    # for note in level:
+    #     if note[1] == 3:
+    #         print(count, type(note[2]))
+    #         count += 1
+
+    songList = ['feiyuedexin']
+    songList = ['aiqingmaimai']
+    x, y = PrepareTrainData(songList, 32, True)
+
+    y = y[:,3]
+    
+    acceptThrehold = 0.9
+
+    pathname = MakeMp3Pathname(songList[0])
+    y = y > acceptThrehold
+    LevelInfo.SaveSamplesToRegionFile(y, pathname, 'region')
+    return    
+
+    notes = postprocess.TrainDataToLevelData(y, 0, acceptThrehold)
+    notes = np.asarray(notes)
+    notes[0]
+
+
+    notes = notes[:,0]
+    LevelInfo.SaveInstantValue(notes, pathname, '_slide')
+
+
 
 
 class TrainData():
@@ -173,26 +192,14 @@ def BuildNetwork(X, Y):
 
     numLayers = 3
     cells = []
+    dropoutCell = []
     for i in range(numLayers * 2):
         c = rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)
-        c = tf.nn.rnn_cell.DropoutWrapper(c, output_keep_prob=0.6)
         cells.append(c)
-
-
-    # lstm_fw_cell = [
-    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
-    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
-    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
-
-    # # Backward direction cell
-    # lstm_bw_cell = [
-    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
-    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0),
-    #     rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)]
-
-    # Get lstm cell output
+        c = tf.nn.rnn_cell.DropoutWrapper(c, output_keep_prob=0.6)
+        dropoutCell.append(c)
     
-    output, _, _ = rnn.stack_bidirectional_rnn(cells[0:numLayers], cells[numLayers:], x, dtype=tf.float32)
+    output, _, _ = rnn.stack_bidirectional_rnn(dropoutCell[0:numLayers], dropoutCell[numLayers:], x, dtype=tf.float32)
     print('stack_bidirectional_rnn', time.time() - t)
     
     weights = tf.Variable(tf.random_normal(shape=[2 * numHidden, outputDim]))
@@ -202,40 +209,30 @@ def BuildNetwork(X, Y):
     logits = tf.stack(logits)
     # print(logits)
 
-    prediction = tf.nn.softmax(logits, name='prediction')
-    print(prediction)
-
-    # return prediction
-
-    correct = tf.equal(tf.argmax(prediction, axis=2), tf.argmax(Y, axis=2))
-    accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
-
     # # Define loss and optimizer
     crossEntropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y)
     loss_op = tf.reduce_mean(crossEntropy)
 
-    print('get loss op', time.time() - t)
-
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)    
     # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
 
-    print('optimizer', time.time() - t)
-
-    # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
     train_op = optimizer.minimize(loss_op)
+    print('train op', time.time() - t)    
 
-    print('train op', time.time() - t)
+    correct = tf.equal(tf.argmax(tf.nn.softmax(logits), axis=2), tf.argmax(Y, axis=2))
+    accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
+    
+    # prediction without dropout
+    output, _, _ = rnn.stack_bidirectional_rnn(cells[0:numLayers], cells[numLayers:], x, dtype=tf.float32)
+    logits = [tf.matmul(o, weights) + bais for o in output]
+    logits = tf.stack(logits)
+    prediction = tf.nn.softmax(logits, name='prediction')
 
     print('ready to train')
 
     return train_op, loss_op, accuracy, prediction
 
-    # loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-    #     logits=logits, labels=Y))
-    # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
-    # train_op = optimizer.minimize(loss_op)
 
-    # print(out[0])
 
 # @run
 def TestBuildTime():
@@ -282,7 +279,7 @@ def SaveModel(sess):
     saver.save(sess, 'd:/work/model.ckpt')
     print('model saved')
 
-@run
+# @run
 def LoadModel():
     
     saver = saver = tf.train.import_meta_graph("d:/work/model.ckpt.meta")
@@ -307,7 +304,7 @@ def GenerateLevelTest(sess=None, train_op=None):
     useSoftmax = True
 
     songList = ['4minuteshm']
-    testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
+    testx, testy = PrepareTrainData(songList, batchSize)
     print('testy', testy.shape)
 
 
@@ -377,10 +374,11 @@ def GenerateLevel(sess, prediction, X):
     useSoftmax = True
     saveRawData = True
 
-    songList = ['hangengxman']
     songList = ['4minuteshm']
-    testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
-    print('testy', testy.shape)    
+    songList = ['hangengxman']
+    songList = ['jilejingtu']
+    testx, _ = PrepareTrainData(songList, batchSize, loadTestData = False)
+    # print('testy', testy.shape)    
 
     testx = np.repeat(testx, batchSize, axis=0)
     count = len(testx)
@@ -408,6 +406,16 @@ def GenerateLevel(sess, prediction, X):
         with open('d:/work/evaluate_data.raw', 'wb') as file:
             pickle.dump(evaluate, file)
 
+
+    acceptThrehold = 0.6
+    pathname = MakeMp3Pathname(songList[0])
+    #for long note
+    print('evaluate shape', evaluate.shape)
+    predicts = evaluate[:,1] > acceptThrehold
+    LevelInfo.SaveSamplesToRegionFile(prediction, pathname, '_region')
+    return
+
+
     predicts = postprocess.pick(evaluate)
 
     # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
@@ -421,7 +429,6 @@ def GenerateLevel(sess, prediction, X):
     notes[0]
     notes = notes[:,0]
 
-    pathname = MakeMp3Pathname(songList[0])
     LevelInfo.SaveInstantValue(notes, pathname, '_predict')
     
 
@@ -429,6 +436,7 @@ def GenerateLevel(sess, prediction, X):
 def LoadRawData(useSoftmax = True):
     
     songList = ['hangengxman']
+    songList = ['jilejingtu']
 
     with open('d:/work/evaluate_data.raw', 'rb') as file:
         evaluate = pickle.load(file)
@@ -440,27 +448,51 @@ def LoadRawData(useSoftmax = True):
         if useSoftmax:
             predicts = predicts[:,1]
 
-        acceptThrehold = 0.51
+        acceptThrehold = 0.7
         notes = postprocess.TrainDataToLevelData(predicts, 0, acceptThrehold)
         notes = np.asarray(notes)
         notes[0]
-        notes = notes[:,0]
 
         pathname = MakeMp3Pathname(songList[0])
+        duration, bpm, entertime = LoadMusicInfo(pathname)
+        levelNotes = postprocess.ConvertToLevelNote(notes, bpm, entertime)
+        levelFilename = 'd:/work/%s.xml' % (songList[0])
+        LevelInfo.GenerateIdolLevel(levelFilename, levelNotes, bpm, entertime, duration)
+
+        notes = notes[:,0]
         LevelInfo.SaveInstantValue(notes, pathname, '_predict')
 
-    
 
-# @run
+def LoadMusicInfo(filename):
+    # filename = r'd:\librosa\RhythmMaster\jilejingtu\jilejingtu.mp3'
+    dir = os.path.dirname(filename) + os.path.sep
+    filename = dir + 'info.txt'
+    with open(filename, 'r') as file:
+        value = [float(s.split('=')[1]) for s in file.readlines()]
+        
+        # duration, bpm, entertime
+        value[0] = int(value[0] * 1000)
+        value[2] = int(value[2] * 1000)
+        print(value)
+        return tuple(value)
+
+
+@run
 def Run():
     
     useSoftmax = True
 
     songList = ['inthegame', 'isthisall', 'huashuo', 'haodan', '2differenttears', 'abracadabra', 'tictic', 'aiqingkele']
+    # for long note
+    songList = ['aiqingmaimai','ai', 'hellobaby', 'hongri', 'houhuiwuqi', 'huashuo', 'huozaicike', 'haodan']
     # songList = ['4minuteshm', 'hangengxman']
 
-    testx, testy = PrepareTrainData(songList, batchSize, useSoftmax)
+    testx, testy = PrepareTrainData(songList, batchSize)
     print('test shape', testx.shape)
+
+    print('pick long note')
+    testy = testy[:, 3]
+    testy = SamplesToSoftmax(testy)
     
     data = TrainData(testx, testy, batchSize, numSteps)
     numBatches = data.numBatches
@@ -480,7 +512,7 @@ def Run():
     with tf.Session() as sess:
         # Run the initializer
         sess.run(init)
-        epch = 100
+        epch = 200
 
         for j in range(epch):
             loss = []
@@ -504,9 +536,9 @@ def Run():
                 maxAcc = accValue
                 notIncreaseCount = 0
             
-            print('epch', j, 'loss', lossValue, 'accuracy', accValue, 'not increase', notIncreaseCount)
-            if notIncreaseCount > 10:
+            if notIncreaseCount > 15:
                 break            
+            print('epch', j, 'loss', lossValue, 'accuracy', accValue, 'not increase', notIncreaseCount)
 
         SaveModel(sess)
         GenerateLevel(sess, prediction, X)

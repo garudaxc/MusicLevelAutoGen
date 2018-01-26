@@ -8,6 +8,9 @@ import sys
 from struct import *
 
 
+slideNote = 0x01
+longNote = 0x02
+
 def parse_level_info(tree):
     #解析传统关卡中的bpm和et
     #root = tree.getroot() #level
@@ -138,11 +141,9 @@ def LoadRhythmMasterLevel(pathname):
     r, offset = ReadAndOffset('2i', data, offset)
     totalTime = r[0]
     numTrunk = r[1]
-    print('total time', totalTime, 'trunk', numTrunk)
 
     r = unpack_from('4i', data, offset)
     interval = r[-1]
-    print('interval', interval)
 
     # 跳过一段数据
     offset += calcsize('3i') * numTrunk
@@ -157,11 +158,13 @@ def LoadRhythmMasterLevel(pathname):
     cnBegin = 0x40
     cnEnd = 0x80
 
-    slideNote = 0x01
-    longNote = 0x02
-
     notes = []
     combineNode = []
+
+    numShort = 0
+    numSlide = 0
+    numLong = 0
+
     for i in range(numNote):
         r, offset = ReadAndOffset('=BBiBi', data, offset)
 
@@ -181,11 +184,11 @@ def LoadRhythmMasterLevel(pathname):
                 # print("c%d begin time %d" % (i, time))
 
             if op & slideNote == slideNote:
-                combineNode.append((time, 1, 0))
-                #print('c%d slide time %d' % (i, time))
+                combineNode.append((time, slideNote, 0))
+                numSlide += 1
 
             if op & longNote == longNote:
-                combineNode.append((time, 2, val))
+                combineNode.append((time, longNote, val))
                 #print('c%d long time %d last %d' % (i, time, val))
                 
             if op & cnEnd == cnEnd:
@@ -197,19 +200,21 @@ def LoadRhythmMasterLevel(pathname):
             continue
         
         if op & slideNote == slideNote:
-            notes.append((time, 1, 0))
-            # print('slide note track ', track)
+            notes.append((time, slideNote, 0))
+            numSlide += 1
             continue
             
         if op & longNote == longNote:
-            notes.append((time, 2, val))
-            #print('long note during %d' % (val))
+            notes.append((time, longNote, val))
+            numLong += 1
             continue
 
         notes.append((time, 0, 0))
+        numShort += 1
         #print("touch note %d %x %x" % (i, op, val))
         
     #notes = list(set(notes))
+    print('got %d short %d slide %d long' % (numShort, numSlide, numLong))
     return notes
     
 
@@ -341,8 +346,10 @@ def SaveMidi(filename, notes, bpm = 120.0):
 
 
 def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
-    #保存到心动模式关卡文件
-    text=open(r'D:\librosa\MusicLevelAutoGen\idol_template.xml', encoding='utf-8').read()
+    '''
+    保存到心动模式关卡文件
+    '''
+    text=open(r'D:\librosa\idol_template.xml', encoding='utf-8').read()
     xmlparser = ElementTree.XMLParser(encoding='utf-8')
     tree = ElementTree.fromstring(text)
 
@@ -399,6 +406,34 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     
     t = ElementTree.ElementTree(root)
     t.write(filename, encoding="utf-8",xml_declaration=True)
+    print('done write file ' + filename)
+
+def SaveSamplesToRegionFile(samples, filename, postfix=''):
+    '''
+    每秒100帧的采样数据转换为连续区间    
+    '''
+    outname = os.path.splitext(filename)[0]
+    outname = outname + postfix + '.csv'
+    
+    border =  np.nonzero(samples[:-1] != samples[1:])[0]
+
+    region = []
+    for b, e in zip(border[0::2], border[1::2]):
+        print(samples[b])
+        if samples[b] == False:
+            assert samples[e] == True
+            begin = (b + 1) * 0.01
+            length = (e - b) * 0.01
+            region.append((begin, length))
+    
+    # print(region)
+    with open(outname, 'w') as file:
+        for r in region:
+            line = '%f,1,%f\n' % r
+            file.write(line)
+        
+        print('file', outname, 'done')
+
 
 
 
