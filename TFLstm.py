@@ -18,12 +18,40 @@ def run(r):
 
 numHidden = 24
 batchSize = 6
+numSteps = 512
 numSteps = 256
-# numSteps = 128
 inputDim = 314
 outputDim = 2
-learning_rate = 0.001
+learning_rate = 0.01
+bSaveModel = False
 
+epch = 300
+
+
+songList = ['inthegame', 'isthisall', 'huashuo', 'haodan', '2differenttears', 'abracadabra', 'tictic', 'aiqingkele']
+# for long note
+songList = ['aiqingmaimai','ai', 'hellobaby', 'hongri', 'houhuiwuqi', 'huashuo', 'huozaicike', 'haodan']
+# songList = ['4minuteshm', 'hangengxman']
+
+testing = False
+if testing:
+    numSteps = 64
+    epch = 3
+    songList = ['aiqingmaimai','ai']
+
+
+
+def FillLongNote(data, combineNote):
+    begin = combineNote[0][0]
+    end = 0
+    for note in combineNote:
+        time = note[0]
+        last = time + note[2]
+        if time < begin:
+            begin = time
+        if last > end:
+            end = last
+    data[[begin//10, end//10], 3] = 1.0
 
 def FillNote(data, note):
     # 音符数据转化为sample data
@@ -34,7 +62,9 @@ def FillNote(data, note):
         data[index] = [0.0, 0.0, 1.0, 0.0]
     elif type == LevelInfo.longNote:
         last = note[2] // 10
-        data[index:index+last, 3] = 1.0
+        # data[index:index+last, 3] = 1.0
+        # 尝试标记长音符的开头和结尾
+        data[[index, index+last], 3] = 1.0
     else:        
         data[index] = [0.0, 1.0, 0.0, 0.0]
 
@@ -59,8 +89,9 @@ def LevelDataToTrainData(LevelData, numSamples):
         type = l[1]
         if type == 3:
             notes = l[2]
-            for n in notes:
-                FillNote(result, n)
+            FillLongNote(result, notes)
+            # for n in notes:
+            #     FillNote(result, n)
             continue
 
         FillNote(result, l)
@@ -80,7 +111,7 @@ def MakeMp3Pathname(song):
     pathname = '%s%s/%s.mp3' % (path, song, song)
     return pathname
 
-def MakeLevelPathname(song, difficulty=1):
+def MakeLevelPathname(song, difficulty=2):
     path = GetSamplePath()
     diff = ['ez', 'nm', 'hd']
     pathname = '%s%s/%s_4k_%s.imd' % (path, song, song, diff[difficulty])
@@ -134,9 +165,9 @@ def RhythmMasterLevelPorcess():
     acceptThrehold = 0.9
 
     pathname = MakeMp3Pathname(songList[0])
-    y = y > acceptThrehold
-    LevelInfo.SaveSamplesToRegionFile(y, pathname, 'region')
-    return    
+    # y = y > acceptThrehold
+    # LevelInfo.SaveSamplesToRegionFile(y, pathname, 'region')
+    # return    
 
     notes = postprocess.TrainDataToLevelData(y, 0, acceptThrehold)
     notes = np.asarray(notes)
@@ -196,7 +227,7 @@ def BuildNetwork(X, Y):
     for i in range(numLayers * 2):
         c = rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)
         cells.append(c)
-        c = tf.nn.rnn_cell.DropoutWrapper(c, output_keep_prob=0.6)
+        c = tf.nn.rnn_cell.DropoutWrapper(c, output_keep_prob=0.9)
         dropoutCell.append(c)
     
     output, _, _ = rnn.stack_bidirectional_rnn(dropoutCell[0:numLayers], dropoutCell[numLayers:], x, dtype=tf.float32)
@@ -274,15 +305,15 @@ def Test():
    
 
 
-def SaveModel(sess):
+def SaveModel(sess, saveMeta = False):
     saver = tf.train.Saver()
-    saver.save(sess, 'd:/work/model.ckpt')
+    saver.save(sess, 'd:/work/model.ckpt', write_meta_graph=saveMeta)
     print('model saved')
 
 # @run
 def LoadModel():
     
-    saver = saver = tf.train.import_meta_graph("d:/work/model.ckpt.meta")
+    saver = tf.train.import_meta_graph("d:/work/model.ckpt.meta")
 
     with tf.Session() as sess:
         
@@ -299,74 +330,6 @@ def LoadModel():
         
 
 
-# @run
-def GenerateLevelTest(sess=None, train_op=None):
-    useSoftmax = True
-
-    songList = ['4minuteshm']
-    testx, testy = PrepareTrainData(songList, batchSize)
-    print('testy', testy.shape)
-
-
-    testx = np.repeat(testx, batchSize, axis=0)
-    count = len(testx)
-    yu = count % (batchSize * numSteps)
-    testx = testx[0:-yu]
-
-    testx = testx.reshape(-1, numSteps, batchSize, inputDim)
-    print('num batches', len(testx))
-
-    b = testx[2]
-    print('batch shape', b.shape)
-
-    print('step 0, batch 0 1', b[0, 0, 0:2], b[0, 1, 0:2])
-    
-    print('step 1 2, batch 0', b[1, 0, 0:2], b[2, 0, 0:2])    
-
-    return
-
-    
-    data = TrainData(testx, testy, batchSize, numSteps)
-
-    print('numbatch', data.numBatches)
-    
-    X = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, inputDim))
-    Y = tf.placeholder(dtype=tf.float32, shape=(numSteps, batchSize, outputDim))
-    prediction = BuildNetwork(X, Y)
-
-    if sess == None:
-        sess = tf.Session()
-    
-    sess.run(tf.global_variables_initializer())
-
-    evaluate = []
-    for i in range(data.numBatches):
-        xData, yData = data.GetBatch(i)
-        t = sess.run(prediction, feed_dict={X:xData, Y:yData})
-        evaluate.append(t)
-
-    evaluate = np.array(evaluate)
-    print('result', evaluate.shape)
-
-    evaluate = evaluate.transpose(2, 0, 1, 3)
-    predicts = np.reshape(evaluate, (-1, 2))
-    
-    predicts = postprocess.pick(predicts)
-
-    postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
-
-    if useSoftmax:
-        predicts = predicts[:,1]
-
-    acceptThrehold = 0.5
-    notes = postprocess.TrainDataToLevelData(predicts, 0, acceptThrehold)
-    notes = np.asarray(notes)
-    notes[0]
-    notes = notes[:,0]
-
-    return notes
-    
-
 def GenerateLevel(sess, prediction, X):
     
     print('gen level')
@@ -374,10 +337,8 @@ def GenerateLevel(sess, prediction, X):
     useSoftmax = True
     saveRawData = True
 
-    songList = ['4minuteshm']
-    songList = ['hangengxman']
-    songList = ['jilejingtu']
-    testx, _ = PrepareTrainData(songList, batchSize, loadTestData = False)
+    testSongList = ['jilejingtu']
+    testx, _ = PrepareTrainData(testSongList, batchSize, loadTestData = False)
     # print('testy', testy.shape)    
 
     testx = np.repeat(testx, batchSize, axis=0)
@@ -408,13 +369,12 @@ def GenerateLevel(sess, prediction, X):
 
 
     acceptThrehold = 0.6
-    pathname = MakeMp3Pathname(songList[0])
-    #for long note
-    print('evaluate shape', evaluate.shape)
-    predicts = evaluate[:,1] > acceptThrehold
-    LevelInfo.SaveSamplesToRegionFile(prediction, pathname, '_region')
-    return
-
+    pathname = MakeMp3Pathname(testSongList[0])
+    # #for long note
+    # print('evaluate shape', evaluate.shape)
+    # predicts = evaluate[:,1] > acceptThrehold
+    # LevelInfo.SaveSamplesToRegionFile(predicts, pathname, '_region')
+    # return
 
     predicts = postprocess.pick(evaluate)
 
@@ -429,7 +389,8 @@ def GenerateLevel(sess, prediction, X):
     notes[0]
     notes = notes[:,0]
 
-    LevelInfo.SaveInstantValue(notes, pathname, '_predict')
+    # LevelInfo.SaveInstantValue(notes, pathname, '_predict')
+    LevelInfo.SaveInstantValue(notes, pathname, '_region')
     
 
 # @run
@@ -441,6 +402,17 @@ def LoadRawData(useSoftmax = True):
     with open('d:/work/evaluate_data.raw', 'rb') as file:
         evaluate = pickle.load(file)
         print(type(evaluate))
+
+        
+        acceptThrehold = 0.4
+        pathname = MakeMp3Pathname(songList[0])
+        #for long note
+        print('evaluate shape', evaluate.shape)
+        predicts = evaluate[:,1] > acceptThrehold
+        LevelInfo.SaveSamplesToRegionFile(predicts, pathname, '_region')
+        return
+
+
         predicts = postprocess.pick(evaluate)
 
     # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
@@ -464,6 +436,9 @@ def LoadRawData(useSoftmax = True):
 
 
 def LoadMusicInfo(filename):
+    '''
+    读取歌曲的长度,bpm,entertime等信息
+    '''
     # filename = r'd:\librosa\RhythmMaster\jilejingtu\jilejingtu.mp3'
     dir = os.path.dirname(filename) + os.path.sep
     filename = dir + 'info.txt'
@@ -482,10 +457,6 @@ def Run():
     
     useSoftmax = True
 
-    songList = ['inthegame', 'isthisall', 'huashuo', 'haodan', '2differenttears', 'abracadabra', 'tictic', 'aiqingkele']
-    # for long note
-    songList = ['aiqingmaimai','ai', 'hellobaby', 'hongri', 'houhuiwuqi', 'huashuo', 'huozaicike', 'haodan']
-    # songList = ['4minuteshm', 'hangengxman']
 
     testx, testy = PrepareTrainData(songList, batchSize)
     print('test shape', testx.shape)
@@ -512,7 +483,9 @@ def Run():
     with tf.Session() as sess:
         # Run the initializer
         sess.run(init)
-        epch = 200
+        if bSaveModel:
+            print('begin save model')
+            SaveModel(sess, saveMeta=True)
 
         for j in range(epch):
             loss = []
@@ -535,12 +508,17 @@ def Run():
             if accValue > maxAcc:
                 maxAcc = accValue
                 notIncreaseCount = 0
+                # save checkpoint
+                print('save checkpoint')
+                SaveModel(sess)
             
             if notIncreaseCount > 15:
                 break            
             print('epch', j, 'loss', lossValue, 'accuracy', accValue, 'not increase', notIncreaseCount)
 
-        SaveModel(sess)
+        saver = tf.train.Saver()
+        saver.restore(sess, 'd:/work/model.ckpt')
+        print('checkpoint loaded')
         GenerateLevel(sess, prediction, X)
 
 

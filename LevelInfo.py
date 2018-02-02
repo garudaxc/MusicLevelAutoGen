@@ -145,6 +145,9 @@ def LoadRhythmMasterLevel(pathname):
     r = unpack_from('4i', data, offset)
     interval = r[-1]
 
+    print('total time', totalTime, 'interval', interval)
+    
+
     # 跳过一段数据
     offset += calcsize('3i') * numTrunk
     r, offset = ReadAndOffset('h', data, offset)
@@ -189,7 +192,7 @@ def LoadRhythmMasterLevel(pathname):
 
             if op & longNote == longNote:
                 combineNode.append((time, longNote, val))
-                #print('c%d long time %d last %d' % (i, time, val))
+                print('c%d long time %d last %d' % (i, time, val))
                 
             if op & cnEnd == cnEnd:
                 notes.append((combineNode[0][0], 3, combineNode))
@@ -419,7 +422,7 @@ def SaveSamplesToRegionFile(samples, filename, postfix=''):
 
     region = []
     for b, e in zip(border[0::2], border[1::2]):
-        print(samples[b])
+        # print(samples[b])
         if samples[b] == False:
             assert samples[e] == True
             begin = (b + 1) * 0.01

@@ -1,6 +1,7 @@
 
 import tensorflow as tf
 import numpy as np
+import time
 
 runList = []
 def run(r):
@@ -139,7 +140,7 @@ def tile_test():
     # a = np.tile(a, (3, 1))
     print(a)
 
-@run
+# @run
 def accuracy_test():
     v0 = tf.Variable([[4, 6], [1, 2], [4, 5]], dtype=tf.float32)
     v1 = tf.Variable([[4, 6], [3, 2], [6, 5]], dtype=tf.float32)
@@ -197,6 +198,24 @@ def TFTest():
     # vs.variable
 
 
+class WithTest:
+    def __init__(self, desc):
+        self.desc = desc
+
+    def __enter__(self):
+        self.time = time.time()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        duration = time.time() - self.time
+        print(self.desc, 'time', duration)
+
+@run
+def WithStatementTest():
+    with WithTest('test') as w:
+        time.sleep(1)
+        
+    print('done') 
 
 if __name__ == '__main__':
     for func in runList:
