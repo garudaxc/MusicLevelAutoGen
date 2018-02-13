@@ -7,9 +7,10 @@ import io
 import sys
 from struct import *
 
-
-slideNote = 0x01
-longNote = 0x02
+shortNote   = 0x00
+slideNote   = 0x01
+longNote    = 0x02
+combineNode = 0x03
 
 def parse_level_info(tree):
     #解析传统关卡中的bpm和et
@@ -145,8 +146,7 @@ def LoadRhythmMasterLevel(pathname):
     r = unpack_from('4i', data, offset)
     interval = r[-1]
 
-    print('total time', totalTime, 'interval', interval)
-    
+    # print('total time', totalTime, 'interval', interval)    
 
     # 跳过一段数据
     offset += calcsize('3i') * numTrunk
@@ -155,7 +155,7 @@ def LoadRhythmMasterLevel(pathname):
 
     r, offset = ReadAndOffset('i', data, offset)
     numNote = r[0]
-    print('numNote', numNote)
+    # print('numNote', numNote)
     
     combineNoteFlag = 0x20
     cnBegin = 0x40
@@ -192,7 +192,7 @@ def LoadRhythmMasterLevel(pathname):
 
             if op & longNote == longNote:
                 combineNode.append((time, longNote, val))
-                print('c%d long time %d last %d' % (i, time, val))
+                # print('c%d long time %d last %d' % (i, time, val))
                 
             if op & cnEnd == cnEnd:
                 notes.append((combineNode[0][0], 3, combineNode))
@@ -217,7 +217,7 @@ def LoadRhythmMasterLevel(pathname):
         #print("touch note %d %x %x" % (i, op, val))
         
     #notes = list(set(notes))
-    print('got %d short %d slide %d long' % (numShort, numSlide, numLong))
+    # print('got %d short %d slide %d long' % (numShort, numSlide, numLong))
     return notes
     
 
@@ -438,9 +438,90 @@ def SaveSamplesToRegionFile(samples, filename, postfix=''):
         print('file', outname, 'done')
 
 
+def GetSamplePath():
+    path = '/Users/xuchao/Documents/rhythmMaster/'
+    if os.name == 'nt':
+        path = 'D:/librosa/RhythmMaster/'
+    return path
+
+
+def MakeMp3Pathname(song):
+    path = GetSamplePath()
+    pathname = '%s%s/%s.mp3' % (path, song, song)
+    return pathname
+
+def MakeLevelPathname(song, difficulty=2):
+    path = GetSamplePath()
+    diff = ['ez', 'nm', 'hd']
+    pathname = '%s%s/%s_4k_%s.imd' % (path, song, song, diff[difficulty])
+    return pathname   
+
+def ProcessRythmMasterMusicInfo():
+    # 读取关卡描述文件，将music info保存到目录下
+
+    path = 'd:/librosa/RhythmMaster'
+    files = os.listdir(path)
+    dirs = []
+    for f in files:
+        if os.path.isdir(path + '/' + f):
+            dirs.append(f)
+
+    
+    text=open(r'd:\librosa\RhythmMaster\mrock_song_client_android.xml', encoding='utf-8').read()
+    xmlparser = ElementTree.XMLParser(encoding='utf-8')
+    tree = ElementTree.fromstring(text)
+
+    nodes = tree.findall('SongConfig_Client')
+
+    collects = {}    
+    for node in nodes:
+        name = node.find('m_szPath')
+        name = name.text
+
+        if name not in dirs:
+            continue
+        
+        levelFileName = MakeLevelPathname(name)
+        if not os.path.exists(levelFileName):
+            continue
+
+        level = LoadRhythmMasterLevel(levelFileName)
+
+        duration = node.find('m_iGameTime')
+        duration = float(duration.text)
+        bpm = node.find('m_szBPM')
+        bpm = float(bpm.text)
+
+        t0, _, _ = level[0]        
+        step = 60000.0 / (bpm * 8)
+        remainder = t0 % step
+        quotient = t0 // step
+
+        r = (step - remainder) % step
+        if abs(r) > 2:
+            print(name, 'q', quotient, 'r', remainder, 'step', step, 'res', r)
+        
+        filename = path + '/' + name + '/' + 'info.txt'
+        with open(filename, 'w') as file:
+            file.write('duration=%f\nbpm=%f\net=%f' % (duration, bpm, 0))
+
+            # to do
+        # print(name)
+        continue
+
+
+
+        print(name, duration, bpm)
+
+    # print(len(nodes))
+
+
 
 
 if __name__ == '__main__':
+
+    ProcessRythmMasterMusicInfo()
+    
     
     #import madmon_test
     #sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
@@ -471,12 +552,12 @@ if __name__ == '__main__':
     # SaveInstantValue(notes, filename, '_time')
 
 
-    filename = r'd:/miditest_out.mid'
-    # LoadMidi(filename)
+    # filename = r'd:/miditest_out.mid'
+    # # LoadMidi(filename)
 
-    MultibyteLength(7680)
-    MultibyteLength(480)
-    MultibyteLength(0)
+    # MultibyteLength(7680)
+    # MultibyteLength(480)
+    # MultibyteLength(0)
     # SaveMidi(filename, None)
 
     # a = input()

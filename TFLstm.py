@@ -178,8 +178,6 @@ def RhythmMasterLevelPorcess():
     LevelInfo.SaveInstantValue(notes, pathname, '_slide')
 
 
-
-
 class TrainData():
     def __init__(self, x, y, batchSize, numSteps):
         assert x.ndim == 2
@@ -367,7 +365,6 @@ def GenerateLevel(sess, prediction, X):
         with open('d:/work/evaluate_data.raw', 'wb') as file:
             pickle.dump(evaluate, file)
 
-
     acceptThrehold = 0.6
     pathname = MakeMp3Pathname(testSongList[0])
     # #for long note
@@ -448,7 +445,7 @@ def LoadMusicInfo(filename):
         # duration, bpm, entertime
         value[0] = int(value[0] * 1000)
         value[2] = int(value[2] * 1000)
-        print(value)
+        # print(value)
         return tuple(value)
 
 

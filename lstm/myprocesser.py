@@ -19,7 +19,7 @@ from madmom.audio.spectrogram import (
     SpectrogramDifferenceProcessor)
 
 
-def CreateProcesser():
+def CreateProcesser(fps=100):
     # define pre-processing chain
     sig = SignalProcessor(num_channels=1, sample_rate=44100)
     # process the multi-resolution spec & diff in parallel
@@ -28,7 +28,7 @@ def CreateProcesser():
     frame_sizes = [1024, 2048, 4096]
     num_bands = [3, 6, 12]
     for frame_size, num_bands in zip(frame_sizes, num_bands):
-        frames = FramedSignalProcessor(frame_size=frame_size, fps=100)
+        frames = FramedSignalProcessor(frame_size=frame_size, fps=fps)
         stft = ShortTimeFourierTransformProcessor()  # caching FFT window
         filt = FilteredSpectrogramProcessor(
             num_bands=num_bands, fmin=30, fmax=17000, norm_filters=True)
@@ -61,8 +61,8 @@ def TestWrite(pathname):
     return d
 
 
-def LoadAndProcessAudio(pathname):
-    pre_processor = CreateProcesser()
+def LoadAndProcessAudio(pathname, fps=100):
+    pre_processor = CreateProcesser(fps)
     d = pre_processor(pathname)
     print('audio processed ', d.shape)
     return d

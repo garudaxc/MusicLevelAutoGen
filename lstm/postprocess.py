@@ -1,53 +1,51 @@
 import numpy as np
 
-def process(notes):
-    pass
 
-
-
-def TrainDataToLevelData(data, timeOffset, threhold = 0.8):
+def TrainDataToLevelData(data, sampleInterval, threhold, timeOffset):
     notes = []
     longNote = False
     last = 0
     start = 0  
     for i in range(len(data)):                
         d = data[i]
-        t = i * 10 + timeOffset
+        t = int(i * sampleInterval + timeOffset)
 
         if not isinstance(d, np.ndarray):
             if (d > threhold):
-                notes.append((t, 0, 0))
+                notes.append([t, 0, 0])
             continue
 
         dim = len(d)
 
         if (d[0] > threhold):
-            notes.append((t, 0, 0))
+            notes.append([t, 0, 0])
 
         if (dim > 1 and d[1] > threhold):
-            notes.append((t, 1, 0))
+            notes.append([t, 1, 0])
 
         if (dim > 2 and d[2] > threhold):
             if not longNote:
                 start = t
             longNote = True
-            last += 10            
+            last += sampleInterval            
         else:
             if longNote:
-                if last <= 10:
+                if last <= sampleInterval:
                     print('long note last too short')
                 else:
-                    notes.append((start, 2, last))
+                    last = int(last)
+                    notes.append([start, 2, last])
             longNote = False
             start = 0
             last = 0
     
+    notes = np.array(notes)
     return notes
 
 
 
-def pick(data):
-    kernelSize = 21
+def pick(data, kernelSize = 21):
+    
     n = len(data) // kernelSize
     dim = data.shape[1]
     newNotes = np.zeros(data.shape)
@@ -61,24 +59,27 @@ def pick(data):
     return newNotes
 
 
-def SaveResult(prid, target, time, pathname):
+def SaveResult(prid, msMinInterval, time, pathname):
     # pathname = '/Users/xuchao/Documents/python/MusicLevelAutoGen/result.txt'
     # if os.name == 'nt':
     #     pathname = r'D:\librosa\result.log'
     with open(pathname, 'w') as file:
         n = 0
-        for i in zip(prid, target):
-            t = time + n * 10
+        for i in prid:
+            t = time + n * msMinInterval
             minite = t // 60000
             sec = (t % 60000) // 1000
             milli = t % 1000
 
-            file.write('%d:%d:%d, %s , %s\n' % (minite, sec, milli, i[0], i[1]))
+            file.write('%d:%d:%d, %s\n' % (minite, sec, milli, str(i)))
             n += 1
 
     print('saved ', pathname)
 
 def ConvertToLevelNote(notes, bpm, et):
+    '''
+    转换为关卡音符，增加音轨信息
+    '''
     hand = 0
 
     barInterval = 240.0 / bpm
