@@ -231,6 +231,7 @@ def SaveDownbeat(bpm, et, lastBeat, filename):
 def CalcMusicInfo():
     filename = r'd:\leveledtior\client\Assets\resources\audio\bgm\jilejingtu.m4a'
     filename = r'd:\librosa\RhythmMaster\aiqingmaimai\aiqingmaimai.mp3'
+    filename = r'd:\librosa\RhythmMaster\BBoomBBoom\BBoomBBoom.mp3'
 
     y, sr = librosa.load(filename, mono=True, sr=44100)
     logger.info('loaded')

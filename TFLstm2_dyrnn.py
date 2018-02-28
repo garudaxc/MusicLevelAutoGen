@@ -11,17 +11,19 @@ import time
 import TFLstm
 
 
-levelDifficulty = 1
+levelDifficulty = 2
 numHidden = 26
-batchSize = 128
+batchSize = 32
 numSteps = 512
 numSteps = 256
 inputDim = 314
 outputDim = 2
-learning_rate = 0.001
+learning_rate = 0.0008
 bSaveModel = True
 
 maxSeqLen = 10
+# whole max seqence length : seqsPerBatch * maxSeqLen
+seqsPerBatch = 48
 
 epch = 200
 
@@ -186,6 +188,7 @@ class MusicTrainData():
         if numframes % self.step != 0:
             self.signals = self.signals[0:-(numframes%self.step)]       #取整
         numFeature = self.signals.shape[1]
+        self.rawSignals = self.signals
         self.signals = np.reshape(self.signals, (-1, self.step, numFeature))
         numSeqs = len(self.signals)
         # print('numSeqs', numSeqs, 'duration', self.duration, 'interval', self.msMinInterval, 'duration/interval', self.duration/self.msMinInterval)
@@ -312,7 +315,18 @@ def TestPrepareData():
 
     print('step', step)
 
+# @run
+def IndexTest():
+    batches = 2
+    step = [3, 4]
+    index = tf.Variable([], dtype=tf.int32)
+    for i in range(batches):
+        ii = tf.range(1, seqsPerBatch+1) * step[i] - 1 + i * (seqsPerBatch*maxSeqLen)
+        index = tf.concat((index, ii), axis=0)
 
+    sess = tf.Session()
+    i = sess.run(index)
+    print(i)
 
 def BuildDynamicRnn(X, Y, seqlen, learningRate):
     t = time.time()
@@ -334,15 +348,22 @@ def BuildDynamicRnn(X, Y, seqlen, learningRate):
         X, sequence_length=seqlen, dtype=tf.float32)
 
     outlayerDim = tf.shape(output)[2]
-    print('outlayer dim', outlayerDim)
-    index = tf.range(0, batchSize) * maxSeqLen + (seqlen - 1)
+    # print('outlayer dim', outlayerDim)
+    # index = tf.range(0, batchSize) * maxSeqLen + (seqlen - 1)
+    
+    index = tf.Variable([], dtype=tf.int32)
+    for i in range(batchSize):
+        step = tf.cast(seqlen[i] / seqsPerBatch, tf.int32)
+        ii = tf.range(1, seqsPerBatch+1) * step - 1 + i * (seqsPerBatch*maxSeqLen)
+        index = tf.concat((index, ii), axis=0)
 
-    output = tf.reshape(output, [batchSize*maxSeqLen, outlayerDim])
+    output = tf.reshape(output, [batchSize*maxSeqLen*seqsPerBatch, outlayerDim])
     output = tf.gather(output, index)
-
-    print('stack_bidirectional_dynamic_rnn', time.time() - t)    
+    print('output', output)
 
     logits = tf.matmul(output, weights) + bais
+
+    Y = tf.reshape(Y, [batchSize*seqsPerBatch, outputDim])
 
     # # Define loss and optimizer
     crossEntropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y)
@@ -356,15 +377,15 @@ def BuildDynamicRnn(X, Y, seqlen, learningRate):
 
     correct = tf.equal(tf.argmax(tf.nn.softmax(logits), axis=1), tf.argmax(Y, axis=1))
     accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
-
-    # return train_op, loss_op, accuracy
     
     # prediction without dropout
     output, _, _ = rnn.stack_bidirectional_dynamic_rnn(
         cells[0:numLayers], cells[numLayers:], 
         X, sequence_length=seqlen, dtype=tf.float32)
 
-    output = tf.reshape(output, [batchSize*maxSeqLen, outlayerDim])
+    # output = tf.reshape(output, [batchSize*maxSeqLen, outlayerDim])
+    
+    output = tf.reshape(output, [batchSize*maxSeqLen*seqsPerBatch, outlayerDim])
     output = tf.gather(output, index)
     logits = tf.matmul(output, weights) + bais
 
@@ -376,38 +397,106 @@ def BuildDynamicRnn(X, Y, seqlen, learningRate):
 
 
 def LoadTrainData(songList):
-    samplesList = []
     lablesList = []
     seqLenList = []
+    batchList = []
+    batchLenth = maxSeqLen * seqsPerBatch
     for song in songList:
         data = MusicTrainData(song)
-        numBatches = data.BeginBatch(batchSize)
-        for i in range(numBatches):
-            s, l, seq = data.GetNextBatch()
-            samplesList.append(s)
-            lablesList.append(l)
-            seqLenList.append(seq)
+
+        raw = data.rawSignals
+        lables = data.lables
+        # print('shape', raw.shape, lables.shape, len(raw) / data.step)
+        stride = data.step * seqsPerBatch
+        print('stride', stride, 'batch len', batchLenth)
+        for i in range(len(raw)//stride):
+            b = raw[i*stride:(i+1)*stride]
+            toCompensate = batchLenth - stride
+            b = np.concatenate((b, np.zeros((toCompensate, inputDim))))
+
+            batchList.append(b)
+            seqLenList.append(stride)
+
+            lablesList.append(lables[i*seqsPerBatch:(i+1)*seqsPerBatch])
+     
+    print('num batches', len(batchList))
+    residual = len(batchList) % batchSize
+    batchList = batchList[:-residual]
+    lablesList = lablesList[:-residual]
+    seqLenList = seqLenList[:-residual]
+    seqLenList = np.array(seqLenList)
     
-    return samplesList, lablesList, seqLenList
+    batches = np.stack(batchList)
+    # print('batches', batches.shape)
+    batches = np.reshape(batches, (batchSize, -1, batchLenth, inputDim))
+    print('batches', batches.shape)
+    batches = batches.transpose(1, 0, 2, 3)
+    print('batches', batches.shape)
+
+    seqLenList = np.reshape(seqLenList, (batchSize, -1))
+    print('seq len list', seqLenList.shape)
+    seqLenList = seqLenList.transpose(1, 0)
+    print('seq len list', seqLenList.shape)
+    # print(seqLenList[1])
+
+    lablesList = np.stack(lablesList)
+    # print('lable list', lablesList.shape)
+    lablesList = np.reshape(lablesList, (batchSize, -1, seqsPerBatch, lablesList.shape[-1]))    
+    print('lable list', lablesList.shape)
+    lablesList = lablesList.transpose(1, 0, 2, 3)
+    print('lable list', lablesList.shape)
+    
+    return batches, lablesList, seqLenList
 
 
 def GenerateLevel(sess, prediction, X, seqLen):
     print('gen level')
 
     song = ['jilejingtu']
+    song = ['bboombboom']
     data = MusicTrainData(song[0], loadLables=False)
-    numBatches = data.BeginBatch(batchSize)
+
+    seqLenList = []
+    batchList = []
+    batchLenth = maxSeqLen * seqsPerBatch
+    raw = data.rawSignals
+    # print('shape', raw.shape, lables.shape, len(raw) / data.step)
+    stride = data.step * seqsPerBatch
+    print('stride', stride, 'batch len', batchLenth)
+    for i in range(len(raw)//stride):
+        b = raw[i*stride:(i+1)*stride]
+        toCompensate = batchLenth - stride
+        b = np.concatenate((b, np.zeros((toCompensate, inputDim))))
+
+        batchList.append(b)
+        seqLenList.append(stride)
+
+    batchList = np.stack(batchList)
+    batchList = np.expand_dims(batchList, axis=1)
+    batchList = np.repeat(batchList, batchSize, axis=1)
+    print('batch list', batchList.shape)
+
+    seqLenList = np.stack(seqLenList)
+    seqLenList = np.expand_dims(seqLenList, axis=1)
+    seqLenList = np.repeat(seqLenList, batchSize, axis=1)
+    print('seqLen list', seqLenList.shape)
+
+    numBatches = len(batchList)
+    print('numBatches', numBatches)
 
     evaluate = []
     for i in range(numBatches):
-        s, _, seq = data.GetNextBatch()
+        s, seq = batchList[i], seqLenList[i]
         t = sess.run(prediction, feed_dict={X:s, seqLen:seq})
+        t = t[:seqsPerBatch]
         evaluate.append(t)
 
-    evaluate = np.array(evaluate)
+    evaluate = np.stack(evaluate)    
+    print('evaluate', evaluate.shape)
     evaluate = np.reshape(evaluate, (-1, outputDim))
-
-    print(evaluate[0:20])
+    print('evaluate', evaluate.shape)
+   
+    # print(evaluate[0:20])
 
     saveRawData = True
     if saveRawData:
@@ -416,9 +505,9 @@ def GenerateLevel(sess, prediction, X, seqLen):
 
     acceptThrehold = 0.6
     pathname = TFLstm.MakeMp3Pathname(song[0])
-    predicts = postprocess.pick(evaluate)
+    predicts = postprocess.pick(evaluate, kernelSize=7)
 
-    postprocess.SaveResult(predicts, data.msMinInterval, 0, r'D:\work\result.log')
+    # postprocess.SaveResult(predicts, data.msMinInterval, 0, r'D:\work\result.log')
 
     predicts = predicts[:,1]
     notes = postprocess.TrainDataToLevelData(predicts, data.msMinInterval, acceptThrehold, timeOffset=0)
@@ -427,7 +516,7 @@ def GenerateLevel(sess, prediction, X, seqLen):
     notes = notes[:,0]
     LevelInfo.SaveInstantValue(notes, pathname, '_inst')
 
-@run
+# @run
 def LoadRawData():
     
     song = ['jilejingtu']
@@ -452,8 +541,12 @@ def LoadRawData():
         notes = notes[:,0]
         LevelInfo.SaveInstantValue(notes, pathname, '_inst')
 
-# @run
+@run
 def LoadModel():    
+    
+    # GenerateLevel(None, None, None, None)
+    # return
+
     saver = tf.train.import_meta_graph("d:/work/model.ckpt.meta")
 
     with tf.Session() as sess:        
@@ -463,19 +556,19 @@ def LoadModel():
         predict = tf.get_default_graph().get_tensor_by_name("prediction:0")         
         X = tf.get_default_graph().get_tensor_by_name('X:0')
         seqLen = tf.get_default_graph().get_tensor_by_name('seqLen:0')
-        print('seqLen',seqLen)
 
         GenerateLevel(sess, predict, X, seqLen)
-
 # @run
 def _Main():
 
     samplesList, lablesList, seqLenList = LoadTrainData(songList)
+
     numBatches = len(samplesList)
+    print('numBatches', numBatches)
 
     seqlenHolder = tf.placeholder(tf.int32, [None], name='seqLen')
-    X = tf.placeholder(dtype=tf.float32, shape=(batchSize, maxSeqLen, inputDim), name='X')
-    Y = tf.placeholder(dtype=tf.float32, shape=(batchSize, outputDim), name='Y')
+    X = tf.placeholder(dtype=tf.float32, shape=(batchSize, maxSeqLen*seqsPerBatch, inputDim), name='X')
+    Y = tf.placeholder(dtype=tf.float32, shape=(batchSize, seqsPerBatch, outputDim), name='Y')
     learningRate = tf.placeholder(dtype=tf.float32, name='learn_rate')
 
     train_op, loss_op, accuracy, prediction = BuildDynamicRnn(X, Y, seqlenHolder, learningRate)
@@ -534,7 +627,7 @@ def _Main():
         saver = tf.train.Saver()
         saver.restore(sess, 'd:/work/model.ckpt')
         print('checkpoint loaded')
-        GenerateLevel(sess, prediction, X, seqlenHolder)
+        # GenerateLevel(sess, prediction, X, seqlenHolder)
 
 
 # @run
