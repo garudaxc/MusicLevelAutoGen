@@ -543,9 +543,6 @@ def LoadRawData():
 
 @run
 def LoadModel():    
-    
-    # GenerateLevel(None, None, None, None)
-    # return
 
     saver = tf.train.import_meta_graph("d:/work/model.ckpt.meta")
 
