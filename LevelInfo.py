@@ -182,9 +182,9 @@ def LoadRhythmMasterLevel(pathname):
         if (op & combineNoteFlag == combineNoteFlag):
             
             if op & cnBegin == cnBegin:
+                print("c%d begin time %d" % (i, time))
                 pass
                 # notes.append((time, 3, 0))
-                # print("c%d begin time %d" % (i, time))
 
             if op & slideNote == slideNote:
                 combineNode.append((time, slideNote, 0))
@@ -196,7 +196,8 @@ def LoadRhythmMasterLevel(pathname):
                 
             if op & cnEnd == cnEnd:
                 notes.append((combineNode[0][0], 3, combineNode))
-                #print('combine note with %d elements' % (len(combineNode)))
+                print(combineNode)
+                print('combine note end at %d with %d elements' % (time, len(combineNode)))
                 combineNode = []
                 #print('c%d end time %d' % (i, time))
 
@@ -520,7 +521,7 @@ def ProcessRythmMasterMusicInfo():
 
 if __name__ == '__main__':
 
-    ProcessRythmMasterMusicInfo()
+    # ProcessRythmMasterMusicInfo()
     
     
     #import madmon_test
@@ -538,7 +539,7 @@ if __name__ == '__main__':
         madmon_test.save_file(notes, pathname, '_notes')
 
 
-    if False:    
+    if True:    
         path = '/Users/xuchao/Documents/rhythmMaster/'
         if os.name == 'nt':
             path = 'D:/librosa/RhythmMaster/'

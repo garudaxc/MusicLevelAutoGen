@@ -31,10 +31,11 @@ epch = 300
 
 # for long note
 songList = ['aiqingmaimai','ai', 'hellobaby', 'hongri', 'houhuiwuqi', 'huashuo', 'huozaicike', 'haodan']
-songList = ['inthegame', 'isthisall', 'huashuo', 'haodan', '2differenttears', 'abracadabra', 'tictic']
 songList = ['huashuo', 'haodan']
-songList = ['inthegame', 'isthisall', 'huashuo', 'haodan', '2differenttears', 
-'abracadabra', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'huozaicike', 'wangfei', 'wodemuyang']
+songList = ['inthegame', 'isthisall', 'huashuo', 'haodan', '2differenttears', 'abracadabra', 'tictic']
+songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai', 
+'1987wbzhyjn', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'myall', 'unreal', 'faraway',
+'fengniao', 'wangfei', 'wodemuyang', 'mrx', 'rageyourdream', 'redhot', 'yilububian', 'yiqiyaobai', 'yiranaini', 'yiyejingxi']
 
 testing = False
 if testing:
@@ -68,7 +69,7 @@ def FillCombineNoteAsLongNote(data, combineNote, msPerFrame):
     i1 = FrameIndex(end, msPerFrame)
     data[i0:i1, 3] = 1.0
 
-def FillNote(data, note, msPerFrame):
+def FillNote(data, note, msPerFrame, combineNote=False):
     # 音符数据转化为sample data
     index = FrameIndex(note[0], msPerFrame)
     type = note[1]
@@ -234,20 +235,19 @@ class TrainDataDynShortNote():
 
         count = x.shape[0]
 
-        if y != None and len(y) != 0:
+        if (not y is None):
             y = y[:, 1]
             y = SamplesToSoftmax(y)
+
+            self.numBatches = count // (self.batchSize * self.numSteps)
+            print('numbatches', self.numBatches)
+            count = self.numBatches * (self.batchSize * self.numSteps)
 
             y = y[:count]
             yDim = y.shape[1]
             y = y.reshape(self.batchSize, -1, self.numSteps, yDim)
             self._y = y.transpose(1, 0, 2, 3)
             print('y shape', self._y.shape)
-
-            self.numBatches = count // (self.batchSize * self.numSteps)
-            print('numbatches', self.numBatches)
-
-            count = self.numBatches * (self.batchSize * self.numSteps)
 
             x = x[:count]
             xDim = x.shape[1]
@@ -287,7 +287,7 @@ class TrainDataDynShortNote():
         evaluate = evaluate.reshape(-1, outputDim)
         print('evaluate', evaluate.shape)
         
-        acceptThrehold = 0.2
+        acceptThrehold = 0.92
         # #for long note
         # print('evaluate shape', evaluate.shape)
         # predicts = evaluate[:,1] > acceptThrehold
@@ -321,8 +321,7 @@ class TrainDataDynLongNote():
         if (not y is None):
             y = y[:, 3]
 
-            ySum = np.sum(y)
-            print('y sample count', len(y), 'y sum', ySum)
+            print('y sample count', len(y), 'y sum', np.sum(y))
 
             y = SamplesToSoftmax(y)
 
@@ -374,7 +373,7 @@ class TrainDataDynLongNote():
         predicts = evaluate.reshape(-1, outputDim)
         print('evaluate', evaluate.shape)
         
-        acceptThrehold = 0.3
+        acceptThrehold = 0.7
         # #for long note
         # print('evaluate shape', evaluate.shape)
         # predicts = evaluate[:,1] > acceptThrehold
@@ -398,8 +397,8 @@ class TrainDataDynLongNote():
 
 
 
+TrainData = TrainDataDynShortNote
 TrainData = TrainDataDynLongNote
-
 
 
 def BuildDynamicRnn(X, Y, seqlen, learningRate):
@@ -414,7 +413,7 @@ def BuildDynamicRnn(X, Y, seqlen, learningRate):
     for i in range(numLayers * 2):
         c = rnn.LSTMCell(numHidden, use_peepholes=True, forget_bias=1.0)
         cells.append(c)
-        c = tf.nn.rnn_cell.DropoutWrapper(c, output_keep_prob=0.8)
+        c = tf.nn.rnn_cell.DropoutWrapper(c, output_keep_prob=0.6)
         dropoutCell.append(c)
     
     output, _, _ = rnn.stack_bidirectional_dynamic_rnn(
@@ -431,9 +430,15 @@ def BuildDynamicRnn(X, Y, seqlen, learningRate):
 
     Y = tf.reshape(Y, [batchSize*numSteps, outputDim])
 
+    class_weight = tf.reduce_sum(Y, axis=0) / tf.cast(tf.shape(Y)[0], tf.float32)
+    class_weight = [class_weight[1], class_weight[0]]
+    class_weight = tf.reduce_sum(class_weight * Y, axis=1)
+
     # # Define loss and optimizer
     crossEntropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y)
-    loss_op = tf.reduce_mean(crossEntropy)
+    print('crossEntropy', crossEntropy)
+
+    loss_op = tf.reduce_mean(crossEntropy * class_weight)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learningRate)    
     # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
@@ -468,13 +473,17 @@ def SaveModel(sess, saveMeta = False):
     print('model saved')
 
 
-@run
+# @run
 def GenerateLevel():
 
     print('gen level')
 
     song = ['bboombboom']
     song = ['jilejingtu']
+    song = ['dainiqulvxing']
+    song = ['PleaseDontGo']
+    song = ['aLIEz']
+
     pathname = MakeMp3Pathname(song[0])
     
     saver = tf.train.import_meta_graph("d:/work/model.ckpt.meta")
@@ -555,7 +564,7 @@ def LoadMusicInfo(filename):
         return tuple(value)
 
 
-# @run
+@run
 def _Main():
     
     testx, testy = PrepareTrainData(songList, batchSize)
