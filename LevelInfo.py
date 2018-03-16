@@ -162,11 +162,12 @@ def LoadRhythmMasterLevel(pathname):
     cnEnd = 0x80
 
     notes = []
-    combineNode = []
 
     numShort = 0
     numSlide = 0
     numLong = 0
+
+    slideInCombine = 0
 
     for i in range(numNote):
         r, offset = ReadAndOffset('=BBiBi', data, offset)
@@ -178,27 +179,30 @@ def LoadRhythmMasterLevel(pathname):
 
         # if track != 0 and track != 1:
         #     continue
+        beginTime = 0
 
         if (op & combineNoteFlag == combineNoteFlag):
             
             if op & cnBegin == cnBegin:
-                print("c%d begin time %d" % (i, time))
-                pass
+                # print("c%d begin time %d" % (i, time))
+                beginTime = time
+                cbNotes = []
                 # notes.append((time, 3, 0))
 
             if op & slideNote == slideNote:
-                combineNode.append((time, slideNote, 0))
-                numSlide += 1
+                # if time == beginTime:
+                # print('combine note begin with slide time %d %d' % (time, slideNote))
+                slideInCombine += 1
+                cbNotes.append((time, slideNote, 0))
+                # numSlide += 1
 
             if op & longNote == longNote:
-                combineNode.append((time, longNote, val))
+                cbNotes.append((time, longNote, val))
                 # print('c%d long time %d last %d' % (i, time, val))
                 
             if op & cnEnd == cnEnd:
-                notes.append((combineNode[0][0], 3, combineNode))
-                print(combineNode)
-                print('combine note end at %d with %d elements' % (time, len(combineNode)))
-                combineNode = []
+                notes.append((beginTime, combineNode, cbNotes))
+                # print('combine note end at %d with %d elements' % (time, len(combineNode)))
                 #print('c%d end time %d' % (i, time))
 
             continue
@@ -217,7 +221,7 @@ def LoadRhythmMasterLevel(pathname):
         numShort += 1
         #print("touch note %d %x %x" % (i, op, val))
         
-    #notes = list(set(notes))
+    # print('begin count %d end count %d slide count %d' % (beginCount, endCount, slideInCombine))
     # print('got %d short %d slide %d long' % (numShort, numSlide, numLong))
     return notes
     
@@ -545,14 +549,22 @@ if __name__ == '__main__':
             path = 'D:/librosa/RhythmMaster/'
 
         songName = '4minuteshm'
+        songName = '1987wbzhyjn'
 
-        pathname = '%s%s/%s_4k_nm.imd' % (path, songName, songName)
 
-        notes = LoadRhythmMasterLevel(pathname)
-        SaveNote(notes, pathname, '_notes')
+        songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai', 
+'1987wbzhyjn', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'myall', 'unreal', 'faraway',
+'fengniao', 'wangfei', 'wodemuyang', 'mrx', 'rageyourdream', 'redhot', 'yilububian', 'yiqiyaobai', 'yiranaini', 'yiyejingxi']
+
+        for songName in songList:
+            pathname = '%s%s/%s_4k_hd.imd' % (path, songName, songName)
+            notes = LoadRhythmMasterLevel(pathname)
+
+
+        # SaveNote(notes, pathname, '_notes')
+
+
     # SaveInstantValue(notes, filename, '_time')
-
-
     # filename = r'd:/miditest_out.mid'
     # # LoadMidi(filename)
 

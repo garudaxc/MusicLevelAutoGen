@@ -8,6 +8,7 @@ import tensorflow as tf
 from tensorflow.contrib import rnn
 from lstm import postprocess
 import time
+import matplotlib.pyplot as plt
 
 
 runList = []
@@ -21,7 +22,7 @@ batchSize = 16
 numSteps = 512
 numSteps = 128
 inputDim = 314
-outputDim = 2
+# outputDim = 2
 learning_rate = 0.002
 bSaveModel = True
 ModelFile = 'd:/work/model.ckpt'
@@ -36,6 +37,13 @@ songList = ['inthegame', 'isthisall', 'huashuo', 'haodan', '2differenttears', 'a
 songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai', 
 '1987wbzhyjn', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'myall', 'unreal', 'faraway',
 'fengniao', 'wangfei', 'wodemuyang', 'mrx', 'rageyourdream', 'redhot', 'yilububian', 'yiqiyaobai', 'yiranaini', 'yiyejingxi']
+
+
+songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai', 
+'1987wbzhyjn', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'myall', 'unreal', 'faraway',
+'fengniao', 'wangfei', 'wodemuyang', 'mrx', 'rageyourdream', 'redhot', 'yilububian', 'yiqiyaobai', 'yiranaini', 'yiyejingxi',
+'hongri', 'huahuangshou', 'huashuo', 'ificoulefly', 'ineedmore', 'iwantmytearsback',  'rippingthebackside', 
+ 'whencaniseeyouagain', 'wingsofpiano', 'wocanggwz', 'ygrightnow']
 
 testing = False
 if testing:
@@ -69,39 +77,47 @@ def FillCombineNoteAsLongNote(data, combineNote, msPerFrame):
     i1 = FrameIndex(end, msPerFrame)
     data[i0:i1, 3] = 1.0
 
-def FillNote(data, note, msPerFrame, combineNote=False):
+def FillNote(data, note, msPerFrame, isCombineNote):
     # 音符数据转化为sample data
     index = FrameIndex(note[0], msPerFrame)
     type = note[1]
 
-    if type == LevelInfo.slideNote:
-        data[index] = [0.0, 0.0, 1.0, 0.0]
+    if type == LevelInfo.shortNote: 
+        data[index, 1] = 1.0
+    elif type == LevelInfo.slideNote:
+        if (not isCombineNote):
+            data[index, 2] = 1.0
+        else:
+            data[index, 3] = 1.0
     elif type == LevelInfo.longNote:
         last = FrameIndex(note[2], msPerFrame)
-        data[index:index+last, 3] = 1.0
-        # print('long note index %d last %d' % (index, last))
-    else:        
-        data[index] = [0.0, 1.0, 0.0, 0.0]
+        data[index:index+last, 4] = 1.0
+    else:
+        assert False
 
 
 def ConvertLevelToLables(level, numframes, msMinInterval = 10):
     '''
     关卡数据转换训练数据
     关卡数据（时刻，类型，时长），训练数据为每个采样点是否有值
-    尝试每个样本三个输出，代表是否有该类型音符，（点击、滑动、长按）
+    样本格式 non-note short slide slide-in-combine long    
     '''
-    frames = [[1.0, 0.0, 0.0, 0.0]] * numframes
+    frames = [[1.0, 0.0, 0.0, 0.0, 0.0]] * numframes
     frames = np.array(frames)
 
-    maxResidual = 0
+    combineNote = 0
+    notesInCombine = 0
     for note in level:
         time, type, val = note
         if type == LevelInfo.combineNode:             
+            combineNote += 1
             for n in val:
-                FillNote(frames, n, msMinInterval)
-            continue
-        
-        FillNote(frames, note, msMinInterval)
+                FillNote(frames, n, msMinInterval, True)
+        else:        
+            FillNote(frames, note, msMinInterval, False)
+
+    # a = np.sum(frames, axis=0)
+    # print('frames', a, 'combine note', combineNote, 'notes in combine', notesInCombine)
 
     return frames
 
@@ -110,9 +126,10 @@ def SamplesToSoftmax(samples):
     '''
     将样本数据转换为分类数据
     '''
-    assert samples.ndim == 1
-    s1 = 1 - samples
-    return np.stack((s1, samples), axis=1)
+    s1 = 1 - np.amax(samples, axis=1)
+    if samples.ndim != s1.ndim:
+        s1 = s1[:, np.newaxis]
+    return np.hstack((s1, samples))
 
 
 
@@ -194,40 +211,11 @@ def RhythmMasterLevelPorcess():
     LevelInfo.SaveInstantValue(notes, pathname, '_slide')
 
 
-# class TrainData():
-#     def __init__(self, x, y, batchSize, numSteps):
-#         assert x.ndim == 2
-#         self.batchSize = batchSize
-#         self.numSteps = numSteps
-
-#         count = x.shape[0]
-#         self.numBatches = count // (self.batchSize * self.numSteps)
-#         print('numbatches', self.numBatches)
-
-#         count = self.numBatches * (self.batchSize * self.numSteps)
-#         x = x[:count]
-#         y = y[:count]
-
-#         xDim = x.shape[1]
-#         yDim = y.shape[1]
-
-#         # 重组数据，数据项 shape=(step, batchsize, inputsize)
-#         x = x.reshape(self.batchSize, self.numBatches, self.numSteps, xDim)
-#         self._x = x.transpose(1, 2, 0, 3)
-
-#         y = y.reshape(self.batchSize, self.numBatches, self.numSteps, yDim)
-#         self._y = y.transpose(1, 2, 0, 3)
-#         print('y shape', self._y.shape)
-
-
-#     def GetBatch(self, n):
-#         x = self._x[n]
-#         y = self._y[n]
-#         return x, y
-
-
-
+###
+# TrainDataDynShortNote
+###
 class TrainDataDynShortNote():
+    lableDim = 2
     def __init__(self, batchSize, numSteps, x, y=None):
         assert x.ndim == 2
         self.batchSize = batchSize
@@ -273,18 +261,11 @@ class TrainDataDynShortNote():
         seqLen = np.array([self.numSteps] * self.batchSize)
         return x, y, seqLen
 
-    
     def GenerateLevel(self, sess, prediction, X, seqLenHolder, pathname):      
         
-        evaluate = []
-        for i in range(self.numBatches):
-            xData, _, seqLen = self.GetBatch(i)
-            t = sess.run(prediction, feed_dict={X:xData, seqLenHolder:seqLen})
-            t = t[0:numSteps,:]
-            evaluate.append(t)
 
         evaluate = np.stack(evaluate)
-        evaluate = evaluate.reshape(-1, outputDim)
+        evaluate = evaluate.reshape(-1, self.lableDim)
         print('evaluate', evaluate.shape)
         
         acceptThrehold = 0.92
@@ -309,9 +290,11 @@ class TrainDataDynShortNote():
         # LevelInfo.SaveInstantValue(notes, pathname, '_region')
     
 
-
-
+###
+# TrainDataDynLongNote
+###
 class TrainDataDynLongNote():
+    lableDim = 2
     def __init__(self, batchSize, numSteps, x, y=None):
         assert x.ndim == 2
         self.batchSize = batchSize
@@ -370,7 +353,7 @@ class TrainDataDynLongNote():
             evaluate.append(t)
 
         evaluate = np.stack(evaluate)
-        predicts = evaluate.reshape(-1, outputDim)
+        predicts = evaluate.reshape(-1, self.lableDim)
         print('evaluate', evaluate.shape)
         
         acceptThrehold = 0.7
@@ -395,17 +378,129 @@ class TrainDataDynLongNote():
         # LevelInfo.SaveInstantValue(notes, pathname, '_region')
     
 
+###
+# TrainDataCombineNote
+###
+class TrainDataCombineNote():
+    lableDim = 3
+
+    def __init__(self, batchSize, numSteps, x, y=None):
+        assert x.ndim == 2
+        self.batchSize = batchSize
+        self.numSteps = numSteps
+
+        count = x.shape[0]
+        if (not y is None):
+            # extract short note and slide note
+            beat = np.max(y[:, 1:4], axis=1)
+
+            with open('d:/raw_sample.raw', 'wb') as file:
+                pickle.dump(beat, file)
+                print('raw file saved')
+            postprocess.SampleDistribute(beat)
+
+            beat = beat[:, np.newaxis]
+
+            y = np.hstack((beat, y[:, 4:5]))
+
+            y = SamplesToSoftmax(y)
+            print('y sample count', len(y), 'y sum', np.sum(y, axis=0))
+
+            # normalize multi-sample
+            s = np.sum(y, axis=1)
+            s = s[:, np.newaxis]
+            y = y / s
+
+            # a = np.sum(y, axis=0)
+            # print('y', y.shape, a)
+            
+            self.numBatches = count // (self.batchSize * self.numSteps)
+            count = self.numBatches * (self.batchSize * self.numSteps)
+
+            y = y[:count]
+            yDim = y.shape[1]
+            y = y.reshape(self.batchSize, -1, self.numSteps, yDim)
+            self._y = y.transpose(1, 0, 2, 3)
+
+            x = x[:count]
+            xDim = x.shape[1]
+            x = x.reshape(self.batchSize, -1, self.numSteps, xDim)
+            self._x = x.transpose(1, 0, 2, 3)
+            print('numbatches', self.numBatches, 'x shape', self._x.shape, 'y shape', self._y.shape)
+
+        else:
+            self._y = [None] * count
+
+            x = x[:-(count%numSteps)]
+            x = x.reshape(-1, 1, numSteps, inputDim)
+            self._x = np.repeat(x, batchSize, axis=1)
+            print('x shape', self._x.shape)
+
+            self.numBatches = len(x)
+            print('numbatch', self.numBatches) 
+
+
+    def GetBatch(self, n):
+        x = self._x[n]
+        y = self._y[n]
+        seqLen = np.array([self.numSteps] * self.batchSize)
+        return x, y, seqLen
+
+
+    def ShuffleBatch(self):
+        s = np.arange(self.batchSize)
+        np.random.shuffle(s)
+
+        self._x = self._x[:, s]
+
+        if not self._y[0] is None:
+            self._y = self._y[:, s]
+
+    
+    def GenerateLevel(predicts, pathname):      
+                
+        # #for long note
+        # print('evaluate shape', evaluate.shape)
+        # predicts = evaluate[:,1] > acceptThrehold
+        # LevelInfo.SaveSamplesToRegionFile(predicts, pathname, '_region')
+        # return
+
+        # predicts = postprocess.pick(evaluate, kernelSize=11)
+        print('predicts', predicts.shape)
+
+        # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
+                
+        acceptThrehold = 0.95
+        pred = predicts[:,1]
+        notes = postprocess.TrainDataToLevelData(pred, 10, acceptThrehold, 0)
+        print('gen notes number', len(notes))
+        notes = notes[:,0]
+        LevelInfo.SaveInstantValue(notes, pathname, '_inst')
+
+        plt.plot(pred, '.')
+
+        acceptThrehold = 0.6
+        pred = predicts[:,2]
+        notes = postprocess.TrainDataToLevelData(pred, 10, acceptThrehold, 0)
+        print('gen notes number', len(notes))
+        notes = notes[:,0]
+        LevelInfo.SaveInstantValue(notes, pathname, '_region')
+
+        plt.plot(pred, '.-')
+        plt.show()
+
 
 
 TrainData = TrainDataDynShortNote
 TrainData = TrainDataDynLongNote
+TrainData = TrainDataCombineNote
 
 
 def BuildDynamicRnn(X, Y, seqlen, learningRate):
-    t = time.time()
+    result = {}
 
-    weights = tf.Variable(tf.random_normal(shape=[2*numHidden, outputDim]))
-    bais = tf.Variable(tf.random_normal(shape=[outputDim]))
+    weights = tf.Variable(tf.random_normal(shape=[2*numHidden, TrainData.lableDim]))
+    bais = tf.Variable(tf.random_normal(shape=[TrainData.lableDim]))
     
     numLayers = 3
     cells = []
@@ -420,34 +515,35 @@ def BuildDynamicRnn(X, Y, seqlen, learningRate):
         dropoutCell[0:numLayers], dropoutCell[numLayers:], 
         X, sequence_length=seqlen, dtype=tf.float32)
 
-    print('output', output)
     outlayerDim = tf.shape(output)[2]
-
     output = tf.reshape(output, [batchSize*numSteps, outlayerDim])
-    print('output', output)
 
     logits = tf.matmul(output, weights) + bais
 
-    Y = tf.reshape(Y, [batchSize*numSteps, outputDim])
+    Y = tf.reshape(Y, [batchSize*numSteps, TrainData.lableDim])
 
+    # weight for each class, balance the sample
     class_weight = tf.reduce_sum(Y, axis=0) / tf.cast(tf.shape(Y)[0], tf.float32)
-    class_weight = [class_weight[1], class_weight[0]]
+    class_weight = tf.maximum(class_weight, tf.ones_like(class_weight) * 0.001)
+    class_weight = (1.0 / TrainData.lableDim) / class_weight
+    result['class_weight'] = class_weight
     class_weight = tf.reduce_sum(class_weight * Y, axis=1)
 
     # # Define loss and optimizer
     crossEntropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y)
-    print('crossEntropy', crossEntropy)
 
     loss_op = tf.reduce_mean(crossEntropy * class_weight)
+    result['loss_op'] = loss_op
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learningRate)    
     # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
 
     train_op = optimizer.minimize(loss_op)
-    print('train op', time.time() - t)    
+    result['train_op'] = train_op
 
     correct = tf.equal(tf.argmax(tf.nn.softmax(logits), axis=1), tf.argmax(Y, axis=1))
     accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
+    result['accuracy'] = accuracy
     
     # prediction without dropout
     output, _, _ = rnn.stack_bidirectional_dynamic_rnn(
@@ -459,14 +555,13 @@ def BuildDynamicRnn(X, Y, seqlen, learningRate):
     output = tf.reshape(output, [batchSize*numSteps, outlayerDim])
     logits = tf.matmul(output, weights) + bais
 
-    prediction = tf.nn.softmax(logits, name='prediction')
+    predict_op = tf.nn.softmax(logits, name='predict_op')
+    result['predict_op'] = predict_op
 
-    print('ready to train')
-
-    return train_op, loss_op, accuracy, prediction
+    print('build rnn done')
+    return result
 
    
-
 def SaveModel(sess, saveMeta = False):
     saver = tf.train.Saver()
     saver.save(sess, ModelFile, write_meta_graph=saveMeta)
@@ -478,13 +573,24 @@ def GenerateLevel():
 
     print('gen level')
 
-    song = ['bboombboom']
-    song = ['jilejingtu']
-    song = ['dainiqulvxing']
+    rawFile = 'd:/work/evaluate_data.raw'   
+
     song = ['PleaseDontGo']
+    song = ['jilejingtu']
     song = ['aLIEz']
+    song = ['bboombboom']
+    song = ['dainiqulvxing']
 
     pathname = MakeMp3Pathname(song[0])
+
+    useRawFile = True
+    if useRawFile:
+        print('load raw file')
+        with open('d:/work/evaluate_data.raw', 'rb') as file:
+            predicts = pickle.load(file)
+        TrainData.GenerateLevel(predicts, pathname)
+
+        return
     
     saver = tf.train.import_meta_graph("d:/work/model.ckpt.meta")
 
@@ -493,16 +599,29 @@ def GenerateLevel():
         saver.restore(sess, ModelFile)
         print('model loaded')
 
-        prediction = tf.get_default_graph().get_tensor_by_name("prediction:0")
-        print('prediction', prediction)         
+        predict_op = tf.get_default_graph().get_tensor_by_name("predict_op:0")
+        print('predict_op', predict_op)         
         X = tf.get_default_graph().get_tensor_by_name('X:0')
         seqLenHolder = tf.get_default_graph().get_tensor_by_name('seqLen:0')
     
         testx, _ = PrepareTrainData(song, batchSize, loadTestData = False)
 
         data = TrainData(batchSize, numSteps, testx)
+        
+        evaluate = []
+        for i in range(data.numBatches):
+            xData, _, seqLen = data.GetBatch(i)
+            t = sess.run(predict_op, feed_dict={X:xData, seqLenHolder:seqLen})
+            t = t[0:numSteps,:]
+            evaluate.append(t)
 
-        data.GenerateLevel(sess, prediction, X, seqLenHolder, pathname)
+        predicts = np.stack(evaluate).reshape(-1, TrainData.lableDim)
+
+        with open(rawFile, 'wb') as file:
+            pickle.dump(predicts, file)
+            print('raw file saved')
+
+        TrainData.GenerateLevel(predicts, pathname)
     
 
 # @run
@@ -514,7 +633,6 @@ def LoadRawData(useSoftmax = True):
     with open('d:/work/evaluate_data.raw', 'rb') as file:
         evaluate = pickle.load(file)
         print(type(evaluate))
-
         
         acceptThrehold = 0.4
         pathname = MakeMp3Pathname(songList[0])
@@ -523,7 +641,6 @@ def LoadRawData(useSoftmax = True):
         predicts = evaluate[:,1] > acceptThrehold
         LevelInfo.SaveSamplesToRegionFile(predicts, pathname, '_region')
         return
-
 
         predicts = postprocess.pick(evaluate)
 
@@ -565,23 +682,20 @@ def LoadMusicInfo(filename):
 
 
 @run
-def _Main():
-    
+def _Main():    
     testx, testy = PrepareTrainData(songList, batchSize)
-    print('test shape', testx.shape)
     
     data = TrainData(batchSize, numSteps, testx, testy)
     numBatches = data.numBatches
-    print('numbatchs', numBatches)
+
+    return
     
     seqlenHolder = tf.placeholder(tf.int32, [None], name='seqLen')
     X = tf.placeholder(dtype=tf.float32, shape=(batchSize, numSteps, inputDim), name='X')
-    Y = tf.placeholder(dtype=tf.float32, shape=(batchSize, numSteps, outputDim), name='Y')
+    Y = tf.placeholder(dtype=tf.float32, shape=(batchSize, numSteps, TrainData.lableDim), name='Y')
     learningRate = tf.placeholder(dtype=tf.float32, name='learn_rate')
 
-    train_op, loss_op, accuracy, prediction = BuildDynamicRnn(X, Y, seqlenHolder, learningRate)
-
-    init = tf.global_variables_initializer()
+    result = BuildDynamicRnn(X, Y, seqlenHolder, learningRate)
 
     maxAcc = 0.0
     notIncreaseCount = 0
@@ -590,8 +704,7 @@ def _Main():
     # Start training
     with tf.Session() as sess:
         # Run the initializer
-        sess.run(init)
-
+        sess.run(tf.global_variables_initializer())
         SaveModel(sess, saveMeta=True)
 
         for j in range(epch):
@@ -602,11 +715,13 @@ def _Main():
                 xData, yData, seqLen = data.GetBatch(i)
 
                 if i % 6 == 0:
-                    l, a = sess.run([loss_op, accuracy], feed_dict={X:xData, Y:yData, seqlenHolder:seqLen})
+                    l, a = sess.run([result['loss_op'], result['accuracy']], 
+                    feed_dict={X:xData, Y:yData, seqlenHolder:seqLen})
+                    
                     loss.append(l)
                     acc.append(a)
                 else:
-                    t = sess.run(train_op, feed_dict={X:xData, Y:yData, seqlenHolder:seqLen, learningRate:currentLearningRate})
+                    t = sess.run(result['train_op'], feed_dict={X:xData, Y:yData, seqlenHolder:seqLen, learningRate:currentLearningRate})
                 
             lossValue = sum(loss) / len(loss)
             accValue = sum(acc) / len(acc)
@@ -619,22 +734,24 @@ def _Main():
                 print('save checkpoint')
                 SaveModel(sess)
             
-            if notIncreaseCount > 10 and not learningRateFined:
-                currentLearningRate = currentLearningRate / 2
-                print('change learning rate', currentLearningRate)
-                notIncreaseCount = 0
-                learningRateFined = True
-
-            if notIncreaseCount > 15 and learningRateFined:
+            if notIncreaseCount > 10:
                 print('stop learning')
                 break
+
+            # if notIncreaseCount > 10 and not learningRateFined:
+            #     currentLearningRate = currentLearningRate / 2
+            #     print('change learning rate', currentLearningRate)
+            #     notIncreaseCount = 0
+            #     learningRateFined = True
+
+            # if notIncreaseCount > 15 and learningRateFined:
+            #     print('stop learning')
+            #     break
             
             print('epch', j, 'loss', lossValue, 'accuracy', accValue, 'not increase', notIncreaseCount)
+            
+            data.ShuffleBatch()
 
-        # saver = tf.train.Saver()
-        # saver.restore(sess, ModelFile)
-        # print('checkpoint loaded')
-        # GenerateLevel(sess, prediction, X, seqlenHolder)
 
 
 if __name__ == '__main__':
