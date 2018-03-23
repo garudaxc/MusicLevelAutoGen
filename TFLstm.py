@@ -16,7 +16,7 @@ def run(r):
     runList.append(r)
     return r
 
-LevelDifficutly = 1
+LevelDifficutly = 2
 numHidden = 26
 batchSize = 16
 numSteps = 512
@@ -25,7 +25,6 @@ inputDim = 314
 # outputDim = 2
 learning_rate = 0.002
 bSaveModel = True
-ModelFile = 'd:/work/model.ckpt'
 
 epch = 300
 
@@ -33,11 +32,13 @@ epch = 300
 # for long note
 songList = ['aiqingmaimai','ai', 'hellobaby', 'hongri', 'houhuiwuqi', 'huashuo', 'huozaicike', 'haodan']
 songList = ['huashuo', 'haodan']
+
+
 songList = ['inthegame', 'isthisall', 'huashuo', 'haodan', '2differenttears', 'abracadabra', 'tictic']
+
 songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai', 
 '1987wbzhyjn', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'myall', 'unreal', 'faraway',
 'fengniao', 'wangfei', 'wodemuyang', 'mrx', 'rageyourdream', 'redhot', 'yilububian', 'yiqiyaobai', 'yiranaini', 'yiyejingxi']
-
 
 songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai', 
 '1987wbzhyjn', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'myall', 'unreal', 'faraway',
@@ -126,11 +127,11 @@ def SamplesToSoftmax(samples):
     '''
     将样本数据转换为分类数据
     '''
+    if samples.ndim == 1:
+        samples = samples[:, np.newaxis]
     s1 = 1 - np.amax(samples, axis=1)
-    if samples.ndim != s1.ndim:
-        s1 = s1[:, np.newaxis]
+    s1 = s1[:, np.newaxis]
     return np.hstack((s1, samples))
-
 
 
 def GetSamplePath():
@@ -166,6 +167,10 @@ def PrepareTrainData(songList, batchSize = 32, loadTestData = True):
             level = LevelInfo.LoadRhythmMasterLevel(pathname)
 
             targetData = ConvertLevelToLables(level, numSample)
+
+            # a = targetData[:, [1, 2, 3]]
+            # count = (a>0.1).nonzero()[0].shape[0]
+            # print('count', count)
                 
             trainy.append(targetData)
 
@@ -211,10 +216,47 @@ def RhythmMasterLevelPorcess():
     LevelInfo.SaveInstantValue(notes, pathname, '_slide')
 
 
+
+
+class TrainDataBase():
+
+    def GetBatch(self, n):
+        x = self._x[n]
+        y = self._y[n]
+        seqLen = np.array([self.numSteps] * self.batchSize)
+        return x, y, seqLen
+
+    def ShuffleBatch(self):
+        s = np.arange(self.batchSize)
+        np.random.shuffle(s)
+
+        self._x = self._x[:, s]
+
+        if not self._y[0] is None:
+            self._y = self._y[:, s]
+
+    def BuildBatch(self, x, y):
+        count = x.shape[0]
+        self.numBatches = count // (self.batchSize * self.numSteps)
+        count = self.numBatches * (self.batchSize * self.numSteps)
+
+        y = y[:count]
+        yDim = y.shape[1]
+        y = y.reshape(self.batchSize, -1, self.numSteps, yDim)
+        self._y = y.transpose(1, 0, 2, 3)
+
+        x = x[:count]
+        xDim = x.shape[1]
+        x = x.reshape(self.batchSize, -1, self.numSteps, xDim)
+        self._x = x.transpose(1, 0, 2, 3)
+        print('numbatches', self.numBatches, 'x shape', self._x.shape, 'y shape', self._y.shape)
+
+
+
 ###
 # TrainDataDynShortNote
 ###
-class TrainDataDynShortNote():
+class TrainDataDynShortNote(TrainDataBase):
     lableDim = 2
     def __init__(self, batchSize, numSteps, x, y=None):
         assert x.ndim == 2
@@ -223,26 +265,12 @@ class TrainDataDynShortNote():
 
         count = x.shape[0]
 
-        if (not y is None):
-            y = y[:, 1]
-            y = SamplesToSoftmax(y)
+        if (not y is None):            
+            beat = np.max(y[:, 1:4], axis=1)
+            y = SamplesToSoftmax(beat)
+            print('y shape', y.shape, 'y sample count', len(y), 'y sum', np.sum(y, axis=0))
 
-            self.numBatches = count // (self.batchSize * self.numSteps)
-            print('numbatches', self.numBatches)
-            count = self.numBatches * (self.batchSize * self.numSteps)
-
-            y = y[:count]
-            yDim = y.shape[1]
-            y = y.reshape(self.batchSize, -1, self.numSteps, yDim)
-            self._y = y.transpose(1, 0, 2, 3)
-            print('y shape', self._y.shape)
-
-            x = x[:count]
-            xDim = x.shape[1]
-            x = x.reshape(self.batchSize, -1, self.numSteps, xDim)
-            self._x = x.transpose(1, 0, 2, 3)
-            print('x shape', self._x.shape)
-
+            self.BuildBatch(x, y)
         else:
             self._y = [None] * count
 
@@ -254,26 +282,27 @@ class TrainDataDynShortNote():
             self.numBatches = len(x)
             print('numbatch', self.numBatches) 
 
+    def GetModelPathName():
+        return 'd:/work/model_shortnote.ckpt'
 
-    def GetBatch(self, n):
-        x = self._x[n]
-        y = self._y[n]
-        seqLen = np.array([self.numSteps] * self.batchSize)
-        return x, y, seqLen
+    
+    def GenerateLevel(predicts, pathname):     
+                       
+        pre = predicts[:, 1]
+        pre = postprocess.PurifyInstanceSample(pre)
+        picked = postprocess.PickInstanceSample(pre)
 
-    def GenerateLevel(self, sess, prediction, X, seqLenHolder, pathname):      
+        sam = np.zeros_like(pre)
+        sam[picked] = 1
         
+        notes = postprocess.TrainDataToLevelData(sam, 10, 0.8, 0)
+        notes = np.asarray(notes)
+        notes[0]
 
-        evaluate = np.stack(evaluate)
-        evaluate = evaluate.reshape(-1, self.lableDim)
-        print('evaluate', evaluate.shape)
-        
-        acceptThrehold = 0.92
-        # #for long note
-        # print('evaluate shape', evaluate.shape)
-        # predicts = evaluate[:,1] > acceptThrehold
-        # LevelInfo.SaveSamplesToRegionFile(predicts, pathname, '_region')
-        # return
+        notes = notes[:,0]
+        LevelInfo.SaveInstantValue(notes, pathname, '_inst')
+
+        return
 
         predicts = postprocess.pick(evaluate, kernelSize=11)
         print('predicts', predicts.shape)
@@ -290,10 +319,11 @@ class TrainDataDynShortNote():
         # LevelInfo.SaveInstantValue(notes, pathname, '_region')
     
 
+
 ###
 # TrainDataDynLongNote
 ###
-class TrainDataDynLongNote():
+class TrainDataDynLongNote(TrainDataBase):
     lableDim = 2
     def __init__(self, batchSize, numSteps, x, y=None):
         assert x.ndim == 2
@@ -308,22 +338,7 @@ class TrainDataDynLongNote():
 
             y = SamplesToSoftmax(y)
 
-            self.numBatches = count // (self.batchSize * self.numSteps)
-            print('numbatches', self.numBatches)
-            count = self.numBatches * (self.batchSize * self.numSteps)
-
-            y = y[:count]
-            yDim = y.shape[1]
-            y = y.reshape(self.batchSize, -1, self.numSteps, yDim)
-            self._y = y.transpose(1, 0, 2, 3)
-            print('y shape', self._y.shape)
-
-            x = x[:count]
-            xDim = x.shape[1]
-            x = x.reshape(self.batchSize, -1, self.numSteps, xDim)
-            self._x = x.transpose(1, 0, 2, 3)
-            print('x shape', self._x.shape)
-
+            self.BuildBatch(x, y)
         else:
             self._y = [None] * count
 
@@ -336,27 +351,12 @@ class TrainDataDynLongNote():
             print('numbatch', self.numBatches) 
 
 
-    def GetBatch(self, n):
-        x = self._x[n]
-        y = self._y[n]
-        seqLen = np.array([self.numSteps] * self.batchSize)
-        return x, y, seqLen
-
+    def GetModelPathName():
+        return 'd:/work/model_longnote.ckpt'
     
-    def GenerateLevel(self, sess, prediction, X, seqLenHolder, pathname):      
-        
-        evaluate = []
-        for i in range(self.numBatches):
-            xData, _, seqLen = self.GetBatch(i)
-            t = sess.run(prediction, feed_dict={X:xData, seqLenHolder:seqLen})
-            t = t[0:numSteps,:]
-            evaluate.append(t)
-
-        evaluate = np.stack(evaluate)
-        predicts = evaluate.reshape(-1, self.lableDim)
-        print('evaluate', evaluate.shape)
-        
-        acceptThrehold = 0.7
+    
+    def GenerateLevel(predicts, pathname):     
+              
         # #for long note
         # print('evaluate shape', evaluate.shape)
         # predicts = evaluate[:,1] > acceptThrehold
@@ -367,21 +367,22 @@ class TrainDataDynLongNote():
         print('predicts', predicts.shape)
 
         # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
-
-        predicts = predicts[:,1]
-
-        notes = postprocess.TrainDataToLevelData(predicts, 10, acceptThrehold, 0)
+        
+        acceptThrehold = 0.3
+        pred = predicts[:,1]
+        notes = postprocess.TrainDataToLevelData(pred, 10, acceptThrehold, 0)
         print('gen notes number', len(notes))
         notes = notes[:,0]
         LevelInfo.SaveInstantValue(notes, pathname, '_region')
 
         # LevelInfo.SaveInstantValue(notes, pathname, '_region')
+
     
 
 ###
 # TrainDataCombineNote
 ###
-class TrainDataCombineNote():
+class TrainDataCombineNote(TrainDataBase):
     lableDim = 3
 
     def __init__(self, batchSize, numSteps, x, y=None):
@@ -413,20 +414,7 @@ class TrainDataCombineNote():
 
             # a = np.sum(y, axis=0)
             # print('y', y.shape, a)
-            
-            self.numBatches = count // (self.batchSize * self.numSteps)
-            count = self.numBatches * (self.batchSize * self.numSteps)
-
-            y = y[:count]
-            yDim = y.shape[1]
-            y = y.reshape(self.batchSize, -1, self.numSteps, yDim)
-            self._y = y.transpose(1, 0, 2, 3)
-
-            x = x[:count]
-            xDim = x.shape[1]
-            x = x.reshape(self.batchSize, -1, self.numSteps, xDim)
-            self._x = x.transpose(1, 0, 2, 3)
-            print('numbatches', self.numBatches, 'x shape', self._x.shape, 'y shape', self._y.shape)
+            self.BuildBatch(x, y)
 
         else:
             self._y = [None] * count
@@ -440,22 +428,8 @@ class TrainDataCombineNote():
             print('numbatch', self.numBatches) 
 
 
-    def GetBatch(self, n):
-        x = self._x[n]
-        y = self._y[n]
-        seqLen = np.array([self.numSteps] * self.batchSize)
-        return x, y, seqLen
-
-
-    def ShuffleBatch(self):
-        s = np.arange(self.batchSize)
-        np.random.shuffle(s)
-
-        self._x = self._x[:, s]
-
-        if not self._y[0] is None:
-            self._y = self._y[:, s]
-
+    def GetModelPathName():
+        return 'd:/work/model_combine.ckpt'
     
     def GenerateLevel(predicts, pathname):      
                 
@@ -491,9 +465,9 @@ class TrainDataCombineNote():
 
 
 
-TrainData = TrainDataDynShortNote
-TrainData = TrainDataDynLongNote
 TrainData = TrainDataCombineNote
+TrainData = TrainDataDynLongNote
+TrainData = TrainDataDynShortNote
 
 
 def BuildDynamicRnn(X, Y, seqlen, learningRate):
@@ -564,11 +538,11 @@ def BuildDynamicRnn(X, Y, seqlen, learningRate):
    
 def SaveModel(sess, saveMeta = False):
     saver = tf.train.Saver()
-    saver.save(sess, ModelFile, write_meta_graph=saveMeta)
+    saver.save(sess, TrainData.GetModelPathName(), write_meta_graph=saveMeta)
     print('model saved')
 
 
-# @run
+@run
 def GenerateLevel():
 
     print('gen level')
@@ -583,20 +557,23 @@ def GenerateLevel():
 
     pathname = MakeMp3Pathname(song[0])
 
-    useRawFile = True
+    useRawFile = False
     if useRawFile:
         print('load raw file')
-        with open('d:/work/evaluate_data.raw', 'rb') as file:
+        with open(rawFile, 'rb') as file:
             predicts = pickle.load(file)
+
         TrainData.GenerateLevel(predicts, pathname)
 
         return
     
-    saver = tf.train.import_meta_graph("d:/work/model.ckpt.meta")
+    modelFile = TrainData.GetModelPathName()
+    graphFile = modelFile + '.meta'
+    saver = tf.train.import_meta_graph(graphFile)
 
     with tf.Session() as sess:
         
-        saver.restore(sess, ModelFile)
+        saver.restore(sess, modelFile)
         print('model loaded')
 
         predict_op = tf.get_default_graph().get_tensor_by_name("predict_op:0")
@@ -681,14 +658,12 @@ def LoadMusicInfo(filename):
         return tuple(value)
 
 
-@run
+# @run
 def _Main():    
     testx, testy = PrepareTrainData(songList, batchSize)
     
     data = TrainData(batchSize, numSteps, testx, testy)
     numBatches = data.numBatches
-
-    return
     
     seqlenHolder = tf.placeholder(tf.int32, [None], name='seqLen')
     X = tf.placeholder(dtype=tf.float32, shape=(batchSize, numSteps, inputDim), name='X')

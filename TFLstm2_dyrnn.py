@@ -11,6 +11,10 @@ import time
 import TFLstm
 
 
+# 将音频特征数据根据bpm分组，意图减少样本总数，降低样本不平衡的情况
+# 经验证效果不是很好
+
+
 levelDifficulty = 2
 numHidden = 26
 batchSize = 32
