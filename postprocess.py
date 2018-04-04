@@ -4,6 +4,8 @@ import scipy.stats
 import pickle
 import scipy.signal
 import numpy.random
+import bisect
+import LevelInfo
 
 
 def TrainDataToLevelData(data, sampleInterval, threhold, timeOffset=0):
@@ -106,12 +108,33 @@ def ConvertToLevelNote(notes, bpm, et):
 
     return data
 
+def ConvertIntermediaNoteToLevelNote(notes, bpm, et):
+    barInterval = 240.0 / bpm
+    barInterval *= 1000
+    posInterval = barInterval / 64.0
+
+    result = []
+    for n in notes:
+        time, type, value, side = n
+
+        time *= 10
+        time -= et
+        bar = int(time // barInterval)
+        pos = int((time % barInterval) // posInterval)
+        track = np.random.randint(0, 2) + side * 2
+
+        # long note
+
+
+        # combine note
+
 
 def PurifyInstanceSample(samples):
-    '''    
+    '''
     '''    
     peakind = scipy.signal.find_peaks_cwt(samples, np.arange(1,50), min_length=3)
-    # print('total', samples.shape[0], 'peak count', len(peakind))
+    #todo
+    # seek to more prescise peak position
 
     newSample = np.zeros_like(samples)
     newSample[peakind] = samples[peakind]
@@ -120,7 +143,7 @@ def PurifyInstanceSample(samples):
     index = newSample < 0.2
     newSample[index.nonzero()] = 0
 
-    # pick largger value in nearby peaks
+    # pick the largger value in nearby peaks
     maxDis = 3
     index = newSample.nonzero()[0]
     dis = index[1:] - index[0:-1]
@@ -144,8 +167,6 @@ def FindCumulativeIndexInArray(a, x):
     '''
     a为一维数组，查找x在a积分中所在的位置，sigma(a'i') < x < sigma(a'i+1')
     '''
-    import bisect
-
     index = (a>0).nonzero()[0]
     # print('index', index)
     values = a[index]
@@ -166,6 +187,7 @@ def FindCumulativeIndexInArray(a, x):
 
 def PickInstanceSample(samples, rate=40):
     '''
+    使用指数分布生成短音符位置
     '''
     maxRange = int(scipy.stats.expon.ppf(0.999, scale=rate))
     x = np.arange(0, maxRange, 1)
@@ -195,36 +217,248 @@ def PickInstanceSample(samples, rate=40):
     return picked
     
 
-def BilateralFilter(samples):
-    pRange = 51
+def BilateralFilter(samples, ratio = 0.7):
+    pRange = 31
     gauKernel = scipy.signal.gaussian(pRange, 10)
-    print(gauKernel)
+    # print(gauKernel)
     gauKernel = gauKernel / np.sum(gauKernel)
     side = pRange // 2
     print('side', side)
-    print(gauKernel, np.sum(gauKernel))
+    # print(gauKernel, np.sum(gauKernel))
     gauSample = np.zeros_like(samples)
     newSample = np.zeros_like(samples)
     count = len(samples)
     
-    fig, ax = plt.subplots(3, 1)
-    ax[0].plot(samples[1800:2700])
-
     for i in range(side, len(samples)-side):
         s = samples[i-side:i+side+1]
         gauSample[i] = np.dot(gauKernel, s)
 
-        d = np.abs(s-samples[i]) ** 4
+        d = np.abs(s-samples[i]) ** 0.5
         kernel = gauKernel * (1-d)
         weight = np.sum(kernel)
 
         newSample[i] = np.dot(kernel, s) / weight
 
 
-    ax[1].plot(gauSample[1800:2700])
+    # fig, ax = plt.subplots(3, 1)
+    # ax[0].plot(samples[800:2500])
+    # ax[1].plot(gauSample[800:2500])    
+    # ax[2].plot(newSample[800:2500])
+    # plt.show()
+
+    # 计算rato比率计算阈值
+    his, bins = np.histogram(newSample, 100)
+    for i in range(1, len(his)):
+        his[i] = his[i] + his[i-1]
+
+    r = len(newSample) * ratio
+    index = bisect.bisect_left(his, r)
+    threhold = bins[index]
+    result = np.zeros_like(samples)
+    acc = 0
+    for i in range(len(newSample)):
+        if newSample[i] > threhold:
+            result[i] = newSample[i]
+            acc += (newSample[i] - threhold) * 0.5
+            continue
+        
+        acc -= (threhold - newSample[i])
+        if acc > 0:
+            result[i] = newSample[i]
+            continue
+        
+        acc = 0
+
+
+    # index = samples > threhold
+    # print(index.nonzero()[0].shape)
+
+    # result[index] = newSample[index]
+
+    # plt.plot(result)
+    # plt.show()
+
+    # plt.plot(his)
+    # plt.vlines(index, 0, len(newSample))
+    # plt.show()
+
+    return result
+
+
+
+def AlignNotePosition(short, long, threhold=50):
+    '''
+    将挨得很近的长音符和短音符对齐到同一位置
+    '''
+    assert short.shape == long.shape
+    longBinay = long > 0
+    edge = (longBinay[1:] != longBinay[:-1]).nonzero()[0] + 1
+    newEdge = []
+    offset = int((threhold / 10) // 2)
+    print('offset', offset, 'edge count', len(edge))
+    for e in edge:
+        beg = max(e-offset, 0)
+        end = min(e+offset+1, len(short))
+        pos = short[beg:end].nonzero()[0] - offset
+        if len(pos) > 0:
+            m = np.argmin(np.abs(pos))
+            e += pos[m]
+
+        newEdge.append(e)
+
+    # remove very close edge
+    threhold = 3
+    i = 0
+    length = len(newEdge)    
+    while i < length-1:
+        if newEdge[i+1] - newEdge[i] < threhold:
+            print('remove', newEdge[i], newEdge[i+1])
+            del newEdge[i]
+            del newEdge[i+1]
+            length -= 2        
+        else:
+            i += 1
     
-    ax[2].plot(newSample[1800:2700])
-    plt.show()
+    long_new = np.zeros_like(long)
+    for i in range(0, len(newEdge), 2):
+        long_new[newEdge[i]:newEdge[i+1]] = long[newEdge[i]:newEdge[i+1]]
+
+    return long
+
+
+def RandSide():
+    # 随机生成0 1，作为side
+    l = np.random.rand() // 0.5
+    r = 1 - l
+    return l, r
+
+def MutateSamples(short, long):
+    '''
+    生成滑动音符，双按音符
+    '''
+    SideLeft, SideRight = RandSide()
+    # 1 normal short, 2 slide, 3 double short, 4 double slide
+    DoubleSlide = 4
+    DoubleShort = 3
+    Slide = 2
+    doubleRate = 0.15
+    param = [('doubleSlide', 0.05, 4), ('doubleRate', 0.15, 3), ('slideRate', 0.15, 2)]
+    
+    longBinay = long > 0
+    edge = (longBinay[1:] != longBinay[:-1]).nonzero()[0] + 1
+    longNoteValue = []
+    for i in range(0, len(edge), 2):
+        value = np.average(long[edge[i]:edge[i+1]])
+        longNoteValue.append((value, i))
+    
+    longNoteValue.sort(reverse=True)
+    long2 = np.zeros_like(long)
+    count = int(len(longNoteValue) * doubleRate)
+    # 选取value最大的为双按音符
+    for i in range(count):
+        e = longNoteValue[i][1]
+        long2[edge[e]:edge[e+1]] = long[edge[e]:edge[e+1]]
+
+    sortIndex = np.argsort(short)    
+    sortIndex = np.flip(sortIndex, axis=0)
+    
+    # print(short[sortIndex][0:100])
+
+    shortMute = np.zeros_like(short)
+    totalCount = np.count_nonzero(short)
+    print(totalCount)
+
+    begin = 0
+    for n, ratio, id in param:
+        count = int(totalCount * ratio)
+        index = sortIndex[begin:begin+count]
+        shortMute[index] = id
+        begin += count
+
+    # generate notes from samples
+    notes = []
+    longBinay = long > 0
+    edge = (longBinay[1:] != longBinay[:-1]).nonzero()[0] + 1
+    i = 0
+    while i < len(short):
+        if long[i] > 0:
+            #long note
+            end = bisect.bisect_right(edge, i)
+            end = edge[end]
+            
+            s = short[i:end].nonzero()[0]+i
+            if len(s) > 0:
+                #combine note
+                cnotes = TransferCombineNote(i, end, s, SideLeft)
+                # print('combine note', cnotes)   
+                notes.append((i, LevelInfo.combineNode, cnotes, SideLeft))
+            else:
+                #long note
+                notes.append((i, LevelInfo.longNote, end-i, SideLeft))
+            
+            if long2[i] > 0:
+                #double long                
+                if len(s) > 0:
+                    #combine note
+                    cnotes = TransferCombineNote(i, end, s, SideRight)
+                    notes.append((i, LevelInfo.combineNode, cnotes, SideRight))
+                else:
+                    #long note
+                    notes.append((i, LevelInfo.longNote, end-i, SideRight))
+            else:
+                # short in other side
+                for n in s:
+                    if (shortMute[n] == DoubleSlide) or (shortMute[n] == Slide):
+                        print('slide beside combine')
+                        notes.append((i, LevelInfo.slideNote, 0, SideRight))
+                    elif shortMute[n] == DoubleShort:
+                        print('short beside combine')
+                        notes.append((i, LevelInfo.shortNote, 0, SideRight))
+
+            i = end
+            SideLeft, SideRight = RandSide()
+
+        elif shortMute[i] > 0 or short[i] > 0:
+            if shortMute[i] == DoubleSlide:
+                notes.append((i, LevelInfo.slideNote, 0, SideLeft))
+                notes.append((i, LevelInfo.slideNote, 0, SideRight))
+            elif shortMute[i] == DoubleShort:
+                notes.append((i, LevelInfo.shortNote, 0, SideLeft))
+                notes.append((i, LevelInfo.shortNote, 0, SideRight))
+            elif shortMute[i] == Slide:
+                notes.append((i, LevelInfo.slideNote, 0, SideLeft))
+            else:
+                notes.append((i, LevelInfo.shortNote, 0, SideLeft))
+
+            i += 1
+            SideLeft, SideRight = RandSide()
+        else:
+            i += 1
+
+    print('got notes', len(notes))
+
+    return notes
+
+
+def TransferCombineNote(begin, end, shortPos, side):
+    notes = []
+    i = 0
+    if shortPos[i] == begin:
+        notes.append((begin, LevelInfo.slideNote, 0, side))
+        i += 1
+
+    while i < len(shortPos):
+        notes.append((begin, LevelInfo.longNote, shortPos[i]-begin, side))
+        notes.append((shortPos[i], LevelInfo.slideNote, 0, side))
+        begin = shortPos[i]
+        i += 1
+
+    if begin == end:
+        notes.append((end, LevelInfo.slideNote, 0, side))
+    else:
+        notes.append((begin, LevelInfo.longNote, end-begin, side))
+        
+    return notes
 
 
 
@@ -329,7 +563,27 @@ def SaveInstantValue(beats, filename, postfix=''):
     return True
 
 
+def LoadInstanceValue(filename):
+    with open(filename, 'r') as file:
+        data = file.read()
+    
+    lines = data.split('\n')
+    result = []
+
+    for i in range(len(lines)):
+        if lines[i] != '':
+            result.append(int(lines[i]))
+
+    result = np.array(result)
+    return result
+
+
+
+
 if __name__ == '__main__':
+
+
+    pathname = 'd:\librosa\RhythmMaster\dainiqulvxing\dainiqulvxing.mp3'
 
     if False:    
         print('load raw file')
@@ -350,22 +604,41 @@ if __name__ == '__main__':
         notes[0]
 
         notes = notes[:,0]
-        SaveInstantValue(notes, 'd:\librosa\RhythmMaster\dainiqulvxing\dainiqulvxing.mp3', '_inst_new')
+        SaveInstantValue(notes, pathname, '_inst_new')
     
 
-    print('load raw file')
-    with open('d:/work/evaluate_data.raw', 'rb') as file:
-        predicts = pickle.load(file)
+    if True:
+        print('load raw file')
+        with open('d:/work/evaluate_data_long.raw', 'rb') as file:
+            predicts = pickle.load(file)
 
-    pre = predicts[:, 2]
-    BilateralFilter(pre)
+        pre = predicts[:, 1]
+        long = BilateralFilter(pre, ratio=0.9)
+       
+        with open('d:/work/evaluate_data_short.raw', 'rb') as file:
+            predicts = pickle.load(file)
+
+        short = predicts[:, 1]
+        short = PurifyInstanceSample(short)
+        picked = PickInstanceSample(short)
+        sam = np.zeros_like(short)
+        sam[picked] = short[picked]
+        
+        long = AlignNotePosition(sam, long)
+
+        MutateSamples(sam, long)
+
+        
+        # notes = TrainDataToLevelData(long, 10, acceptThrehold, 0)
+        # print('gen notes number', len(notes))
+        # notes = notes[:,0]
+        # SaveInstantValue(notes, pathname, '_region')        
+
 
     # a = np.zeros(100)
     # a[range(0, 100, 5)] = 0.05
 
     # FindCumulativeIndexInArray(a, 1.2)
-
-
     # print(numpy.random.rand(1))
     
     # SampleDistribute2()

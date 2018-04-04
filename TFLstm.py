@@ -2,11 +2,10 @@ import pickle
 import os
 import LevelInfo
 import numpy as np
-import lstm.myprocesser
-from lstm import postprocess
+import myprocesser
+import postprocess
 import tensorflow as tf
 from tensorflow.contrib import rnn
-from lstm import postprocess
 import time
 import matplotlib.pyplot as plt
 
@@ -23,11 +22,10 @@ numSteps = 512
 numSteps = 128
 inputDim = 314
 # outputDim = 2
-learning_rate = 0.002
+learning_rate = 0.001
 bSaveModel = True
 
 epch = 300
-
 
 # for long note
 songList = ['aiqingmaimai','ai', 'hellobaby', 'hongri', 'houhuiwuqi', 'huashuo', 'huozaicike', 'haodan']
@@ -38,13 +36,13 @@ songList = ['inthegame', 'isthisall', 'huashuo', 'haodan', '2differenttears', 'a
 
 songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai', 
 '1987wbzhyjn', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'myall', 'unreal', 'faraway',
-'fengniao', 'wangfei', 'wodemuyang', 'mrx', 'rageyourdream', 'redhot', 'yilububian', 'yiqiyaobai', 'yiranaini', 'yiyejingxi']
-
-songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai', 
-'1987wbzhyjn', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'myall', 'unreal', 'faraway',
 'fengniao', 'wangfei', 'wodemuyang', 'mrx', 'rageyourdream', 'redhot', 'yilububian', 'yiqiyaobai', 'yiranaini', 'yiyejingxi',
 'hongri', 'huahuangshou', 'huashuo', 'ificoulefly', 'ineedmore', 'iwantmytearsback',  'rippingthebackside', 
  'whencaniseeyouagain', 'wingsofpiano', 'wocanggwz', 'ygrightnow']
+
+songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai', 
+'1987wbzhyjn', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'myall', 'unreal', 'faraway',
+'fengniao', 'wangfei', 'wodemuyang', 'mrx', 'rageyourdream', 'redhot', 'yilububian', 'yiqiyaobai', 'yiranaini', 'yiyejingxi']
 
 testing = False
 if testing:
@@ -332,11 +330,10 @@ class TrainDataDynLongNote(TrainDataBase):
 
         count = x.shape[0]
         if (not y is None):
-            y = y[:, 3]
-
-            print('y sample count', len(y), 'y sum', np.sum(y))
-
-            y = SamplesToSoftmax(y)
+            
+            beat = np.max(y[:, 3:5], axis=1)
+            y = SamplesToSoftmax(beat)
+            print('y shape', y.shape, 'y sample count', len(y), 'y sum', np.sum(y, axis=0))
 
             self.BuildBatch(x, y)
         else:
@@ -368,7 +365,7 @@ class TrainDataDynLongNote(TrainDataBase):
 
         # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
         
-        acceptThrehold = 0.3
+        acceptThrehold = 0.8
         pred = predicts[:,1]
         notes = postprocess.TrainDataToLevelData(pred, 10, acceptThrehold, 0)
         print('gen notes number', len(notes))
