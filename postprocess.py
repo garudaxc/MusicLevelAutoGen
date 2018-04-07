@@ -83,51 +83,37 @@ def SaveResult(prid, msMinInterval, time, pathname):
 
     print('saved ', pathname)
 
-def ConvertToLevelNote(notes, bpm, et):
+
+def ConvertIntermediaNoteToLevelNote(notes):
     '''
-    转换为关卡音符，增加音轨信息
+    choose track
+    track = -1时，在相邻两个track随机一个，否则保持track,滑动音符时切换track（实现组合音符）
     '''
-    hand = 0
-
-    barInterval = 240.0 / bpm
-    barInterval *= 1000
-    posInterval = barInterval / 64.0
-
-    data = []
-    for n in notes:
-        time, type = n[0], n[1]
-
-        time -= et
-        bar = int(time // barInterval)
-        pos = int((time % barInterval) // posInterval)
-
-        track = np.random.randint(0, 2) + hand
-
-        data.append((bar, pos, track))
-        hand = 1 - hand
-
-    return data
-
-def ConvertIntermediaNoteToLevelNote(notes, bpm, et):
-    barInterval = 240.0 / bpm
-    barInterval *= 1000
-    posInterval = barInterval / 64.0
-
     result = []
     for n in notes:
         time, type, value, side = n
+        channel = np.random.randint(0, 2)
+        track = channel + side * 2
 
         time *= 10
-        time -= et
-        bar = int(time // barInterval)
-        pos = int((time % barInterval) // posInterval)
-        track = np.random.randint(0, 2) + side * 2
 
-        # long note
+        if type == LevelInfo.combineNode:
+            cnote = []
+            for nn in value:
+                time2, type2, value2, side2 = nn
+                time2 *= 10
+                value2 *= 10
+                notes.append((time2, type2, Value2, track))
+                if type2 == LevelInfo.slideNote:
+                    channel = 1 - channel
+                    track = channel + side*2
 
+            result.append((time, type, cnote, -1))
+        else:
+            value *= 10
+            result.append((time, type, value, track))
 
-        # combine note
-
+        return result
 
 def PurifyInstanceSample(samples):
     '''
@@ -283,7 +269,6 @@ def BilateralFilter(samples, ratio = 0.7):
     # plt.show()
 
     return result
-
 
 
 def AlignNotePosition(short, long, threhold=50):

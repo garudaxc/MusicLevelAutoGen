@@ -1,4 +1,4 @@
-# coding=UTF-8
+# codingd=UTF-8
 import logger
 from xml.etree import ElementTree  
 import numpy as np
@@ -352,21 +352,91 @@ def SaveMidi(filename, notes, bpm = 120.0):
         file.write(buffer[:size])
         file.flush()            
 
+def CorrespondingTrack(track0):
+    if track0 < 2:
+        track1 = 1-track0
+    elif track0 == 2:
+        track1 = 3
+    elif track0 == 3:
+        track1 = 2
+    return track1
 
+def ConvertNoteToXml(note):
+    trackName = ('Left1', 'Left2', 'Right1', 'Right2')
+    bar, pos, type, value, track = note
+
+    e = ElementTree.Element('Note')
+    e.attrib['Bar'] = str(bar+1)
+    e.attrib['Pos'] = str(pos)
+
+    if type == shortNote:
+        e.attrib['from_track'] = trackName[track]
+        e.attrib['target_track'] = trackName[track]
+        e.attrib['note_type'] = 'short'
+    elif type == slideNote:
+        e.attrib['from_track'] = trackName[track]
+        target = CorrespondingTrack(track)
+        e.attrib['target_track'] = trackName[target]
+        e.attrib['note_type'] = 'slip'
+    elif type == longNote:
+        e.attrib['from_track'] = trackName[track]
+        e.attrib['target_track'] = trackName[track]
+        e.attrib['note_type'] = 'long'
+        endBar, endPos = value
+        e.attrib['EndBar'] = str(endBar)
+        e.attrib['EndPos'] = str(endPos)
+    else:
+        assert False
+
+    return e
+
+def ConvertTimeBar(note, barInterval, posInterval, et):
+    time, type, value, track = note
+    time -= et
+
+    bar = int(time // barInterval)
+    pos = int((time % barInterval) // posInterval)
+
+    if type == longNote:
+        endTime = time + value
+        endBar = int(endTime//barInterval)
+        endPos = int((endTime % barInterval) // posInterval)
+        value = (endBar, endPos)
+
+    return (bar, pos, type, value, track)
+        
 def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     '''
     保存到心动模式关卡文件
     '''
+    barInterval = 240.0 / bpm
+    barInterval *= 1000
+    posInterval = barInterval / 64.0
+
+    newNotes = []
+    for n in notes:
+        type = n[1]
+
+        r = ConvertTimeBar(n, barInterval, posInterval, et)
+
+        if type == combineNode:
+            value = n[2]
+            l = []
+            for subNote in value:
+                s = ConvertTimeBar(subNote, barInterval, posInterval, et)
+                l.append(s)
+            r[3] = l
+             
+        newNotes.append(r)
+    notes = newNotes
+
     text=open(r'D:\librosa\idol_template.xml', encoding='utf-8').read()
     xmlparser = ElementTree.XMLParser(encoding='utf-8')
     tree = ElementTree.fromstring(text)
 
     lastNote = notes[-1]
     lastBar = lastNote[0]
-
     totalBar  = lastBar + 1
-
-    trackName = ('Left1', 'Left2', 'Right1', 'Right2')
 
     # 删除前面8小节和最后2小节的音符
     notes = [note for note in notes if note[0] > 7 and note[0] < lastBar - 1]
@@ -394,12 +464,17 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     notesNode = root.find('NoteInfo').find('Normal')
     notesNode.clear()
     for note in notes:
-        e = ElementTree.Element('Note')
-        e.attrib['Bar'] = str(note[0]+1)
-        e.attrib['Pos'] = str(note[1])
-        e.attrib['from_track'] = trackName[note[2]]
-        e.attrib['target_track'] = trackName[note[2]]
-        e.attrib['note_type'] = 'short'
+        type = note[2]
+        
+        if type == combineNode:
+            e = ElementTree.Element('CombineNote')
+            value = note[3]
+            for subNote in value:
+                s = ConvertNoteToXml(subNote)
+                e.append(s)
+        else:
+            e = ConvertNoteToXml(note)
+
         notesNode.append(e)
     
     camera = root.find('CameraSeq').find('Camera')
@@ -523,11 +598,12 @@ def ProcessRythmMasterMusicInfo():
 
 
 
+
 if __name__ == '__main__':
 
+
     # ProcessRythmMasterMusicInfo()
-    
-    
+
     #import madmon_test
     #sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf8')
 
@@ -543,7 +619,7 @@ if __name__ == '__main__':
         madmon_test.save_file(notes, pathname, '_notes')
 
 
-    if True:    
+    if False:    
         path = '/Users/xuchao/Documents/rhythmMaster/'
         if os.name == 'nt':
             path = 'D:/librosa/RhythmMaster/'
@@ -568,9 +644,6 @@ if __name__ == '__main__':
     # filename = r'd:/miditest_out.mid'
     # # LoadMidi(filename)
 
-    # MultibyteLength(7680)
-    # MultibyteLength(480)
-    # MultibyteLength(0)
     # SaveMidi(filename, None)
 
     # a = input()

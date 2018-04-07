@@ -128,7 +128,6 @@ def CalcBarInterval(beat_times):
     return a, b
 
 
-
 def CalcBarInterval2(beat_times):
     numBeats = len(beat_times)
     itvals = beat_intervals(beat_times)
@@ -141,7 +140,6 @@ def CalcBarInterval2(beat_times):
 
     # new_beat_times = np.arange(numBeats) * a + b
     return a, b
-
 
 
 def doWork():
