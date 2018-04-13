@@ -138,10 +138,19 @@ def GetSamplePath():
         path = 'D:/librosa/RhythmMaster/'
     return path
 
-
 def MakeMp3Pathname(song):
     path = GetSamplePath()
-    pathname = '%s%s/%s.mp3' % (path, song, song)
+    pathname = '%s%s/%s.m4a' % (path, song, song)
+    if not os.path.exists(pathname):
+        pathname = '%s%s/%s.mp3' % (path, song, song)
+
+    return pathname
+
+def MakeMp3Dir(song):
+    path = GetSamplePath()
+    pathname = '%s%s/' % (path, song)
+    if not os.path.exists(pathname):
+        assert False
     return pathname
 
 def MakeLevelPathname(song, difficulty=2):
@@ -150,13 +159,12 @@ def MakeLevelPathname(song, difficulty=2):
     pathname = '%s%s/%s_4k_%s.imd' % (path, song, song, diff[difficulty])
     return pathname   
 
-
 def PrepareTrainData(songList, batchSize = 32, loadTestData = True):   
     trainx = []
     trainy = []
     for song in songList:
         pathname = MakeMp3Pathname(song)
-        inputData = lstm.myprocesser.LoadAndProcessAudio(pathname)
+        inputData = myprocesser.LoadAndProcessAudio(pathname)
         trainx.append(inputData)
         numSample = len(inputData)
 
@@ -283,6 +291,9 @@ class TrainDataDynShortNote(TrainDataBase):
     def GetModelPathName():
         return 'd:/work/model_shortnote.ckpt'
 
+    def RawDataFileName(song):
+        path = MakeMp3Dir(song)
+        return path + 'evaluate_data_short.raw'    
     
     def GenerateLevel(predicts, pathname):     
                        
@@ -350,7 +361,10 @@ class TrainDataDynLongNote(TrainDataBase):
 
     def GetModelPathName():
         return 'd:/work/model_longnote.ckpt'
-    
+
+    def RawDataFileName(song):
+        path = MakeMp3Dir(song)
+        return path + 'evaluate_data_long.raw'    
     
     def GenerateLevel(predicts, pathname):     
               
@@ -427,6 +441,10 @@ class TrainDataCombineNote(TrainDataBase):
 
     def GetModelPathName():
         return 'd:/work/model_combine.ckpt'
+
+    def RawDataFileName():
+        return 'd:/work/evaluate_data_combine.raw'
+
     
     def GenerateLevel(predicts, pathname):      
                 
@@ -459,7 +477,6 @@ class TrainDataCombineNote(TrainDataBase):
 
         plt.plot(pred, '.-')
         plt.show()
-
 
 
 TrainData = TrainDataCombineNote
@@ -544,13 +561,18 @@ def GenerateLevel():
 
     print('gen level')
 
-    rawFile = 'd:/work/evaluate_data.raw'   
-
     song = ['PleaseDontGo']
     song = ['jilejingtu']
     song = ['aLIEz']
     song = ['bboombboom']
     song = ['dainiqulvxing']
+    song = ['xiagelukoujian']
+    song = ['CheapThrills']
+    song = ['foxishaonv']
+
+    rawFile = TrainData.RawDataFileName(song[0])
+    postprocess.ProcessSampleToIdolLevel(song[0])
+    return
 
     pathname = MakeMp3Pathname(song[0])
 
@@ -595,7 +617,7 @@ def GenerateLevel():
             pickle.dump(predicts, file)
             print('raw file saved')
 
-        TrainData.GenerateLevel(predicts, pathname)
+        # TrainData.GenerateLevel(predicts, pathname)
     
 
 # @run
@@ -636,23 +658,6 @@ def LoadRawData(useSoftmax = True):
 
         notes = notes[:,0]
         LevelInfo.SaveInstantValue(notes, pathname, '_predict')
-
-
-def LoadMusicInfo(filename):
-    '''
-    读取歌曲的长度,bpm,entertime等信息
-    '''
-    # filename = r'd:\librosa\RhythmMaster\jilejingtu\jilejingtu.mp3'
-    dir = os.path.dirname(filename) + os.path.sep
-    filename = dir + 'info.txt'
-    with open(filename, 'r') as file:
-        value = [float(s.split('=')[1]) for s in file.readlines()]
-        
-        # duration, bpm, entertime
-        value[0] = int(value[0] * 1000)
-        value[2] = int(value[2] * 1000)
-        # print(value)
-        return tuple(value)
 
 
 # @run

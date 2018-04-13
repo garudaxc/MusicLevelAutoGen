@@ -2,6 +2,7 @@
 import tensorflow as tf
 import numpy as np
 import time
+import matplotlib.pyplot as plt
 
 runList = []
 def run(r):
@@ -210,12 +211,36 @@ class WithTest:
         duration = time.time() - self.time
         print(self.desc, 'time', duration)
 
-@run
+# @run
 def WithStatementTest():
     with WithTest('test') as w:
         time.sleep(1)
         
     print('done') 
+
+@run
+def PowInZeroToOne():
+
+    x = np.arange(0, 1, 0.05)
+
+    y0 = x ** 0.2
+    y1 = x ** 0.8
+    y2 = x ** 2.0
+    y3 = x ** 5.0
+
+    plt.subplot
+
+    plt.subplot(4, 1, 1)
+    plt.plot(x, y0, label='y0')
+    plt.subplot(4, 1, 2)
+    plt.plot(x, y1)
+    plt.subplot(4, 1, 3)
+    plt.plot(x, y2)
+    plt.subplot(4, 1, 4)
+    plt.plot(x, y3)
+
+    plt.show()
+
 
 if __name__ == '__main__':
     for func in runList:

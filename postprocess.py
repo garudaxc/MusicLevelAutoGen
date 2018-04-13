@@ -6,6 +6,7 @@ import scipy.signal
 import numpy.random
 import bisect
 import LevelInfo
+import os
 
 
 def TrainDataToLevelData(data, sampleInterval, threhold, timeOffset=0):
@@ -91,29 +92,30 @@ def ConvertIntermediaNoteToLevelNote(notes):
     '''
     result = []
     for n in notes:
-        time, type, value, side = n
+        time, t, value, side = n
+    
         channel = np.random.randint(0, 2)
         track = channel + side * 2
 
         time *= 10
 
-        if type == LevelInfo.combineNode:
+        if t == LevelInfo.combineNode:
             cnote = []
             for nn in value:
                 time2, type2, value2, side2 = nn
                 time2 *= 10
                 value2 *= 10
-                notes.append((time2, type2, Value2, track))
+                cnote.append((time2, type2, value2, track))
                 if type2 == LevelInfo.slideNote:
                     channel = 1 - channel
                     track = channel + side*2
 
-            result.append((time, type, cnote, -1))
+            result.append((time, t, cnote, -1))
         else:
             value *= 10
-            result.append((time, type, value, track))
+            result.append((time, t, value, track))
 
-        return result
+    return result
 
 def PurifyInstanceSample(samples):
     '''
@@ -171,7 +173,7 @@ def FindCumulativeIndexInArray(a, x):
     return i
 
 
-def PickInstanceSample(samples, rate=40):
+def PickInstanceSample(samples, rate=60):
     '''
     使用指数分布生成短音符位置
     '''
@@ -200,10 +202,41 @@ def PickInstanceSample(samples, rate=40):
 
     picked = np.array(picked)
     print('picked', picked.shape[0])
-    return picked
+    
+    result = np.zeros_like(samples)
+    result[picked] = samples[picked]
+
+    return result
     
 
-def BilateralFilter(samples, ratio = 0.7):
+def PickInstanceSample2(short, count=300):
+
+    sortarg = np.argsort(short)[-count:]
+    newSample = np.zeros_like(short)
+    
+    newSample[sortarg] = short[sortarg]
+    
+    maxDis = 3
+    index = newSample.nonzero()[0]
+    dis = index[1:] - index[0:-1]
+    closeIndex = (dis<maxDis).nonzero()[0]
+    index = index[closeIndex]
+    index = index[:, np.newaxis]
+
+    index = np.hstack((index, index+1, index+2))
+    value = newSample[np.reshape(index, -1)].reshape((-1, maxDis))
+    maxValueIndex = np.argmax(value, axis=1)
+
+    selectIndex = index[range(index.shape[0]), maxValueIndex]
+    selectValue = newSample[selectIndex]
+    newSample[np.reshape(index, -1)] = 0
+    newSample[selectIndex] = selectValue
+
+    return newSample
+
+
+
+def BilateralFilter(samples, ratio = 0.8):
     pRange = 31
     gauKernel = scipy.signal.gaussian(pRange, 10)
     # print(gauKernel)
@@ -245,7 +278,7 @@ def BilateralFilter(samples, ratio = 0.7):
     for i in range(len(newSample)):
         if newSample[i] > threhold:
             result[i] = newSample[i]
-            acc += (newSample[i] - threhold) * 0.5
+            acc += (newSample[i] - threhold) * 2
             continue
         
         acc -= (threhold - newSample[i])
@@ -270,10 +303,27 @@ def BilateralFilter(samples, ratio = 0.7):
 
     return result
 
+def EliminateShortSamples(long, threhold=200):
+    '''
+    去掉过短的长音符
+    threhold 单位毫秒
+    '''
+    longBinay = long > 0
+    edge = (longBinay[1:] != longBinay[:-1]).nonzero()[0] + 1
+    result = np.copy(long)
+    threhold /= 10
+    for i in range(len(edge)-1):
+        if (edge[i+1] - edge[i]) < threhold:
+            # print('found too short long note', result[edge[i+1]-1], result[edge[i+1]], result[edge[i+1]+1])
+            result[edge[i]:edge[i+1]] = 0
+    
+    return result
+    
 
-def AlignNotePosition(short, long, threhold=50):
+def AlignNotePosition(short, long, threhold=100):
     '''
     将挨得很近的长音符和短音符对齐到同一位置
+    threhold 范围内的会对齐 单位毫秒
     '''
     assert short.shape == long.shape
     longBinay = long > 0
@@ -311,9 +361,37 @@ def AlignNotePosition(short, long, threhold=50):
     return long
 
 
+def EliminateTooCloseSample(short, long, threhold=200):
+    '''
+    去掉和长音符挨的太近的音符
+    '''
+     #should calc with bpm
+    assert short.shape == long.shape
+    longBinay = long > 0
+    edge = (longBinay[1:] != longBinay[:-1]).nonzero()[0] + 1
+    offset = int((threhold / 10) // 2)
+
+    for i in range(len(edge)-1):
+        p1 = edge[i]
+        p0 = max(p1-offset, 0)
+        pos = short[p0:p1].nonzero()[0] + p0
+        if len(pos) > 0:
+            # print('too close sample at', pos, i)
+            short[pos] = 0
+
+        p0 = edge[i+1]+1
+        p1 = min(p0+offset+1, len(short))
+        pos = short[p0:p1].nonzero()[0] + p0
+        if len(pos) > 0:
+            # print('too close sample at', pos, i+1)
+            short[pos] = 0
+
+    return short
+
+
 def RandSide():
     # 随机生成0 1，作为side
-    l = np.random.rand() // 0.5
+    l = np.random.randint(0, 2)
     r = 1 - l
     return l, r
 
@@ -327,7 +405,9 @@ def MutateSamples(short, long):
     DoubleShort = 3
     Slide = 2
     doubleRate = 0.15
-    param = [('doubleSlide', 0.05, 4), ('doubleRate', 0.15, 3), ('slideRate', 0.15, 2)]
+    doubleRate = 0.0
+    param = [('doubleSlide', 0.01, 4), ('doubleRate', 0.02, 3), ('slideRate', 0.05, 2)]
+    # param = [('doubleSlide', 0.0, 4), ('doubleRate', 0.0, 3), ('slideRate', 0.0, 2)]
     
     longBinay = long > 0
     edge = (longBinay[1:] != longBinay[:-1]).nonzero()[0] + 1
@@ -339,6 +419,7 @@ def MutateSamples(short, long):
     longNoteValue.sort(reverse=True)
     long2 = np.zeros_like(long)
     count = int(len(longNoteValue) * doubleRate)
+    print('double long count', count)
     # 选取value最大的为双按音符
     for i in range(count):
         e = longNoteValue[i][1]
@@ -346,17 +427,16 @@ def MutateSamples(short, long):
 
     sortIndex = np.argsort(short)    
     sortIndex = np.flip(sortIndex, axis=0)
-    
-    # print(short[sortIndex][0:100])
 
     shortMute = np.zeros_like(short)
     totalCount = np.count_nonzero(short)
-    print(totalCount)
+    print('total short count', totalCount)
 
     begin = 0
     for n, ratio, id in param:
         count = int(totalCount * ratio)
         index = sortIndex[begin:begin+count]
+        print('id %d name %s count %d' % (id, n, len(index)))
         shortMute[index] = id
         begin += count
 
@@ -381,26 +461,26 @@ def MutateSamples(short, long):
                 #long note
                 notes.append((i, LevelInfo.longNote, end-i, SideLeft))
             
-            if long2[i] > 0:
-                #double long                
-                if len(s) > 0:
-                    #combine note
-                    cnotes = TransferCombineNote(i, end, s, SideRight)
-                    notes.append((i, LevelInfo.combineNode, cnotes, SideRight))
-                else:
-                    #long note
-                    notes.append((i, LevelInfo.longNote, end-i, SideRight))
-            else:
-                # short in other side
-                for n in s:
-                    if (shortMute[n] == DoubleSlide) or (shortMute[n] == Slide):
-                        print('slide beside combine')
-                        notes.append((i, LevelInfo.slideNote, 0, SideRight))
-                    elif shortMute[n] == DoubleShort:
-                        print('short beside combine')
-                        notes.append((i, LevelInfo.shortNote, 0, SideRight))
+            # if long2[i] > 0:
+            #     #double long                
+            #     if len(s) > 0:
+            #         #combine note
+            #         cnotes = TransferCombineNote(i, end, s, SideRight)
+            #         notes.append((i, LevelInfo.combineNode, cnotes, SideRight))
+            #     else:
+            #         #long note
+            #         notes.append((i, LevelInfo.longNote, end-i, SideRight))
+            # else:
+            #     # short in other side
+            #     for n in s:
+            #         if (shortMute[n] == DoubleSlide) or (shortMute[n] == Slide):
+            #             # print('slide beside combine')
+            #             notes.append((i, LevelInfo.slideNote, 0, SideRight))
+            #         elif shortMute[n] == DoubleShort:
+            #             # print('short beside combine')
+            #             notes.append((i, LevelInfo.shortNote, 0, SideRight))
 
-            i = end
+            i = end+1
             SideLeft, SideRight = RandSide()
 
         elif shortMute[i] > 0 or short[i] > 0:
@@ -444,7 +524,6 @@ def TransferCombineNote(begin, end, shortPos, side):
         notes.append((begin, LevelInfo.longNote, end-begin, side))
         
     return notes
-
 
 
 def SampleDistribute(samples):
@@ -492,49 +571,6 @@ def SampleDistribute(samples):
 
     plt.show()
 
-    # plt.show()
-
-
-
-def SampleDistribute2():
-    with open('d:/raw_sample.raw', 'rb') as file:
-        samples = pickle.load(file)
-    
-    index = (samples > 0.1).nonzero()[0]
-    inter = index[1:] - index[:-1]
-    # inter = inter * 100
-
-    his, b = np.histogram(inter, 100)
-    his = his / samples.shape[0]
-    maxx = b[-1]
-    # his = his / 5000
-
-    a = scipy.stats.expon.fit(inter)
-    print(a)
-
-    count = int(inter.shape[0] / 3)
-    a0 = scipy.stats.expon.fit(inter[:count])
-    a1 = scipy.stats.expon.fit(inter[count:2*count])
-    a2 = scipy.stats.expon.fit(inter[2*count:])
-    print('fit3', a)
-
-    fig, ax = plt.subplots(2, 1)
-    ax[0].plot(his[:50])
-
-    x = np.linspace(0, maxx, 100)
-    y = scipy.stats.expon.pdf(x, a[0], a[1])
-    ax[1].plot(y[:50])    
-    y = scipy.stats.expon.pdf(x, a0[0], a0[1])
-    ax[1].plot(y[:50])    
-    y = scipy.stats.expon.pdf(x, a1[0], a1[1])
-    ax[1].plot(y[:50])    
-    y = scipy.stats.expon.pdf(x, a2[0], a2[1])
-    ax[1].plot(y[:50])    
-
-    # n, bins, _ = plt.hist(inter, 200)
-    plt.show()
-
-
 
 def SaveInstantValue(beats, filename, postfix=''):
     import os
@@ -562,13 +598,79 @@ def LoadInstanceValue(filename):
     result = np.array(result)
     return result
 
+def TestInputParam(input):
+    # 输入参数可以作为返回值
+
+    print(input)
+
+    input[3:4] = 0
+
+    print(input)
+
+    return input
 
 
 
-if __name__ == '__main__':
+def GetSamplePath():
+    path = '/Users/xuchao/Documents/rhythmMaster/'
+    if os.name == 'nt':
+        path = 'D:/librosa/RhythmMaster/'
+    return path
 
+def MakeMp3Dir(song):
+    path = GetSamplePath()
+    pathname = '%s%s/' % (path, song)
+    if not os.path.exists(pathname):
+        assert False
+    return pathname
+
+def ProcessSampleToIdolLevel(songname):
+
+    pathname = 'd:/librosa/RhythmMaster/%s/%s.mp3' % (songname, songname)
+    levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (songname)
+
+    np.random.seed(0)
+
+    print('load raw file')
+    path = MakeMp3Dir(song)
+    rawfile = path + 'evaluate_data_long.raw'    
+    with open(rawfile, 'rb') as file:
+        predicts = pickle.load(file)
+
+    pre = predicts[:, 1]
+    long = BilateralFilter(pre, ratio=0.85)
+    long = EliminateShortSamples(long)
+    
+    path = MakeMp3Dir(song)
+    rawfile = path + 'evaluate_data_short.raw'
+    with open(rawfile, 'rb') as file:
+        predicts = pickle.load(file)
+
+    short = predicts[:, 1]
+    # short = PurifyInstanceSample(short)
+    # short = PickInstanceSample(short)
+    short = PickInstanceSample2(short)
+    
+    long = AlignNotePosition(short, long)
+
+    short = EliminateTooCloseSample(short, long)
+
+    notes = MutateSamples(short, long) 
+    levelNotes = ConvertIntermediaNoteToLevelNote(notes)
+
+    duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
+
+    LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
+
+
+
+def Run():
 
     pathname = 'd:\librosa\RhythmMaster\dainiqulvxing\dainiqulvxing.mp3'
+
+    a = os.path.split(pathname)[1]
+    a = os.path.splitext(a)
+    print(a)
 
     if False:    
         print('load raw file')
@@ -592,33 +694,61 @@ if __name__ == '__main__':
         SaveInstantValue(notes, pathname, '_inst_new')
     
 
-    if True:
-        print('load raw file')
-        with open('d:/work/evaluate_data_long.raw', 'rb') as file:
-            predicts = pickle.load(file)
-
-        pre = predicts[:, 1]
-        long = BilateralFilter(pre, ratio=0.9)
-       
-        with open('d:/work/evaluate_data_short.raw', 'rb') as file:
-            predicts = pickle.load(file)
-
-        short = predicts[:, 1]
-        short = PurifyInstanceSample(short)
-        picked = PickInstanceSample(short)
-        sam = np.zeros_like(short)
-        sam[picked] = short[picked]
-        
-        long = AlignNotePosition(sam, long)
-
-        MutateSamples(sam, long)
-
+        # print('level file', levelFile)
         
         # notes = TrainDataToLevelData(long, 10, acceptThrehold, 0)
         # print('gen notes number', len(notes))
         # notes = notes[:,0]
         # SaveInstantValue(notes, pathname, '_region')        
 
+
+def TestShortNote():
+    
+    songname = 'dainiqulvxing'
+
+    pathname = 'd:/librosa/RhythmMaster/%s/%s.mp3' % (songname, songname)
+    levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (songname)
+
+    np.random.seed(0)
+
+    
+    with open('d:/work/evaluate_data_short.raw', 'rb') as file:
+        predicts = pickle.load(file)
+
+    short = predicts[:, 1]
+    sortarg = np.argsort(short)[-300:]
+    newSample = np.zeros_like(short)
+    
+    newSample[sortarg] = short[sortarg]
+
+    
+    maxDis = 3
+    index = newSample.nonzero()[0]
+    dis = index[1:] - index[0:-1]
+    closeIndex = (dis<maxDis).nonzero()[0]
+    index = index[closeIndex]
+    index = index[:, np.newaxis]
+
+    index = np.hstack((index, index+1, index+2))
+    value = newSample[np.reshape(index, -1)].reshape((-1, maxDis))
+    maxValueIndex = np.argmax(value, axis=1)
+
+    selectIndex = index[range(index.shape[0]), maxValueIndex]
+    selectValue = newSample[selectIndex]
+    newSample[np.reshape(index, -1)] = 0
+    newSample[selectIndex] = selectValue
+    
+    note = TrainDataToLevelData(newSample, 10, 0.01)
+    note = note[:,0]
+    print('note count', len(note))
+    SaveInstantValue(note, pathname, '_short')
+
+
+
+if __name__ == '__main__':
+
+    # TestShortNote()
+    Run()
 
     # a = np.zeros(100)
     # a[range(0, 100, 5)] = 0.05

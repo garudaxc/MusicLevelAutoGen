@@ -230,36 +230,52 @@ def SaveDownbeat(bpm, et, lastBeat, filename):
 
 def CalcMusicInfo():
     filename = r'd:\leveledtior\client\Assets\resources\audio\bgm\jilejingtu.m4a'
-    filename = r'd:\librosa\RhythmMaster\aiqingmaimai\aiqingmaimai.mp3'
     filename = r'd:\librosa\RhythmMaster\BBoomBBoom\BBoomBBoom.mp3'
 
-    y, sr = librosa.load(filename, mono=True, sr=44100)
-    logger.info('loaded')
-    duration = librosa.get_duration(y=y, sr=sr)
+    filelist = [
+        # r'd:\librosa\RhythmMaster\dainiqulvxing\dainiqulvxing.',
+        # r'd:\librosa\RhythmMaster\aLIEz\aLIEz.'
+        # r'd:\librosa\RhythmMaster\foxishaonv\foxishaonv.',
+        # r'd:\librosa\RhythmMaster\xiagelukoujian\xiagelukoujian.',
+        r'd:\librosa\RhythmMaster\CheapThrills\CheapThrills.'
+    ]
 
-    processer = madmom.features.downbeats.RNNDownBeatProcessor()
-    downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda = 1000, fps=FPS)
-    
-    act = processer(y)
-    beat = downbeatTracking(act)
-    firstBeat, lastBeat = normalizeInterval(beat)
+    for f in filelist:
+        filename = f + 'm4a'
+        if not os.path.exists(filename):
+            filename = f + 'mp3'
 
-    if firstBeat == -1:
-        print('generate error, abnormal rate %f' % (lastBeat))
-        return
+        if not os.path.exists(filename):
+            print('can not find', filename)
+            continue
 
-    bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
-    beatInter = 60.0 / bpm
+        y, sr = librosa.load(filename, mono=True, sr=44100)
+        logger.info('loaded')
+        duration = librosa.get_duration(y=y, sr=sr)
 
-    lastBeat = beat[-1, 0]
-    print('bpm', bpm, 'et', etAuto)
+        processer = madmom.features.downbeats.RNNDownBeatProcessor()
+        downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda = 1000, fps=FPS)
+        
+        act = processer(y)
+        beat = downbeatTracking(act)
+        firstBeat, lastBeat = normalizeInterval(beat)
 
-    dir = os.path.dirname(filename) + os.path.sep
-    infoFileName = dir + 'info.txt'
-    with open(infoFileName, 'w') as file:
-        file.write('duration=%f\nbpm=%f\net=%f' % (duration, bpm, etAuto))
+        if firstBeat == -1:
+            print('generate error, abnormal rate %f' % (lastBeat))
+            return
 
-    SaveDownbeat(bpm, etAuto, lastBeat, filename)
+        bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
+        beatInter = 60.0 / bpm
+
+        lastBeat = beat[-1, 0]
+        print('bpm', bpm, 'et', etAuto)
+
+        dir = os.path.dirname(filename) + os.path.sep
+        infoFileName = dir + 'info.txt'
+        with open(infoFileName, 'w') as file:
+            file.write('duration=%f\nbpm=%f\net=%f' % (duration, bpm, etAuto))
+
+        SaveDownbeat(bpm, etAuto, lastBeat, filename)
 
 
 

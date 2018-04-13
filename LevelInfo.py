@@ -56,7 +56,23 @@ def load_levels(path):
     return infos
 
 
-def load_levelinfo_file(filename):
+def LoadMusicInfo(filename):
+    '''
+    读取歌曲的长度,bpm,entertime等信息
+    '''
+    # filename = r'd:\librosa\RhythmMaster\jilejingtu\jilejingtu.mp3'
+    dir = os.path.dirname(filename) + os.path.sep
+    filename = dir + 'info.txt'
+    with open(filename, 'r') as file:
+        value = [float(s.split('=')[1]) for s in file.readlines()]
+        
+        # duration, bpm, entertime
+        value[0] = int(value[0] * 1000)
+        value[2] = int(value[2] * 1000)
+        # print(value)
+        return tuple(value)
+
+def ReadInfoInXml(filename):
     # 加载集合好的关卡信息
     if not os.path.exists(filename):
         return None
@@ -362,29 +378,29 @@ def CorrespondingTrack(track0):
     return track1
 
 def ConvertNoteToXml(note):
-    trackName = ('Left1', 'Left2', 'Right1', 'Right2')
+    trackName = ('Left2', 'Left1', 'Right1', 'Right2')
     bar, pos, type, value, track = note
 
     e = ElementTree.Element('Note')
     e.attrib['Bar'] = str(bar+1)
-    e.attrib['Pos'] = str(pos)
+    e.attrib['Pos'] = str(pos*2)
 
     if type == shortNote:
         e.attrib['from_track'] = trackName[track]
         e.attrib['target_track'] = trackName[track]
         e.attrib['note_type'] = 'short'
     elif type == slideNote:
-        e.attrib['from_track'] = trackName[track]
+        e.attrib['target_track'] = trackName[track]
         target = CorrespondingTrack(track)
-        e.attrib['target_track'] = trackName[target]
+        e.attrib['end_track'] = trackName[target]
         e.attrib['note_type'] = 'slip'
     elif type == longNote:
         e.attrib['from_track'] = trackName[track]
         e.attrib['target_track'] = trackName[track]
         e.attrib['note_type'] = 'long'
         endBar, endPos = value
-        e.attrib['EndBar'] = str(endBar)
-        e.attrib['EndPos'] = str(endPos)
+        e.attrib['EndBar'] = str(endBar+1)
+        e.attrib['EndPos'] = str(endPos*2)
     else:
         assert False
 
@@ -404,28 +420,36 @@ def ConvertTimeBar(note, barInterval, posInterval, et):
         value = (endBar, endPos)
 
     return (bar, pos, type, value, track)
-        
+
+def MakeActionListNode(startBar, danceLen, seqLen):
+    e = ElementTree.Element('ActionList')
+    e.attrib['start_bar'] = str(startBar)
+    e.attrib['dance_len'] = str(danceLen)
+    e.attrib['seq_len'] = str(seqLen)
+    e.attrib['level'] = '2'
+    e.attrib['type'] = ''
+
+    return e
+
 def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     '''
     保存到心动模式关卡文件
     '''
     barInterval = 240.0 / bpm
     barInterval *= 1000
-    posInterval = barInterval / 64.0
+    posInterval = barInterval / 32.0
 
     newNotes = []
     for n in notes:
         type = n[1]
-
         r = ConvertTimeBar(n, barInterval, posInterval, et)
-
         if type == combineNode:
             value = n[2]
             l = []
             for subNote in value:
                 s = ConvertTimeBar(subNote, barInterval, posInterval, et)
                 l.append(s)
-            r[3] = l
+            r = (r[0], r[1], r[2], l, r[4])
              
         newNotes.append(r)
     notes = newNotes
@@ -438,8 +462,9 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     lastBar = lastNote[0]
     totalBar  = lastBar + 1
 
-    # 删除前面8小节和最后2小节的音符
-    notes = [note for note in notes if note[0] > 7 and note[0] < lastBar - 1]
+    # 删除前面4小节和最后4小节的音符
+    enterBar = 4
+    notes = [note for note in notes if note[0] > (enterBar-1) and note[0] < lastBar - 3]
     print('number of notes', len(notes))
 
     root = tree
@@ -452,13 +477,24 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     node.text = str(musicTime)
     node = levelInfo.find('BarAmount')
     node.text = str(totalBar)
+    node = levelInfo.find('BeginBarLen')
+    node.text = str(enterBar)
+
+    
+    musicName = os.path.split(filename)[1]
+    musicName = os.path.splitext(musicName)[0]
+    MusicInfo = root.find('MusicInfo')
+    node = MusicInfo.find('Title')
+    node.text = str(musicName)
+    node = MusicInfo.find('FilePath')
+    node.text = str('audio/bgm/'+musicName)
     
     SectionSeq = root.find('SectionSeq')
     for node in SectionSeq:
         if node.attrib['type'] == 'note':
-            node.attrib['endbar'] = str(totalBar - 2)
+            node.attrib['endbar'] = str(totalBar - 4)
         if node.attrib['type'] == 'showtime':
-            node.attrib['startbar'] = str(totalBar - 1)
+            node.attrib['startbar'] = str(totalBar - 3)
             node.attrib['endbar'] = str(totalBar)
 
     notesNode = root.find('NoteInfo').find('Normal')
@@ -476,6 +512,24 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
             e = ConvertNoteToXml(note)
 
         notesNode.append(e)
+
+    numseq = (totalBar-enterBar-4) // 2
+    print('numseq', totalBar, numseq * 2)
+    ActionSeq = root.find('ActionSeq')
+    seq = enterBar+1
+    if totalBar % 2 == 1:
+        e = MakeActionListNode(seq, 1, 1)
+        ActionSeq.append(e)
+        seq += 1
+    
+    for i in range(numseq):
+        e = MakeActionListNode(seq, 2, 2)
+        ActionSeq.append(e)
+        seq += 2
+        
+    e = MakeActionListNode(seq, 4, 4)
+    ActionSeq.append(e)
+
     
     camera = root.find('CameraSeq').find('Camera')
     camera.attrib['end_bar'] = str(totalBar)
