@@ -148,6 +148,17 @@ def ReadAndOffset(fmt, buffer, offset):
     offset += calcsize(fmt)
     return r, offset
 
+def ReadRhythmMasterLevelTime(pathname):
+    #读取节奏大师关卡时间
+    with open(pathname, 'rb') as file:
+        data = file.read()
+        
+    offset = 0
+    r, offset = ReadAndOffset('2i', data, offset)
+    totalTime = r[0]
+
+    return totalTime
+
 
 def LoadRhythmMasterLevel(pathname):
     #加载节奏大师关卡
@@ -592,7 +603,6 @@ def MakeLevelPathname(song, difficulty=2):
 
 def ProcessRythmMasterMusicInfo():
     # 读取关卡描述文件，将music info保存到目录下
-
     path = 'd:/librosa/RhythmMaster'
     files = os.listdir(path)
     dirs = []

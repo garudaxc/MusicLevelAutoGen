@@ -44,6 +44,9 @@ songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai',
 '1987wbzhyjn', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'myall', 'unreal', 'faraway',
 'fengniao', 'wangfei', 'wodemuyang', 'mrx', 'rageyourdream', 'redhot', 'yilububian', 'yiqiyaobai', 'yiranaini', 'yiyejingxi']
 
+
+# 'mrq',  'huozaicike' 'ribuluo'
+
 testing = False
 if testing:
     numSteps = 64
@@ -271,7 +274,7 @@ class TrainDataDynShortNote(TrainDataBase):
 
         count = x.shape[0]
 
-        if (not y is None):            
+        if (not y is None): 
             beat = np.max(y[:, 1:4], axis=1)
             y = SamplesToSoftmax(beat)
             print('y shape', y.shape, 'y sample count', len(y), 'y sum', np.sum(y, axis=0))
@@ -556,7 +559,7 @@ def SaveModel(sess, saveMeta = False):
     print('model saved')
 
 
-@run
+# @run
 def GenerateLevel():
 
     print('gen level')
@@ -569,10 +572,14 @@ def GenerateLevel():
     song = ['xiagelukoujian']
     song = ['CheapThrills']
     song = ['foxishaonv']
+    song = ['1987wbzhyjn']
+    song = ['mrq']
+    song = ['ribuluo']
 
     rawFile = TrainData.RawDataFileName(song[0])
-    postprocess.ProcessSampleToIdolLevel(song[0])
-    return
+    
+    # postprocess.ProcessSampleToIdolLevel(song[0])
+    # return
 
     pathname = MakeMp3Pathname(song[0])
 
@@ -614,8 +621,9 @@ def GenerateLevel():
         predicts = np.stack(evaluate).reshape(-1, TrainData.lableDim)
 
         with open(rawFile, 'wb') as file:
+
             pickle.dump(predicts, file)
-            print('raw file saved')
+            print('raw file saved', predicts.shape)
 
         # TrainData.GenerateLevel(predicts, pathname)
     
@@ -728,6 +736,35 @@ def _Main():
             print('epch', j, 'loss', lossValue, 'accuracy', accValue, 'not increase', notIncreaseCount)
             
             data.ShuffleBatch()
+
+@run
+def InstanceNoteTest():
+    # 读取节奏大师关卡，生成文件
+    song = 'mrq'
+    song = 'ribuluo'
+    pathname = MakeLevelPathname(song, difficulty=2)
+
+    print(pathname)
+    time = LevelInfo.ReadRhythmMasterLevelTime(pathname)
+    print(time)
+    return
+
+
+    level = LevelInfo.LoadRhythmMasterLevel(pathname)
+
+    duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
+    numSample = duration // 10
+
+    targetData = ConvertLevelToLables(level, numSample)
+    
+    beat = np.max(targetData[:, 1:4], axis=1)
+    
+    note = postprocess.TrainDataToLevelData(beat, 10, 0.1)
+    note = note[:,0]
+    print('note count', len(note))
+    LevelInfo.SaveInstantValue(note, pathname, '_origshort')
+
+
 
 
 

@@ -116,100 +116,12 @@ def ConvertIntermediaNoteToLevelNote(notes):
             result.append((time, t, value, track))
 
     return result
-
-def PurifyInstanceSample(samples):
-    '''
-    '''    
-    peakind = scipy.signal.find_peaks_cwt(samples, np.arange(1,50), min_length=3)
-    #todo
-    # seek to more prescise peak position
-
-    newSample = np.zeros_like(samples)
-    newSample[peakind] = samples[peakind]
-
-    # delete very small value
-    index = newSample < 0.2
-    newSample[index.nonzero()] = 0
-
-    # pick the largger value in nearby peaks
-    maxDis = 3
-    index = newSample.nonzero()[0]
-    dis = index[1:] - index[0:-1]
-    index = index[(dis<maxDis).nonzero()]
-    index = index[:, np.newaxis]
-
-    # print('joint count', len(index))
-    index = np.hstack((index, index+1, index+2))
-    value = newSample[np.reshape(index, -1)].reshape((-1, maxDis))
-    maxValueIndex = np.argmax(value, axis=1)
-
-    selectIndex = index[range(index.shape[0]), maxValueIndex]
-    selectValue = newSample[selectIndex]
-    newSample[np.reshape(index, -1)] = 0
-    newSample[selectIndex] = selectValue
-
-    return newSample
-
-
-def FindCumulativeIndexInArray(a, x):
-    '''
-    a为一维数组，查找x在a积分中所在的位置，sigma(a'i') < x < sigma(a'i+1')
-    '''
-    index = (a>0).nonzero()[0]
-    # print('index', index)
-    values = a[index]
-    # print(values)
-    for i in range(1, len(values)):
-        values[i] = values[i] + values[i-1]
-    # print(values)
-
-    i = bisect.bisect_left(values, x)
-    # print('index %d in %d values' % (i, len(values)))
-    if i == len(values):
-        i = np.argmax(values)
-
-    i = index[i]
-
-    return i
-
-
-def PickInstanceSample(samples, rate=60):
-    '''
-    使用指数分布生成短音符位置
-    '''
-    maxRange = int(scipy.stats.expon.ppf(0.999, scale=rate))
-    x = np.arange(0, maxRange, 1)
-    kernel = scipy.stats.expon.pdf(x, scale=rate)
-
-    numSample = samples.shape[0]
-    index = 0
-    picked = []
-    while index < numSample:
-        length = maxRange
-        if index + maxRange > numSample:
-            length = numSample - index
-        prob = kernel[:length] * samples[index:index+length]
-        totalProb = np.sum(prob)
-        if totalProb < 0.0001:
-            index = index + length
-            continue
-        prob = prob / totalProb
-        # print('total prob', totalProb, np.sum(prob))
-        r = numpy.random.rand(1)[0]
-        ii = FindCumulativeIndexInArray(prob, r)
-        picked.append(index + ii)
-        index = index + ii + 1
-
-    picked = np.array(picked)
-    print('picked', picked.shape[0])
-    
-    result = np.zeros_like(samples)
-    result[picked] = samples[picked]
-
-    return result
     
 
-def PickInstanceSample2(short, count=300):
+def PickInstanceSample(short, count=300):
+    '''
+    从大到小选取sample，并消去临近的sample
+    '''
 
     sortarg = np.argsort(short)[-count:]
     newSample = np.zeros_like(short)
@@ -647,9 +559,7 @@ def ProcessSampleToIdolLevel(songname):
         predicts = pickle.load(file)
 
     short = predicts[:, 1]
-    # short = PurifyInstanceSample(short)
-    # short = PickInstanceSample(short)
-    short = PickInstanceSample2(short)
+    short = PickInstanceSample(short)
     
     long = AlignNotePosition(short, long)
 
@@ -703,25 +613,27 @@ def Run():
 
 
 def TestShortNote():
+    # 从大到小筛选短音符
     
-    songname = 'dainiqulvxing'
+    songname = 'mrq'
+    songname = 'ribuluo'
 
     pathname = 'd:/librosa/RhythmMaster/%s/%s.mp3' % (songname, songname)
     levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (songname)
 
     np.random.seed(0)
 
-    
-    with open('d:/work/evaluate_data_short.raw', 'rb') as file:
+    rawFile = 'd:/librosa/RhythmMaster/%s/evaluate_data_short.raw' % (songname)
+    with open(rawFile, 'rb') as file:
         predicts = pickle.load(file)
+        print('raw file loaded', predicts.shape)
 
     short = predicts[:, 1]
-    sortarg = np.argsort(short)[-300:]
+    sortarg = np.argsort(short)[-240:]
     newSample = np.zeros_like(short)
     
     newSample[sortarg] = short[sortarg]
 
-    
     maxDis = 3
     index = newSample.nonzero()[0]
     dis = index[1:] - index[0:-1]
@@ -744,11 +656,34 @@ def TestShortNote():
     SaveInstantValue(note, pathname, '_short')
 
 
+def TestShortNote2():
+    #使用阈值筛选短音符
+    
+    songname = 'mrq'
+    songname = 'ribuluo'
+
+    pathname = 'd:/librosa/RhythmMaster/%s/%s.mp3' % (songname, songname)
+    levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (songname)
+
+    np.random.seed(0)
+
+    rawFile = 'd:/librosa/RhythmMaster/%s/evaluate_data_short.raw' % (songname)
+    with open(rawFile, 'rb') as file:
+        predicts = pickle.load(file)
+        print('raw file loaded', predicts.shape)
+
+    short = predicts[:, 1]
+    
+    note = TrainDataToLevelData(short, 10, 0.93)
+    note = note[:,0]
+    print('note count', len(note))
+    SaveInstantValue(note, pathname, '_shortThre')
+
 
 if __name__ == '__main__':
 
-    # TestShortNote()
-    Run()
+    TestShortNote2()
+    # Run()
 
     # a = np.zeros(100)
     # a[range(0, 100, 5)] = 0.05
