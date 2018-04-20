@@ -778,8 +778,49 @@ def GenShortNoteFromRhythmLevel():
             print(filename, 'saved')
 
 
+def ReadTrainningRegion(file):
+
+    regions = ([], [])
+    for line in file:
+        time, type, duration = line.split(',')
+        time = float(time) * 1000
+        duration = float(duration) * 1000
+        type = int(type)
+        regions[type].append((time, duration))
+        # print(type, time, duration)
+    
+    return regions
+        
+# @run
+def LoadMarkedTrainningLable():
+    path = 'D:/librosa/MusicLevelAutoGen/train'
+    filelist = os.listdir(path)
+    lables = ([], [])
+    lableDuration = [0, 0]
+    for file in filelist:
+        if os.path.splitext(file)[1] != '.csv':
+            continue
+
+        pathname = path + '/' + file
+        file = os.path.splitext(file)[0]
+        song, level = file.split('_')
+        print(song, level)
+
+        with open(pathname, 'r') as f:
+            regions = ReadTrainningRegion(f)
+
+        for i in range(2):
+            if len(regions[i]) == 0:
+                continue
+            lables[i].append((song, level, regions[i]))
+            for _, dur in regions[i]:
+                lableDuration[i] += dur // 1000
+
+    print(lables[0], lableDuration[0])
+    print(lables[1], lableDuration[1])
 
 
+    # return singingLables, beatLables
 
 if __name__ == '__main__':
     
