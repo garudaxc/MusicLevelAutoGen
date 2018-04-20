@@ -8,6 +8,7 @@ import tensorflow as tf
 from tensorflow.contrib import rnn
 import time
 import matplotlib.pyplot as plt
+import util
 
 
 runList = []
@@ -737,22 +738,13 @@ def _Main():
             
             data.ShuffleBatch()
 
-@run
-def InstanceNoteTest():
+# @run
+def SaveShortNoteFile(pathname):
     # 读取节奏大师关卡，生成文件
-    song = 'mrq'
-    song = 'ribuluo'
-    pathname = MakeLevelPathname(song, difficulty=2)
-
-    print(pathname)
-    time = LevelInfo.ReadRhythmMasterLevelTime(pathname)
-    print(time)
-    return
-
+    duration = LevelInfo.ReadRhythmMasterLevelTime(pathname)
 
     level = LevelInfo.LoadRhythmMasterLevel(pathname)
 
-    duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
     numSample = duration // 10
 
     targetData = ConvertLevelToLables(level, numSample)
@@ -763,6 +755,27 @@ def InstanceNoteTest():
     note = note[:,0]
     print('note count', len(note))
     LevelInfo.SaveInstantValue(note, pathname, '_origshort')
+
+@run
+def GenShortNoteFromRhythmLevel():
+    
+    path = util.GetSamplePath()
+
+    dirs = os.listdir(path)
+    for name in dirs:
+        dirname = path + name
+        if not os.path.isdir(dirname):
+            continue
+        
+        filename = util.MakeLevelPathname(name, 1)
+        if os.path.exists(filename):
+            SaveShortNoteFile(filename)
+            print(filename, 'saved')
+
+        filename = util.MakeLevelPathname(name, 2)
+        if os.path.exists(filename):
+            SaveShortNoteFile(filename)
+            print(filename, 'saved')
 
 
 
