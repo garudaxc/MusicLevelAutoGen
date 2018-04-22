@@ -756,7 +756,7 @@ def SaveShortNoteFile(pathname):
     print('note count', len(note))
     LevelInfo.SaveInstantValue(note, pathname, '_origshort')
 
-@run
+# @run
 def GenShortNoteFromRhythmLevel():
     
     path = util.GetSamplePath()
@@ -791,9 +791,10 @@ def ReadTrainningRegion(file):
     
     return regions
         
-# @run
+@run
 def LoadMarkedTrainningLable():
     path = 'D:/librosa/MusicLevelAutoGen/train'
+    path = '/Users/xuchao/Documents/python/MusicLevelAutoGen/train'
     filelist = os.listdir(path)
     lables = ([], [])
     lableDuration = [0, 0]
@@ -804,7 +805,7 @@ def LoadMarkedTrainningLable():
         pathname = path + '/' + file
         file = os.path.splitext(file)[0]
         song, level = file.split('_')
-        print(song, level)
+        # print(song, level)
 
         with open(pathname, 'r') as f:
             regions = ReadTrainningRegion(f)
@@ -816,8 +817,8 @@ def LoadMarkedTrainningLable():
             for _, dur in regions[i]:
                 lableDuration[i] += dur // 1000
 
-    print(lables[0], lableDuration[0])
-    print(lables[1], lableDuration[1])
+    print(lableDuration[0])
+    print(lableDuration[1])
 
 
     # return singingLables, beatLables

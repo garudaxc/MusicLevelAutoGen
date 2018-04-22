@@ -2,6 +2,9 @@ import urllib.request
 import urllib.parse
 from struct import *
 import os
+from xml.etree import ElementTree
+import shutil
+
 
 url = 'http://game.ds.qq.com/Com_SongRes/song/dontmatter/dontmatter.mp3'
 url = 'http://game.ds.qq.com/Com_SongRes/song/dontmatter/dontmatter_4k_ez.imd'
@@ -45,9 +48,29 @@ def ReadRythmMasterSongList():
     return songList
 
 
+def ReadRythmMasterSongList2():
+    # read from xml file
+    pathname = r'/Users/xuchao/Documents/rhythmMaster/MD5List.xml'
+    pathname = r'/Users/xuchao/Documents/rhythmMaster/mrock_song_client_android.xml'
+    text=open(pathname, encoding='utf-8').read()
+
+    xmlparser = ElementTree.XMLParser(encoding='utf-8')
+    tree = ElementTree.fromstring(text)
+    
+    nodes = tree.findall('SongConfig_Client')
+
+    songList = []
+    for node in nodes:
+        name = node.find('m_szPath')
+        name = name.text
+        songList.append(name)
+
+    return songList
+
+
 def DownloadRythmMasterLevels():
 
-    songList = ReadRythmMasterSongList()
+    songList = ReadRythmMasterSongList2()
     
     for i in range(len(songList)):
         song = songList[i]
@@ -72,18 +95,37 @@ def DownloadRythmMasterLevels():
                 print('downloaded %d in %d %s' % (i , len(songList), filename))
                 
 
-        filename = '%s\%s_4k_hd.imd' % (dir, song)
-        if not os.path.exists(filename):
-            url = 'http://game.ds.qq.com/Com_SongRes/song/%s/%s_4k_hd.imd' % (song, song)
-            try:
-                filename, info = urllib.request.urlretrieve(url, filename)
-            except:
-                print('can not download', filename)
-            else:
-                print('downloaded %d in %d %s' % (i , len(songList), filename))
+        # filename = '%s\%s_4k_hd.imd' % (dir, song)
+        # if not os.path.exists(filename):
+        #     url = 'http://game.ds.qq.com/Com_SongRes/song/%s/%s_4k_hd.imd' % (song, song)
+        #     try:
+        #         filename, info = urllib.request.urlretrieve(url, filename)
+        #     except:
+        #         print('can not download', filename)
+        #     else:
+        #         print('downloaded %d in %d %s' % (i , len(songList), filename))
 
+def changename():
+    path = '/Users/xuchao/Documents/python/MusicLevelAutoGen'
+    path1 = '/Users/xuchao/Documents/rhythmMaster/'
 
+    filelist = os.listdir(path)
+    for file in filelist:
+        if file.find('d:\librosa\RhythmMaster') == 0:
+            full = path + '/' + file
+            song = file.split('\\')[3]
+
+            newdir = path1 + song
+            name = file.split('\\')[-1]
+            newname = newdir + '/' + name
+            shutil.move(full, newname)
+            print(full)
+            print(newname)
+
+    print('ok')
+            
 
 if __name__ == '__main__':
     # ReadRythmMasterSongList()
-    DownloadRythmMasterLevels()
+    # DownloadRythmMasterLevels()
+    changename()
