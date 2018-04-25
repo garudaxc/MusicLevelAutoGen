@@ -9,6 +9,7 @@ from tensorflow.contrib import rnn
 import time
 import matplotlib.pyplot as plt
 import util
+import DownbeatTracking
 
 
 runList = []
@@ -261,12 +262,10 @@ class TrainDataBase():
         self._x = x.transpose(1, 0, 2, 3)
         print('numbatches', self.numBatches, 'x shape', self._x.shape, 'y shape', self._y.shape)
 
-
-
 ###
-# TrainDataDynShortNote
+# TrainDataDynShortNoteSinging
 ###
-class TrainDataDynShortNote(TrainDataBase):
+class TrainDataDynShortNoteSinging(TrainDataBase):
     lableDim = 2
     def __init__(self, batchSize, numSteps, x, y=None):
         assert x.ndim == 2
@@ -277,6 +276,12 @@ class TrainDataDynShortNote(TrainDataBase):
 
         if (not y is None): 
             beat = np.max(y[:, 1:4], axis=1)
+            
+            long = np.max(y[:, 4:5], axis=1)
+            for i in range(1, len(long)):
+                if long[i-1] == 0 and long[i] > 0:
+                    beat[i] = 1
+
             y = SamplesToSoftmax(beat)
             print('y shape', y.shape, 'y sample count', len(y), 'y sum', np.sum(y, axis=0))
 
@@ -293,44 +298,77 @@ class TrainDataDynShortNote(TrainDataBase):
             print('numbatch', self.numBatches) 
 
     def GetModelPathName():
-        return 'd:/work/model_shortnote.ckpt'
+        return 'd:/work/model_shortnote_singing.ckpt'
 
     def RawDataFileName(song):
         path = MakeMp3Dir(song)
-        return path + 'evaluate_data_short.raw'    
+        return path + 'evaluate_data_short_singing.raw'
     
-    def GenerateLevel(predicts, pathname):     
+    def GenerateLevel(predicts, pathname):      
                        
         pre = predicts[:, 1]
-        pre = postprocess.PurifyInstanceSample(pre)
-        picked = postprocess.PickInstanceSample(pre)
+        # pre = postprocess.PurifyInstanceSample(pre)
+        # picked = postprocess.PickInstanceSample(pre)
 
-        sam = np.zeros_like(pre)
-        sam[picked] = 1
+        # sam = np.zeros_like(pre)
+        # sam[picked] = 1
         
-        notes = postprocess.TrainDataToLevelData(sam, 10, 0.8, 0)
+        notes = postprocess.TrainDataToLevelData(pre, 10, 0.90, 0)
         notes = np.asarray(notes)
         notes[0]
 
         notes = notes[:,0]
-        LevelInfo.SaveInstantValue(notes, pathname, '_inst')
+        LevelInfo.SaveInstantValue(notes, pathname, '_inst_singing')
 
-        return
 
-        predicts = postprocess.pick(evaluate, kernelSize=11)
-        print('predicts', predicts.shape)
 
-        # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
+class TrainDataDynShortNoteBeat(TrainDataBase):
+    lableDim = 2
+    def __init__(self, batchSize, numSteps, x, y=None):
+        assert x.ndim == 2
+        self.batchSize = batchSize
+        self.numSteps = numSteps
 
-        predicts = predicts[:,1]
+        count = x.shape[0]
 
-        notes = postprocess.TrainDataToLevelData(predicts, 10, acceptThrehold, 0)
-        print('gen notes number', len(notes))
-        notes = notes[:,0]
-        LevelInfo.SaveInstantValue(notes, pathname, '_inst')
+        if (not y is None): 
+            beat = np.max(y[:, 1:4], axis=1)
+            
+            long = np.max(y[:, 4:5], axis=1)
+            for i in range(1, len(long)):
+                if long[i-1] == 0 and long[i] > 0:
+                    beat[i] = 1
 
-        # LevelInfo.SaveInstantValue(notes, pathname, '_region')
+            y = SamplesToSoftmax(beat)
+            print('y shape', y.shape, 'y sample count', len(y), 'y sum', np.sum(y, axis=0))
+
+            self.BuildBatch(x, y)
+        else:
+            self._y = [None] * count
+
+            x = x[:-(count%numSteps)]
+            x = x.reshape(-1, 1, numSteps, inputDim)
+            self._x = np.repeat(x, batchSize, axis=1)
+            print('x shape', self._x.shape)
+
+            self.numBatches = len(x)
+            print('numbatch', self.numBatches) 
+
+    def GetModelPathName():
+        return 'd:/work/model_shortnote_beat.ckpt'
+
+    def RawDataFileName(song):
+        path = MakeMp3Dir(song)
+        return path + 'evaluate_data_short_beat.raw'
     
+    def GenerateLevel(predicts, pathname):     
+                       
+        short = predicts[:, 1]
+        short = postprocess.PickInstanceSample(short, count=400)
+        notes = postprocess.TrainDataToLevelData(short, 10, 0.1, 0)
+
+        notes = notes[:,0]
+        LevelInfo.SaveInstantValue(notes, pathname, '_inst_beat')
 
 
 ###
@@ -392,103 +430,8 @@ class TrainDataDynLongNote(TrainDataBase):
 
         # LevelInfo.SaveInstantValue(notes, pathname, '_region')
 
-    
 
-###
-# TrainDataCombineNote
-###
-class TrainDataCombineNote(TrainDataBase):
-    lableDim = 3
-
-    def __init__(self, batchSize, numSteps, x, y=None):
-        assert x.ndim == 2
-        self.batchSize = batchSize
-        self.numSteps = numSteps
-
-        count = x.shape[0]
-        if (not y is None):
-            # extract short note and slide note
-            beat = np.max(y[:, 1:4], axis=1)
-
-            with open('d:/raw_sample.raw', 'wb') as file:
-                pickle.dump(beat, file)
-                print('raw file saved')
-            postprocess.SampleDistribute(beat)
-
-            beat = beat[:, np.newaxis]
-
-            y = np.hstack((beat, y[:, 4:5]))
-
-            y = SamplesToSoftmax(y)
-            print('y sample count', len(y), 'y sum', np.sum(y, axis=0))
-
-            # normalize multi-sample
-            s = np.sum(y, axis=1)
-            s = s[:, np.newaxis]
-            y = y / s
-
-            # a = np.sum(y, axis=0)
-            # print('y', y.shape, a)
-            self.BuildBatch(x, y)
-
-        else:
-            self._y = [None] * count
-
-            x = x[:-(count%numSteps)]
-            x = x.reshape(-1, 1, numSteps, inputDim)
-            self._x = np.repeat(x, batchSize, axis=1)
-            print('x shape', self._x.shape)
-
-            self.numBatches = len(x)
-            print('numbatch', self.numBatches) 
-
-
-    def GetModelPathName():
-        return 'd:/work/model_combine.ckpt'
-
-    def RawDataFileName():
-        return 'd:/work/evaluate_data_combine.raw'
-
-    
-    def GenerateLevel(predicts, pathname):      
-                
-        # #for long note
-        # print('evaluate shape', evaluate.shape)
-        # predicts = evaluate[:,1] > acceptThrehold
-        # LevelInfo.SaveSamplesToRegionFile(predicts, pathname, '_region')
-        # return
-
-        # predicts = postprocess.pick(evaluate, kernelSize=11)
-        print('predicts', predicts.shape)
-
-        # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
-                
-        acceptThrehold = 0.95
-        pred = predicts[:,1]
-        notes = postprocess.TrainDataToLevelData(pred, 10, acceptThrehold, 0)
-        print('gen notes number', len(notes))
-        notes = notes[:,0]
-        LevelInfo.SaveInstantValue(notes, pathname, '_inst')
-
-        plt.plot(pred, '.')
-
-        acceptThrehold = 0.6
-        pred = predicts[:,2]
-        notes = postprocess.TrainDataToLevelData(pred, 10, acceptThrehold, 0)
-        print('gen notes number', len(notes))
-        notes = notes[:,0]
-        LevelInfo.SaveInstantValue(notes, pathname, '_region')
-
-        plt.plot(pred, '.-')
-        plt.show()
-
-
-TrainData = TrainDataCombineNote
-TrainData = TrainDataDynLongNote
-TrainData = TrainDataDynShortNote
-
-
-def BuildDynamicRnn(X, Y, seqlen, learningRate):
+def BuildDynamicRnn(X, Y, seqlen, learningRate, TrainData):
     result = {}
 
     weights = tf.Variable(tf.random_normal(shape=[2*numHidden, TrainData.lableDim]))
@@ -554,47 +497,15 @@ def BuildDynamicRnn(X, Y, seqlen, learningRate):
     return result
 
    
-def SaveModel(sess, saveMeta = False):
+def SaveModel(sess, filename, saveMeta = False):
     saver = tf.train.Saver()
-    saver.save(sess, TrainData.GetModelPathName(), write_meta_graph=saveMeta)
+    saver.save(sess, filename, write_meta_graph=saveMeta)
     print('model saved')
 
 
-# @run
-def GenerateLevel():
-
-    print('gen level')
-
-    song = ['PleaseDontGo']
-    song = ['jilejingtu']
-    song = ['aLIEz']
-    song = ['bboombboom']
-    song = ['dainiqulvxing']
-    song = ['xiagelukoujian']
-    song = ['CheapThrills']
-    song = ['foxishaonv']
-    song = ['1987wbzhyjn']
-    song = ['mrq']
-    song = ['ribuluo']
-
-    rawFile = TrainData.RawDataFileName(song[0])
+def EvaluateWithModel(modelFile, song, rawFile, TrainData):
+    # 加载训练好的模型，将结果保存到二进制文件
     
-    # postprocess.ProcessSampleToIdolLevel(song[0])
-    # return
-
-    pathname = MakeMp3Pathname(song[0])
-
-    useRawFile = False
-    if useRawFile:
-        print('load raw file')
-        with open(rawFile, 'rb') as file:
-            predicts = pickle.load(file)
-
-        TrainData.GenerateLevel(predicts, pathname)
-
-        return
-    
-    modelFile = TrainData.GetModelPathName()
     graphFile = modelFile + '.meta'
     saver = tf.train.import_meta_graph(graphFile)
 
@@ -622,14 +533,66 @@ def GenerateLevel():
         predicts = np.stack(evaluate).reshape(-1, TrainData.lableDim)
 
         with open(rawFile, 'wb') as file:
-
             pickle.dump(predicts, file)
             print('raw file saved', predicts.shape)
 
+    return predicts
+
+
+@run
+def GenerateLevel():
+    print('gen level')
+
+    song = ['PleaseDontGo']
+    song = ['jilejingtu']
+    song = ['aLIEz']
+    song = ['bboombboom']
+    song = ['1987wbzhyjn']
+    song = ['mrq']
+    song = ['ribuluo']
+    song = ['xiagelukoujian']
+    song = ['CheapThrills']
+    song = ['dainiqulvxing']
+    song = ['foxishaonv']
+
+    # postprocess.ProcessSampleToIdolLevel(song[0])
+    # return
+
+    pathname = MakeMp3Pathname(song[0])
+    
+    print(pathname)
+    if True:
+        # gen raw data
+
+        # TrainData = TrainDataDynLongNote
+        # rawFile = TrainData.RawDataFileName(song[0])
+        # modelFile = TrainData.GetModelPathName()
+        # predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)   
+
         # TrainData.GenerateLevel(predicts, pathname)
+        
+        TrainData = TrainDataDynShortNoteBeat
+        rawFile = TrainData.RawDataFileName(song[0])
+        modelFile = TrainData.GetModelPathName()
+        predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)   
+
+        TrainData.GenerateLevel(predicts, pathname)
+
+        # print('calc bpm')
+        # DownbeatTracking.CalcMusicInfoFromFile(pathname)
+    else:
+        levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
+        duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
+        
+        rawFileLong = TrainDataDynLongNote.RawDataFileName(song[0])
+        rawFileShort = TrainDataDynShortNoteBeat.RawDataFileName(song[0])
+        levelNotes = postprocess.ProcessSampleToIdolLevel(rawFileLong, rawFileShort)
+
+        LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
+
+    
     
 
-# @run
 def LoadRawData(useSoftmax = True):
     
     songList = ['hangengxman']
@@ -671,7 +634,10 @@ def LoadRawData(useSoftmax = True):
 
 # @run
 def _Main():    
-    testx, testy = PrepareTrainData(songList, batchSize)
+    # testx, testy = PrepareTrainData(songList, batchSize)
+    TrainData = TrainDataDynLongNote
+
+    testx, testy = PrepareTrainDataFromPack()
     
     data = TrainData(batchSize, numSteps, testx, testy)
     numBatches = data.numBatches
@@ -681,7 +647,7 @@ def _Main():
     Y = tf.placeholder(dtype=tf.float32, shape=(batchSize, numSteps, TrainData.lableDim), name='Y')
     learningRate = tf.placeholder(dtype=tf.float32, name='learn_rate')
 
-    result = BuildDynamicRnn(X, Y, seqlenHolder, learningRate)
+    result = BuildDynamicRnn(X, Y, seqlenHolder, learningRate, TrainData)
 
     maxAcc = 0.0
     notIncreaseCount = 0
@@ -691,7 +657,7 @@ def _Main():
     with tf.Session() as sess:
         # Run the initializer
         sess.run(tf.global_variables_initializer())
-        SaveModel(sess, saveMeta=True)
+        SaveModel(sess, TrainData.GetModelPathName(), saveMeta=True)
 
         for j in range(epch):
             loss = []
@@ -718,7 +684,7 @@ def _Main():
                 notIncreaseCount = 0
                 # save checkpoint
                 print('save checkpoint')
-                SaveModel(sess)
+                SaveModel(sess, TrainData.GetModelPathName())
             
             if notIncreaseCount > 10:
                 print('stop learning')
@@ -739,7 +705,7 @@ def _Main():
             data.ShuffleBatch()
 
 # @run
-def SaveShortNoteFile(pathname):
+def SaveShortNoteFile(pathname=r'd:\librosa\RhythmMaster\breakfree\breakfree_4k_nm.imd'):
     # 读取节奏大师关卡，生成文件
     duration = LevelInfo.ReadRhythmMasterLevelTime(pathname)
 
@@ -747,14 +713,21 @@ def SaveShortNoteFile(pathname):
 
     numSample = duration // 10
 
-    targetData = ConvertLevelToLables(level, numSample)
-    
+    targetData = ConvertLevelToLables(level, numSample)    
     beat = np.max(targetData[:, 1:4], axis=1)
+
+    # beat[:] = 0
+    long = np.max(targetData[:, 4:5], axis=1)
+    for i in range(1, len(long)):
+        if long[i-1] == 0 and long[i] > 0:
+            beat[i] = 1
     
     note = postprocess.TrainDataToLevelData(beat, 10, 0.1)
     note = note[:,0]
     print('note count', len(note))
     LevelInfo.SaveInstantValue(note, pathname, '_origshort')
+    # LevelInfo.SaveInstantValue(note, pathname, '_origlong')
+
 
 # @run
 def GenShortNoteFromRhythmLevel():
@@ -791,10 +764,11 @@ def ReadTrainningRegion(file):
     
     return regions
         
-@run
+# @run
 def LoadMarkedTrainningLable():
-    path = 'D:/librosa/MusicLevelAutoGen/train'
+    # 加载标记信息
     path = '/Users/xuchao/Documents/python/MusicLevelAutoGen/train'
+    path = 'D:/librosa/MusicLevelAutoGen/train'
     filelist = os.listdir(path)
     lables = ([], [])
     lableDuration = [0, 0]
@@ -820,8 +794,60 @@ def LoadMarkedTrainningLable():
     print(lableDuration[0])
     print(lableDuration[1])
 
+    return lables
 
-    # return singingLables, beatLables
+# featureFile = r'D:\librosa\MusicLevelAutoGen\train\beat_train_feature.raw'
+featureFile = r'D:\librosa\MusicLevelAutoGen\train\singing_train_feature.raw'
+
+# @run
+def LoadAllTrainningLable():
+    # 加载所有的标记段落，保守数据到二进制文件
+    metaData = LoadMarkedTrainningLable()
+    metaData = metaData[0]
+
+    print('labled song', len(metaData))
+
+    featureData = []
+    lableData = []
+    index = 0
+    for song, _, regions in metaData:
+        print('load', index, song)
+        index += 1
+        pathname = MakeMp3Pathname(song)
+        features = myprocesser.LoadAndProcessAudio(pathname)
+        numSample = len(features)
+        
+        pathname = MakeLevelPathname(song, difficulty=1)
+        print(pathname)
+        level = LevelInfo.LoadRhythmMasterLevel(pathname)
+        lable = ConvertLevelToLables(level, numSample)
+
+        for start, length in regions:
+            start = int(start // 10)
+            length = int(length // 10)
+            featureData.append(features[start:start+length])
+            lableData.append(lable[start:start+length])
+        
+    featureData = np.vstack(featureData)
+    lableData = np.vstack(lableData)
+    print('featureData', featureData.shape, 'lableData', lableData.shape)
+
+    with open(featureFile, 'wb') as file:
+        pickle.dump(featureData, file)
+        pickle.dump(lableData, file)
+        print('raw file saved', featureData.shape)
+
+
+def PrepareTrainDataFromPack():
+    
+    with open(featureFile, 'rb') as file:
+        xdata = pickle.load(file)
+        ydata = pickle.load(file)
+        print(xdata.shape, ydata.shape)
+    
+    return xdata, ydata
+
+    
 
 if __name__ == '__main__':
     

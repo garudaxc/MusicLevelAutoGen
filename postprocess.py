@@ -118,15 +118,19 @@ def ConvertIntermediaNoteToLevelNote(notes):
     return result
     
 
-def PickInstanceSample(short, count=300):
+def PickInstanceSample(short, count=500):
     '''
-    从大到小选取sample，并消去临近的sample
+    根据阈值选取音符，迭代并调整阈值
     '''
+    threhold = 0.9
+    index = (short > threhold).nonzero()[0]
+    while len(index) * 0.8 > count:
+        threhold += 0.01
+        index = (short > threhold).nonzero()[0]
+        # print(threhold, len(index))
 
-    sortarg = np.argsort(short)[-count:]
-    newSample = np.zeros_like(short)
-    
-    newSample[sortarg] = short[sortarg]
+    newSample = np.zeros_like(short)    
+    newSample[index] = short[index]
     
     maxDis = 3
     index = newSample.nonzero()[0]
@@ -316,9 +320,8 @@ def MutateSamples(short, long):
     DoubleSlide = 4
     DoubleShort = 3
     Slide = 2
-    doubleRate = 0.15
     doubleRate = 0.0
-    param = [('doubleSlide', 0.01, 4), ('doubleRate', 0.02, 3), ('slideRate', 0.05, 2)]
+    param = [('doubleSlide', 0.0, 4), ('doubleRate', 0.0, 3), ('slideRate', 0.0, 2)]
     # param = [('doubleSlide', 0.0, 4), ('doubleRate', 0.0, 3), ('slideRate', 0.0, 2)]
     
     longBinay = long > 0
@@ -365,10 +368,15 @@ def MutateSamples(short, long):
             
             s = short[i:end].nonzero()[0]+i
             if len(s) > 0:
-                #combine note
-                cnotes = TransferCombineNote(i, end, s, SideLeft)
-                # print('combine note', cnotes)   
-                notes.append((i, LevelInfo.combineNode, cnotes, SideLeft))
+                # 暂时注掉组合音符
+                # #combine note
+                # cnotes = TransferCombineNote(i, end, s, SideLeft)
+                # # print('combine note', cnotes)   
+                # notes.append((i, LevelInfo.combineNode, cnotes, SideLeft))
+            
+                notes.append((i, LevelInfo.longNote, end-i, SideLeft))
+                for p in s:                    
+                    notes.append((p, LevelInfo.shortNote, 0, SideRight))
             else:
                 #long note
                 notes.append((i, LevelInfo.longNote, end-i, SideLeft))
@@ -536,30 +544,24 @@ def MakeMp3Dir(song):
         assert False
     return pathname
 
-def ProcessSampleToIdolLevel(songname):
 
-    pathname = 'd:/librosa/RhythmMaster/%s/%s.mp3' % (songname, songname)
-    levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (songname)
+def ProcessSampleToIdolLevel(rawFileLong, rawFileShort):
 
     np.random.seed(0)
 
     print('load raw file')
-    path = MakeMp3Dir(song)
-    rawfile = path + 'evaluate_data_long.raw'    
-    with open(rawfile, 'rb') as file:
+    with open(rawFileLong, 'rb') as file:
         predicts = pickle.load(file)
 
     pre = predicts[:, 1]
     long = BilateralFilter(pre, ratio=0.85)
     long = EliminateShortSamples(long)
     
-    path = MakeMp3Dir(song)
-    rawfile = path + 'evaluate_data_short.raw'
-    with open(rawfile, 'rb') as file:
+    with open(rawFileShort, 'rb') as file:
         predicts = pickle.load(file)
 
     short = predicts[:, 1]
-    short = PickInstanceSample(short)
+    short = PickInstanceSample(short, count=400)
     
     long = AlignNotePosition(short, long)
 
@@ -568,9 +570,8 @@ def ProcessSampleToIdolLevel(songname):
     notes = MutateSamples(short, long) 
     levelNotes = ConvertIntermediaNoteToLevelNote(notes)
 
-    duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
+    return levelNotes
 
-    LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
 
 
 
@@ -578,9 +579,6 @@ def Run():
 
     pathname = 'd:\librosa\RhythmMaster\dainiqulvxing\dainiqulvxing.mp3'
 
-    a = os.path.split(pathname)[1]
-    a = os.path.splitext(a)
-    print(a)
 
     if False:    
         print('load raw file')
@@ -612,73 +610,35 @@ def Run():
         # SaveInstantValue(notes, pathname, '_region')        
 
 
-def TestShortNote():
-    # 从大到小筛选短音符
-    
-    songname = 'mrq'
-    songname = 'ribuluo'
-
-    pathname = 'd:/librosa/RhythmMaster/%s/%s.mp3' % (songname, songname)
-    levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (songname)
-
-    np.random.seed(0)
-
-    rawFile = 'd:/librosa/RhythmMaster/%s/evaluate_data_short.raw' % (songname)
-    with open(rawFile, 'rb') as file:
-        predicts = pickle.load(file)
-        print('raw file loaded', predicts.shape)
-
-    short = predicts[:, 1]
-    sortarg = np.argsort(short)[-240:]
-    newSample = np.zeros_like(short)
-    
-    newSample[sortarg] = short[sortarg]
-
-    maxDis = 3
-    index = newSample.nonzero()[0]
-    dis = index[1:] - index[0:-1]
-    closeIndex = (dis<maxDis).nonzero()[0]
-    index = index[closeIndex]
-    index = index[:, np.newaxis]
-
-    index = np.hstack((index, index+1, index+2))
-    value = newSample[np.reshape(index, -1)].reshape((-1, maxDis))
-    maxValueIndex = np.argmax(value, axis=1)
-
-    selectIndex = index[range(index.shape[0]), maxValueIndex]
-    selectValue = newSample[selectIndex]
-    newSample[np.reshape(index, -1)] = 0
-    newSample[selectIndex] = selectValue
-    
-    note = TrainDataToLevelData(newSample, 10, 0.01)
-    note = note[:,0]
-    print('note count', len(note))
-    SaveInstantValue(note, pathname, '_short')
-
-
 def TestShortNote2():
     #使用阈值筛选短音符
     
     songname = 'mrq'
     songname = 'ribuluo'
+    songname = 'CheapThrills'
+    songname = 'dainiqulvxing'
 
     pathname = 'd:/librosa/RhythmMaster/%s/%s.mp3' % (songname, songname)
-    levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (songname)
 
     np.random.seed(0)
 
-    rawFile = 'd:/librosa/RhythmMaster/%s/evaluate_data_short.raw' % (songname)
+    rawFile = 'd:/librosa/RhythmMaster/%s/evaluate_data_short_singing.raw' % (songname)
+    rawFile = 'd:/librosa/RhythmMaster/%s/evaluate_data_short_beat.raw' % (songname)
+
     with open(rawFile, 'rb') as file:
         predicts = pickle.load(file)
         print('raw file loaded', predicts.shape)
 
     short = predicts[:, 1]
-    
-    note = TrainDataToLevelData(short, 10, 0.93)
+    short = PickInstanceSample(short)
+        
+    note = TrainDataToLevelData(short, 10, 0.1)
     note = note[:,0]
     print('note count', len(note))
-    SaveInstantValue(note, pathname, '_shortThre')
+    # SaveInstantValue(note, pathname, '_inst_singing')
+    SaveInstantValue(note, pathname, '_inst_beat')
 
+    
 
 if __name__ == '__main__':
 
