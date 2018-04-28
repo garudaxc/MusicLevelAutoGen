@@ -561,26 +561,29 @@ def GenerateLevel():
     pathname = MakeMp3Pathname(song[0])
     
     print(pathname)
-    if True:
+    if False:
         # gen raw data
 
         # TrainData = TrainDataDynLongNote
         # rawFile = TrainData.RawDataFileName(song[0])
         # modelFile = TrainData.GetModelPathName()
         # predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)   
+        # print('predicts shape', predicts.shape)
 
         # TrainData.GenerateLevel(predicts, pathname)
         
-        TrainData = TrainDataDynShortNoteBeat
-        rawFile = TrainData.RawDataFileName(song[0])
-        modelFile = TrainData.GetModelPathName()
-        predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)   
+        # TrainData = TrainDataDynShortNoteBeat
+        # rawFile = TrainData.RawDataFileName(song[0])
+        # modelFile = TrainData.GetModelPathName()
+        # predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)  
+        # print('predicts shape', predicts.shape) 
 
-        TrainData.GenerateLevel(predicts, pathname)
+        # TrainData.GenerateLevel(predicts, pathname)
 
-        # print('calc bpm')
-        # DownbeatTracking.CalcMusicInfoFromFile(pathname)
-    else:
+        print('calc bpm')
+        DownbeatTracking.CalcMusicInfoFromFile(pathname)
+
+    if False:
         levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
         duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
         
@@ -590,6 +593,19 @@ def GenerateLevel():
 
         LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
 
+    if True:
+        levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
+        duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
+
+        # postprocess.SaveDownbeat(bpm, et/1000.0, duration/1000.0, pathname)
+        # return
+        
+        rawFileLong = TrainDataDynLongNote.RawDataFileName(song[0])
+        short = DownbeatTracking.PickOnsetFromFile(pathname, count=350)
+
+        levelNotes = postprocess.ProcessSampleToIdolLevel2(rawFileLong, short)
+
+        LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
     
     
 

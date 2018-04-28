@@ -10,6 +10,7 @@ import logger
 import calc_bpm
 import matplotlib.pyplot as plt
 import librosa
+import pickle
 
 
 FPS = 100
@@ -232,12 +233,14 @@ def CalcMusicInfoFromFile(filename):
     y, sr = librosa.load(filename, mono=True, sr=44100)
     logger.info('loaded')
     duration = librosa.get_duration(y=y, sr=sr)
+    print('duration', duration)
 
     processer = madmom.features.downbeats.RNNDownBeatProcessor()
     downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda = 1000, fps=FPS)
     
     act = processer(y)
     beat = downbeatTracking(act)
+    print('fitst beat', beat[:2])
     firstBeat, lastBeat = normalizeInterval(beat)
 
     if firstBeat == -1:
@@ -452,18 +455,66 @@ def study():
     bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
     print('bpm', bpm, 'et', etAuto)
 
-def OnsetTest():
-    onsetPorc = madmom.features.onsets.CNNOnsetProcessor()
+def PickOnsetFromFile(filename, count=400):
     
-    filename = r'd:\librosa\RhythmMaster\4minuteshm\4minuteshm.mp3'
+    # filename = r'd:\librosa\RhythmMaster\foxishaonv\foxishaonv.mp3'
+    # filename = r'd:\librosa\RhythmMaster\CheapThrills\CheapThrills.mp3'
+    # filename = r'd:/librosa/RhythmMaster/dainiqulvxing/dainiqulvxing_aaa.mp3'
+    onsetPorc = madmom.features.onsets.CNNOnsetProcessor()
     samples = onsetPorc(filename)
 
-    picker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=0.99, smooth=0.0, fps=100)
-    onsettime = picker(samples)
-    print(len(onsettime))
-    # print(onsettime)
+    # print(type(samples), samples.shape, len(samples))
 
+    threhold = 0.9
+    dis_time = 0.1
+    while True:
+        picker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=threhold, smooth=0.0, 
+        pre_max=dis_time, post_max=dis_time, 
+        # pre_avg=0.4, post_avg=0.4,
+        fps=100)
+        onsettime = picker(samples)
+        # print(threhold, dis_time, len(onsettime))
+        if len(onsettime) < count:
+            break
+        # threhold += 0.0001
+        dis_time += 0.0001
+
+    print(threhold, len(onsettime))
     SaveInstantValue(onsettime, filename, '_onset')    
+
+    onsettime = onsettime * 100
+    onsettime = onsettime.astype(int)
+
+    short = np.zeros_like(samples)
+    short[onsettime] = 1
+
+    return short
+
+
+
+def PickOnset():
+
+    rawFile = r'd:\librosa\RhythmMaster\dainiqulvxing\evaluate_data_short_beat.raw'
+    print('load raw file')
+    with open(rawFile, 'rb') as file:
+        predicts = pickle.load(file)
+
+    samples = predicts[:, 1]
+
+    count = 450
+    threhold = 0.93
+    while True:
+        picker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=threhold, smooth=0.0, fps=100)
+        onsettime = picker(samples)
+        if len(onsettime) < count:
+            break
+        threhold += 0.001
+
+    print(threhold, len(onsettime))
+    
+    filename = r'd:/librosa/RhythmMaster/dainiqulvxing/dainiqulvxing.mp3'
+    SaveInstantValue(onsettime, filename, '_onset')
+    
 
 
 
@@ -471,7 +522,29 @@ def OnsetTest():
 if __name__ == '__main__':    
     # doMultiProcess(8)
     #test()
-    # OnsetTest()
-    CalcMusicInfo()
+    # PickOnsetFromFile(r'd:/librosa/RhythmMaster/dainiqulvxing/dainiqulvxing_aaa.mp3')
+    # PickOnset()
+    # CalcMusicInfoFromFile(r'd:/librosa/RhythmMaster/dainiqulvxing/dainiqulvxing_aaa.mp3')
+    # CalcMusicInfoFromFile(r'd:\librosa\RhythmMaster\foxishaonv\foxishaonv.mp3')
+
+
+    filename = r'd:\librosa\RhythmMaster\foxishaonv\foxishaonv.mp3'
+    filename = r'd:\librosa\RhythmMaster\foxishaonv\foxishaonv.m4a'
+    y, sr = librosa.load(filename, mono=True, sr=44100)
+
+    print(sr)
+    t0 = 1.915
+    t1 = 2.541
+    t0 = int(t0 * sr)
+    t1 = int(t1 * sr)
+
+    y = y[t0:t1]
+    maxi = np.argmax(y) + t0
+    print(maxi, maxi / float(44100))
+
+    logger.info('loaded')
+    duration = librosa.get_duration(y=y, sr=sr)
+    print('duration', duration)
+
 
 

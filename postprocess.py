@@ -219,7 +219,7 @@ def BilateralFilter(samples, ratio = 0.8):
 
     return result
 
-def EliminateShortSamples(long, threhold=200):
+def EliminateShortSamples(long, threhold=300):
     '''
     去掉过短的长音符
     threhold 单位毫秒
@@ -241,7 +241,9 @@ def AlignNotePosition(short, long, threhold=100):
     将挨得很近的长音符和短音符对齐到同一位置
     threhold 范围内的会对齐 单位毫秒
     '''
+    print('shape', short.shape, long.shape)
     assert short.shape == long.shape
+
     longBinay = long > 0
     edge = (longBinay[1:] != longBinay[:-1]).nonzero()[0] + 1
     newEdge = []
@@ -544,6 +546,11 @@ def MakeMp3Dir(song):
         assert False
     return pathname
 
+def SaveDownbeat(bpm, et, duration, filename):
+    downbeatInter = 240.0 / bpm
+    numBar = ((duration - et) // downbeatInter) + 1
+    downbeat = np.arange(numBar) * downbeatInter + et
+    SaveInstantValue(downbeat, filename, '_downbeat')
 
 def ProcessSampleToIdolLevel(rawFileLong, rawFileShort):
 
@@ -572,7 +579,30 @@ def ProcessSampleToIdolLevel(rawFileLong, rawFileShort):
 
     return levelNotes
 
+def ProcessSampleToIdolLevel2(rawFileLong, short):
+    # 
 
+    np.random.seed(0)
+
+    print('load raw file')
+    with open(rawFileLong, 'rb') as file:
+        predicts = pickle.load(file)
+
+    pre = predicts[:, 1]
+
+    short = short[:pre.shape[0]]
+
+    long = BilateralFilter(pre, ratio=0.9)
+    long = EliminateShortSamples(long)
+    
+    long = AlignNotePosition(short, long)
+
+    short = EliminateTooCloseSample(short, long)
+
+    notes = MutateSamples(short, long) 
+    levelNotes = ConvertIntermediaNoteToLevelNote(notes)
+
+    return levelNotes
 
 
 def Run():

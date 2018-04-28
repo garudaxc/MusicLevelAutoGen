@@ -28,3 +28,21 @@ def MakeLevelPathname(song, difficulty=2):
     diff = ['ez', 'nm', 'hd']
     pathname = '%s%s/%s_4k_%s.imd' % (path, song, song, diff[difficulty])
     return pathname   
+
+def CalcBPMManually(et, t1, bpm0):
+    bpm0 = float(bpm0)
+
+    barTime = 240000.0 / bpm0
+    bars = (t1 - et) / barTime
+    bars2 = int(bars + 0.5)
+    print('bars diff', abs(bars2-bars))
+
+    barTime = (t1-et) / float(bars2)
+    bpm = 240000.0 / barTime
+
+    print('new bpm', bpm)
+
+
+if __name__ == '__main__':
+    # CalcBPMManually(766, 182606, 128.0)
+    CalcBPMManually(762, 182605, 128.0)
