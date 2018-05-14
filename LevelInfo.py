@@ -6,11 +6,15 @@ import os
 import io
 import sys
 from struct import *
+import util
+rootDir = util.getRootDir()
 
 shortNote   = 0x00
 slideNote   = 0x01
 longNote    = 0x02
 combineNode = 0x03
+
+posCountPerBar = 32
 
 def parse_level_info(tree):
     #解析传统关卡中的bpm和et
@@ -442,6 +446,37 @@ def MakeActionListNode(startBar, danceLen, seqLen):
 
     return e
 
+def AdjustBarAndPos(bar, pos, minPosInterval, startBar = -1, startPos = -1):
+    adjustBar = bar
+    adjustPos = round(pos / minPosInterval) * minPosInterval
+    maxPos = posCountPerBar
+    if adjustPos >= maxPos:
+        adjustBar = adjustBar + 1
+        adjustPos = 0
+
+    return adjustBar, adjustPos
+
+
+def AlignNotesWithInterval(notes, minPosInterval):
+    alignedNotes = []
+    trackName = ('Left2', 'Left1', 'Right1', 'Right2')
+    # 对齐到最近的整拍、半拍
+    for note in notes:
+        bar, pos, type, value, track = note
+        if type == combineNode:
+            # todo
+            alignedNotes.append(note)
+        elif type == longNote:
+            adjustStartBar, adjustStartPos = AdjustBarAndPos(bar, pos, minPosInterval)
+            endBar, endPos = value
+            adjustEndBar, adjustEndPos = AdjustBarAndPos(endBar, endPos, minPosInterval, adjustStartBar, adjustStartPos)
+            alignedNotes.append((adjustStartBar, adjustStartPos, type, (adjustEndBar, adjustEndPos), track))
+        else:
+            adjustBar, adjustPos = AdjustBarAndPos(bar, pos, minPosInterval)
+            alignedNotes.append((adjustBar, adjustPos, type, value, track))
+    
+    return alignedNotes
+
 def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     '''
     保存到心动模式关卡文件
@@ -465,7 +500,7 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
         newNotes.append(r)
     notes = newNotes
 
-    text=open(r'D:\librosa\idol_template.xml', encoding='utf-8').read()
+    text=open(rootDir + 'data/idol_template.xml', encoding='utf-8').read()
     xmlparser = ElementTree.XMLParser(encoding='utf-8')
     tree = ElementTree.fromstring(text)
 
@@ -477,6 +512,8 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     enterBar = 4
     notes = [note for note in notes if note[0] > (enterBar-1) and note[0] < lastBar - 3]
     print('number of notes', len(notes))
+
+    notes = AlignNotesWithInterval(notes, 4)
 
     root = tree
     levelInfo = root.find('LevelInfo')

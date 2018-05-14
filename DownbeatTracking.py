@@ -204,12 +204,31 @@ def CalcAbnormal(beat, threhold = 0.02):
 
     return 0, len(beat)
 
+# 新版本移除了这个函数，暂时替换一下，考虑用新版本的函数
+def madmom_features_downbeats_filter_downbeats(beats):
+    """
+
+    Parameters
+    ----------
+    beats : numpy array, shape (num_beats, 2)
+        Array with beats and their position inside the bar as the second
+        column.
+
+    Returns
+    -------
+    downbeats : numpy array
+        Array with downbeat times.
+
+    """
+    # return only downbeats (timestamps)
+    return beats[beats[:, 1] == 1][:, 0]
+
 
 
 def CalcBPM(beat, firstBeat, lastBeat):
     firstBeatTime = beat[0, 0]
     newBeat = beat[firstBeat:lastBeat]
-    downbeat = madmom.features.downbeats.filter_downbeats(newBeat)
+    downbeat = madmom_features_downbeats_filter_downbeats(newBeat)
 
     barInter, et = calc_bpm.CalcBarInterval(downbeat)
 

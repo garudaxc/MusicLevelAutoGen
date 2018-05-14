@@ -10,7 +10,9 @@ import time
 import matplotlib.pyplot as plt
 import util
 import DownbeatTracking
+import shutil
 
+rootDir = util.getRootDir()
 
 runList = []
 def run(r):
@@ -140,7 +142,7 @@ def SamplesToSoftmax(samples):
 def GetSamplePath():
     path = '/Users/xuchao/Documents/rhythmMaster/'
     if os.name == 'nt':
-        path = 'D:/librosa/RhythmMaster/'
+        path = rootDir + 'rm/'
     return path
 
 def MakeMp3Pathname(song):
@@ -402,7 +404,7 @@ class TrainDataDynLongNote(TrainDataBase):
 
 
     def GetModelPathName():
-        return 'd:/work/model_longnote.ckpt'
+        return rootDir + 'model/model_longnote.ckpt'
 
     def RawDataFileName(song):
         path = MakeMp3Dir(song)
@@ -553,7 +555,12 @@ def GenerateLevel():
     song = ['xiagelukoujian']
     song = ['CheapThrills']
     song = ['dainiqulvxing']
-    song = ['foxishaonv']
+    # song = ['foxishaonv']
+    # song = ['dear my lady']
+    # song = ['tian kong zhi cheng']
+    # song = ['kanong']
+    # song = ['qinghuaci']
+    # song = ['zuichibi']]
 
     # postprocess.ProcessSampleToIdolLevel(song[0])
     # return
@@ -561,14 +568,14 @@ def GenerateLevel():
     pathname = MakeMp3Pathname(song[0])
     
     print(pathname)
-    if False:
+    if True:
         # gen raw data
 
-        # TrainData = TrainDataDynLongNote
-        # rawFile = TrainData.RawDataFileName(song[0])
-        # modelFile = TrainData.GetModelPathName()
-        # predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)   
-        # print('predicts shape', predicts.shape)
+        TrainData = TrainDataDynLongNote
+        rawFile = TrainData.RawDataFileName(song[0])
+        modelFile = TrainData.GetModelPathName()
+        predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)   
+        print('predicts shape', predicts.shape)
 
         # TrainData.GenerateLevel(predicts, pathname)
         
@@ -594,7 +601,9 @@ def GenerateLevel():
         LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
 
     if True:
-        levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
+        # levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
+        levelEditorRoot = rootDir + 'LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'
+        levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, song[0])
         duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
 
         # postprocess.SaveDownbeat(bpm, et/1000.0, duration/1000.0, pathname)
@@ -606,6 +615,10 @@ def GenerateLevel():
         levelNotes = postprocess.ProcessSampleToIdolLevel2(rawFileLong, short)
 
         LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
+
+        #levelAudioFilePath = '%sclient/Assets/resources/audio/bgm/%s.m4a' % (levelEditorRoot, song[0])
+        #if not os.path.exists(levelAudioFilePath):
+        #    os.system('ffmpeg -i %s %s' % (pathname, levelAudioFilePath))
     
     
 
@@ -648,7 +661,7 @@ def LoadRawData(useSoftmax = True):
         LevelInfo.SaveInstantValue(notes, pathname, '_predict')
 
 
-# @run
+#@run
 def _Main():    
     # testx, testy = PrepareTrainData(songList, batchSize)
     TrainData = TrainDataDynLongNote
@@ -785,6 +798,7 @@ def LoadMarkedTrainningLable():
     # 加载标记信息
     path = '/Users/xuchao/Documents/python/MusicLevelAutoGen/train'
     path = 'D:/librosa/MusicLevelAutoGen/train'
+    path = rootDir + 'MusicLevelAutoGen/train'
     filelist = os.listdir(path)
     lables = ([], [])
     lableDuration = [0, 0]
@@ -813,13 +827,14 @@ def LoadMarkedTrainningLable():
     return lables
 
 # featureFile = r'D:\librosa\MusicLevelAutoGen\train\beat_train_feature.raw'
-featureFile = r'D:\librosa\MusicLevelAutoGen\train\singing_train_feature.raw'
+# featureFile = r'D:\librosa\MusicLevelAutoGen\train\singing_train_feature.raw'
+featureFile = rootDir + 'data/singing_train_feature.raw'
 
 # @run
 def LoadAllTrainningLable():
     # 加载所有的标记段落，保守数据到二进制文件
     metaData = LoadMarkedTrainningLable()
-    metaData = metaData[0]
+    metaData = metaData[0] + metaData[1]
 
     print('labled song', len(metaData))
 

@@ -43,6 +43,9 @@ def CalcBPMManually(et, t1, bpm0):
     print('new bpm', bpm)
 
 
+def getRootDir():
+    return 'E:/work/dl/audio/proj/'
+
 if __name__ == '__main__':
     # CalcBPMManually(766, 182606, 128.0)
     CalcBPMManually(762, 182605, 128.0)
