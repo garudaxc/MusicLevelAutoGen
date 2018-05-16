@@ -248,7 +248,7 @@ def SaveDownbeat(bpm, et, lastBeat, filename):
     SaveInstantValue(downbeat, filename, '_downbeat')
 
 
-def CalcMusicInfoFromFile(filename):
+def CalcMusicInfoFromFile(filename, debugET = -1):
     y, sr = librosa.load(filename, mono=True, sr=44100)
     logger.info('loaded')
     duration = librosa.get_duration(y=y, sr=sr)
@@ -270,6 +270,10 @@ def CalcMusicInfoFromFile(filename):
     beatInter = 60.0 / bpm
 
     lastBeat = beat[-1, 0]
+    if (debugET >= 0):
+        print('force set et:', debugET)
+        etAuto = debugET / 1000
+
     print('bpm', bpm, 'et', etAuto)
 
     dir = os.path.dirname(filename) + os.path.sep
@@ -474,13 +478,16 @@ def study():
     bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
     print('bpm', bpm, 'et', etAuto)
 
-def PickOnsetFromFile(filename, count=400):
+def PickOnsetFromFile(filename, count=400, onsets = None):
     
     # filename = r'd:\librosa\RhythmMaster\foxishaonv\foxishaonv.mp3'
     # filename = r'd:\librosa\RhythmMaster\CheapThrills\CheapThrills.mp3'
     # filename = r'd:/librosa/RhythmMaster/dainiqulvxing/dainiqulvxing_aaa.mp3'
-    onsetPorc = madmom.features.onsets.CNNOnsetProcessor()
-    samples = onsetPorc(filename)
+    if onsets is None:
+        onsetPorc = madmom.features.onsets.CNNOnsetProcessor()
+        samples = onsetPorc(filename)
+    else:
+        samples = onsets
 
     # print(type(samples), samples.shape, len(samples))
 

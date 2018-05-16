@@ -357,7 +357,7 @@ class TrainDataDynShortNoteBeat(TrainDataBase):
             print('numbatch', self.numBatches) 
 
     def GetModelPathName():
-        return 'd:/work/model_shortnote_beat.ckpt'
+        return rootDir + 'model_shortnote_beat/model_shortnote_beat.ckpt'
 
     def RawDataFileName(song):
         path = MakeMp3Dir(song)
@@ -545,6 +545,7 @@ def EvaluateWithModel(modelFile, song, rawFile, TrainData):
 def GenerateLevel():
     print('gen level')
 
+    debugET = -1
     song = ['PleaseDontGo']
     song = ['jilejingtu']
     song = ['aLIEz']
@@ -562,45 +563,75 @@ def GenerateLevel():
     # song = ['qinghuaci']
     # song = ['zuichibi']]
 
+    # 
+    song = ['100580']
+    debugET = 100
+    song = ['ISI']
+    debugET = 15020
+    song = ['Luv Letter']
+    debugET = 29543
+    song = ['jianyunzhe']
+    debugET = 682
+    song = ['jinjuebianjingxian']
+    debugET = 6694
+    song = ['ouxiangwanwansui']
+    debugET = 571
+    song = ['shanghaihongchaguan']
+    debugET = 1353
+    song = ['xingzhixing']
+    debugET = 2360
+    song = ['yanghuadaqiao']
+    debugET = 170
+
     # postprocess.ProcessSampleToIdolLevel(song[0])
     # return
 
     pathname = MakeMp3Pathname(song[0])
-    
     print(pathname)
+
+    useOnsetForShort = True
     if True:
         # gen raw data
 
-        TrainData = TrainDataDynLongNote
-        rawFile = TrainData.RawDataFileName(song[0])
-        modelFile = TrainData.GetModelPathName()
-        predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)   
-        print('predicts shape', predicts.shape)
-
-        # TrainData.GenerateLevel(predicts, pathname)
-        
-        # TrainData = TrainDataDynShortNoteBeat
+        # TrainData = TrainDataDynLongNote
         # rawFile = TrainData.RawDataFileName(song[0])
         # modelFile = TrainData.GetModelPathName()
-        # predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)  
-        # print('predicts shape', predicts.shape) 
+        # predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)   
+        # print('predicts shape', predicts.shape)
+
+        # TrainData.GenerateLevel(predicts, pathname)
+
+        # if not useOnsetForShort:
+        #     TrainData = TrainDataDynShortNoteBeat
+        #     rawFile = TrainData.RawDataFileName(song[0])
+        #     modelFile = TrainData.GetModelPathName()
+        #     predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)  
+        #     print('predicts shape', predicts.shape) 
 
         # TrainData.GenerateLevel(predicts, pathname)
 
         print('calc bpm')
-        DownbeatTracking.CalcMusicInfoFromFile(pathname)
+        # DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET)
 
-    if False:
-        levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
+    if not useOnsetForShort:
+        # levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
+        levelEditorRoot = rootDir + 'LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'
+        levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, song[0])
         duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
         
         rawFileLong = TrainDataDynLongNote.RawDataFileName(song[0])
         rawFileShort = TrainDataDynShortNoteBeat.RawDataFileName(song[0])
-        levelNotes = postprocess.ProcessSampleToIdolLevel(rawFileLong, rawFileShort)
+        #levelNotes = postprocess.ProcessSampleToIdolLevel(rawFileLong, rawFileShort)
+        with open(rawFileShort, 'rb') as file:
+            predicts = pickle.load(file)
+
+        short = predicts[:, 1]
+        short = DownbeatTracking.PickOnsetFromFile(pathname, count=350, onsets=short)
+        levelNotes = postprocess.ProcessSampleToIdolLevel2(rawFileLong, short)
 
         LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
 
-    if True:
+    if useOnsetForShort:
         # levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
         levelEditorRoot = rootDir + 'LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'
         levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, song[0])
@@ -615,11 +646,6 @@ def GenerateLevel():
         levelNotes = postprocess.ProcessSampleToIdolLevel2(rawFileLong, short)
 
         LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
-
-        #levelAudioFilePath = '%sclient/Assets/resources/audio/bgm/%s.m4a' % (levelEditorRoot, song[0])
-        #if not os.path.exists(levelAudioFilePath):
-        #    os.system('ffmpeg -i %s %s' % (pathname, levelAudioFilePath))
-    
     
 
 def LoadRawData(useSoftmax = True):
@@ -661,10 +687,11 @@ def LoadRawData(useSoftmax = True):
         LevelInfo.SaveInstantValue(notes, pathname, '_predict')
 
 
-#@run
+# @run
 def _Main():    
     # testx, testy = PrepareTrainData(songList, batchSize)
     TrainData = TrainDataDynLongNote
+    # TrainData = TrainDataDynShortNoteBeat
 
     testx, testy = PrepareTrainDataFromPack()
     

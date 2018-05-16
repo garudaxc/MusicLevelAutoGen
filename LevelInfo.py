@@ -14,7 +14,9 @@ slideNote   = 0x01
 longNote    = 0x02
 combineNode = 0x03
 
-posCountPerBar = 32
+posCountPerBeat = 8
+beatPerBar = 4
+posCountPerBar = posCountPerBeat * beatPerBar
 
 def parse_level_info(tree):
     #解析传统关卡中的bpm和et
@@ -446,8 +448,12 @@ def MakeActionListNode(startBar, danceLen, seqLen):
 
     return e
 
-def AdjustBarAndPos(bar, pos, minPosInterval, startBar = -1, startPos = -1):
-    adjustBar = bar
+def CalcNotePos(bar, pos):
+    return bar * posCountPerBar + pos
+
+def AdjustBarAndPos(bar, pos, maxNotePerBeat):
+    adjustBar = round(bar)
+    minPosInterval = posCountPerBeat // maxNotePerBeat
     adjustPos = round(pos / minPosInterval) * minPosInterval
     maxPos = posCountPerBar
     if adjustPos >= maxPos:
@@ -456,25 +462,145 @@ def AdjustBarAndPos(bar, pos, minPosInterval, startBar = -1, startPos = -1):
 
     return adjustBar, adjustPos
 
+def AlignShortNote(note, maxNotePerBeat):
+    bar, pos, type, value, track = note
+    adjustBar, adjustPos = AdjustBarAndPos(bar, pos, maxNotePerBeat)
+    newNote = adjustBar, adjustPos, type, value, track
+    start = CalcNotePos(adjustBar, adjustPos)
+    return newNote, [(track, start, start)]
 
-def AlignNotesWithInterval(notes, minPosInterval):
-    alignedNotes = []
-    trackName = ('Left2', 'Left1', 'Right1', 'Right2')
-    # 对齐到最近的整拍、半拍
-    for note in notes:
-        bar, pos, type, value, track = note
-        if type == combineNode:
-            # todo
-            alignedNotes.append(note)
-        elif type == longNote:
-            adjustStartBar, adjustStartPos = AdjustBarAndPos(bar, pos, minPosInterval)
-            endBar, endPos = value
-            adjustEndBar, adjustEndPos = AdjustBarAndPos(endBar, endPos, minPosInterval, adjustStartBar, adjustStartPos)
-            alignedNotes.append((adjustStartBar, adjustStartPos, type, (adjustEndBar, adjustEndPos), track))
+def AlignSlideNote(note, maxNotePerBeat):
+    bar, pos, type, value, track = note
+    adjustBar, adjustPos = AdjustBarAndPos(bar, pos, maxNotePerBeat)
+    newNote = adjustBar, adjustPos, type, value, track
+    start = CalcNotePos(adjustBar, adjustPos)
+
+    trackInfo = []
+    target = CorrespondingTrack(track)
+    step = 1
+    if target < track:
+        step = -1
+    for i in range(track, target, step):
+        trackInfo.append((i, start, start))
+
+    return newNote, trackInfo
+
+def AlignLongNote(note, maxNotePerBeat):
+    bar, pos, type, value, track = note
+    endBar, endPos = value
+    adjustStartBar, adjustStartPos = AdjustBarAndPos(bar, pos, maxNotePerBeat)
+    adjustEndBar, adjustEndPos = AdjustBarAndPos(endBar, endPos, maxNotePerBeat)
+    start = CalcNotePos(adjustStartBar, adjustStartPos)
+    end = CalcNotePos(adjustEndBar, adjustEndPos)
+    if start < end:
+        newNote = (adjustStartBar, adjustStartPos, type, (adjustEndBar, adjustEndPos), track)
+        trackInfo = [(track, start, end)]
+    else:
+        # 长音符如果调整后首位相接了，用短音符代替
+        print('start == end, adjust long to short. origin pos:', bar, pos, endBar, endPos)
+        newNote = (adjustStartBar, adjustStartPos, shortNote, 0, track)
+        trackInfo = [(track, start, start)]
+    return newNote, trackInfo
+
+def AlignCombineNote(note, maxNotePerBeat):
+    bar, pos, type, value, track = note
+    isFirst = True
+    isValid = True
+    lastPosIdx = 0
+    adjustSubNotes = []
+    trackInfos = []
+    combineStart = 0
+    combineEnd = 0
+    trackInfoDic = {}
+    for subNote in value:
+        subType = subNote[2]
+        if subType == longNote:
+            newNote, trackInfo = AlignLongNote(subNote, maxNotePerBeat)
+            if newNote[2] != longNote:
+                print('combine note adjust long note not vaild')
+                isValid = False
+                break
+        elif subType == slideNote:
+            newNote, trackInfo = AlignSlideNote(subNote, maxNotePerBeat)
         else:
-            adjustBar, adjustPos = AdjustBarAndPos(bar, pos, minPosInterval)
-            alignedNotes.append((adjustBar, adjustPos, type, value, track))
-    
+            print('combine note contain invaild note type: ', subType)
+            isValid = False
+            break
+
+        posIdx = CalcNotePos(newNote[0], newNote[1])
+        adjustSubNotes.append(newNote)
+        for info in trackInfo:
+            trackInfoDic[trackInfo[0]] = True
+        if isFirst:
+            lastPosIdx = posIdx
+            isFirst = False
+            combineStart = trackInfo[0][0]
+            combineEnd = trackInfo[0][1]
+            continue
+        if lastPosIdx < posIdx:
+            lastPosIdx = posIdx
+            combineEnd = trackInfo[0][1]
+            continue
+        print('combine node adjust not valid.')
+        isValid = False
+        break
+
+    newNote = None
+    if isValid and len(adjustSubNotes) > 0:
+        firstNote = adjustSubNotes[0]
+        newNote = (firstNote[0], firstNote[1], type, adjustSubNotes, track)
+        for key in trackInfoDic:
+            trackInfo.append((key, combineStart, combineEnd))
+
+    return newNote, trackInfo
+
+def updateTrackEndDic(trackEndDic, trackInfos):
+    for trackInfo in trackInfos:
+        track, start, end = trackInfo
+        if track not in trackEndDic.keys():
+            trackEndDic[track] = end
+        elif trackEndDic[track] < end:
+            trackEndDic[track] = end
+
+def isTrackInfoValid(trackEndDic, trackInfos):
+    isValid = True
+    for trackInfo in trackInfos:
+        track, start, end = trackInfo
+        if track not in trackEndDic.keys():
+            continue
+        if trackEndDic[track] >= start:
+            isValid = False
+            break
+
+    return isValid
+
+
+def AlignNotesWithBeat(notes, maxNotePerBeat):
+    '''
+    maxNotePerBeat 对齐音符，1为整拍，2为半拍，4为1/4拍...
+    '''
+    alignedNotes = []
+    trackEndDic = {}
+    for note in notes:
+        type = note[2]
+        if type == combineNode:
+            newNote, info = AlignCombineNote(note, maxNotePerBeat)
+        elif type == longNote:
+            newNote, info = AlignLongNote(note, maxNotePerBeat)
+        elif type == slideNote:
+            newNote, info = AlignSlideNote(note, maxNotePerBeat)
+        else:
+            newNote, info = AlignShortNote(note, maxNotePerBeat)
+
+        if newNote and isTrackInfoValid(trackEndDic, info):
+            updateTrackEndDic(trackEndDic, info)
+            alignedNotes.append(newNote)
+        else:
+            if newNote:
+                print('note conflict with other after align. Discard this note. type:', type)
+            else:
+                print('new note is none')
+
     return alignedNotes
 
 def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
@@ -513,7 +639,7 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     notes = [note for note in notes if note[0] > (enterBar-1) and note[0] < lastBar - 3]
     print('number of notes', len(notes))
 
-    notes = AlignNotesWithInterval(notes, 4)
+    notes = AlignNotesWithBeat(notes, 2)
 
     root = tree
     levelInfo = root.find('LevelInfo')
