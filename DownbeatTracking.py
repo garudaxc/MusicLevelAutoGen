@@ -478,7 +478,74 @@ def study():
     bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
     print('bpm', bpm, 'et', etAuto)
 
-def PickOnsetFromFile(filename, count=400, onsets = None):
+def keyFunc(a):
+    return a[1]
+
+def ChromaFeature(filename):
+
+    onsetPorc = madmom.features.onsets.CNNOnsetProcessor()
+    samples = onsetPorc(filename)
+
+    dcp = madmom.audio.chroma.DeepChromaProcessor()
+    chroma = dcp(filename)
+    outname = filename + '_chroma.csv'
+    short = []
+    onsettime = []
+    with open(outname, 'w') as file:
+        count = 2
+        lastIdx = [0] * count
+        frameIdx = 0
+        for obj in chroma:
+            line = ''
+            idx = 0
+            arr = []
+            for i in range(len(obj)):
+                arr.append((i, obj[i]))
+                obj[i] = 0
+            arr.sort(key = keyFunc, reverse = True)
+            curIdx = []
+            isChanged = False
+            for i in range(count):
+                obj[arr[i][0]] = 1.0 - i / count
+                curIdx.append(arr[i][0])
+                if arr[i][0] != lastIdx[i] and frameIdx > 0:
+                    isChanged = True
+            if isChanged:
+                onsettime.append(frameIdx * 1.0 / 10.0)
+            lastIdx = curIdx  
+            for v in obj:
+                line = line + str(v) + ','
+            line = line[:-1]
+            file.write(line + '\n')
+            frameIdx = frameIdx + 1
+    
+    SaveInstantValue(onsettime, filename, '_onset_ex')
+    onsettime = onsettime * 100
+    onsettime = np.array(onsettime)
+    onsettime = onsettime.astype(int)
+
+    short = np.zeros_like(samples)
+    short[onsettime] = 1
+    return short
+
+def CalcPreferenceBeatCount(bpm, duration):
+    minBpm = 90
+    maxBpm = 220
+    rate = (bpm - minBpm) / (maxBpm - minBpm)
+    rate = min(max(rate, 0.0), 1.0)
+    beatPerBar = 4
+    minNotePerBeat = 3 / beatPerBar
+    maxNotePerBeat = 6 / beatPerBar
+    beat = duration / 60000 * bpm
+    count = round((minNotePerBeat + rate * (maxNotePerBeat - minNotePerBeat)) * beat)
+    return count
+
+def SaveOnsetActivation(filepath, onsets):
+    with open(filepath, 'w') as file:
+        for val in onsets:
+            file.write(str(val) + '\n')
+
+def PickOnsetFromFile(filename, bpm, duration, onsets = None):
     
     # filename = r'd:\librosa\RhythmMaster\foxishaonv\foxishaonv.mp3'
     # filename = r'd:\librosa\RhythmMaster\CheapThrills\CheapThrills.mp3'
@@ -489,21 +556,27 @@ def PickOnsetFromFile(filename, count=400, onsets = None):
     else:
         samples = onsets
 
+    SaveOnsetActivation(filename + '_onset_activation.csv', samples)
+    count = CalcPreferenceBeatCount(bpm, duration)
+
     # print(type(samples), samples.shape, len(samples))
 
-    threhold = 0.9
+    threhold = 0.7
     dis_time = 0.1
     while True:
         picker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=threhold, smooth=0.0, 
         pre_max=dis_time, post_max=dis_time, 
-        # pre_avg=0.4, post_avg=0.4,
         fps=100)
         onsettime = picker(samples)
         # print(threhold, dis_time, len(onsettime))
         if len(onsettime) < count:
             break
         # threhold += 0.0001
+        if dis_time >= 60 / bpm:
+            print('dis time is more than one beat. break')
+            break
         dis_time += 0.0001
+        print('pick onset', len(onsettime), 'more than', count, '. continue with dis_time', dis_time)
 
     print(threhold, len(onsettime))
     SaveInstantValue(onsettime, filename, '_onset')    

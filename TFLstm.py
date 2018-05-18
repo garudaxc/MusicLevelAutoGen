@@ -589,6 +589,10 @@ def GenerateLevel():
     pathname = MakeMp3Pathname(song[0])
     print(pathname)
 
+
+    # DownbeatTracking.ChromaFeature(pathname)
+    # return
+
     useOnsetForShort = True
     if True:
         # gen raw data
@@ -626,7 +630,7 @@ def GenerateLevel():
             predicts = pickle.load(file)
 
         short = predicts[:, 1]
-        short = DownbeatTracking.PickOnsetFromFile(pathname, count=350, onsets=short)
+        short = DownbeatTracking.PickOnsetFromFile(pathname, bpm, duration, onsets=short)
         levelNotes = postprocess.ProcessSampleToIdolLevel2(rawFileLong, short)
 
         LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
@@ -641,7 +645,7 @@ def GenerateLevel():
         # return
         
         rawFileLong = TrainDataDynLongNote.RawDataFileName(song[0])
-        short = DownbeatTracking.PickOnsetFromFile(pathname, count=350)
+        short = DownbeatTracking.PickOnsetFromFile(pathname, bpm, duration)
 
         levelNotes = postprocess.ProcessSampleToIdolLevel2(rawFileLong, short)
 
