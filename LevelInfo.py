@@ -291,6 +291,18 @@ def SaveNote(notes, filename, postfix = ''):
                 file.write(s)
         print('done')
 
+def ReadVariableLengthQuantity(buffer, offset):
+    value = 0
+    while True:
+        # 按byte读取值，最高位不为1，需要读取下一个byte
+        r, offset = ReadAndOffset('>B', buffer, offset)
+        byteValue = r[0]
+        value = (value << 7) | (byteValue & 0x7f)
+        if (byteValue & 0x80) == 0:
+            break
+        
+    return value, offset
+
 def LoadMidi(filename):
     with open(filename, 'rb') as file:        
         data = file.read()
@@ -300,18 +312,100 @@ def LoadMidi(filename):
     if r[0].decode() != 'MThd':
         print(filename, 'is not midi file')
     
-    r, offset = ReadAndOffset('>i3H', data, offset)
+    r, offset = ReadAndOffset('>I3H', data, offset)
     filetype = r[1]
     numTrack = r[2]
-    tpq = r[3]
+    # x51的midi似乎只用了最高位为0的division情况
+    division = r[3]
+    print('track count:', numTrack)
+    midiNotes = []
+    microsecondsPerQuarterNote = 0
+    for i in range(numTrack):
+        print('parse track idx:', i)
+        # chunk type: MTrk string
+        r, offset = ReadAndOffset('4s', data, offset)
+        print(r)
+        assert r[0].decode() == 'MTrk'
 
-    #for i in range(numTrack):
-    r, offset = ReadAndOffset('4s', data, offset)
-    print(r)
-    assert r[0].decode() == 'MTrk'
-    r, offset = ReadAndOffset('>i', data, offset)
-    size = r[0]
-    print(size)
+        # length
+        r, offset = ReadAndOffset('>I', data, offset)
+        trackLength = r[0]
+        print('trackLength', trackLength)
+
+        if trackLength <= 0:
+            continue
+
+        # MTrk event
+        eventsStart = offset
+        isTrackEnd = False
+        notePitch = 0
+        noteStart = 0
+        noteEnd = 0
+        curTicks = 0
+        while (offset < eventsStart + trackLength) or (not isTrackEnd):
+            deltaTime, offset = ReadVariableLengthQuantity(data, offset)
+            curTicks += deltaTime 
+            r, offset = ReadAndOffset('>B', data, offset)
+            eventType = r[0]
+            if eventType == 0xF0 or eventType == 0xF7:
+                # sysex event
+                eventLength, offset = ReadVariableLengthQuantity(data, offset)
+                offset = offset + eventLength
+            elif eventType == 0xFF:
+                # meta-event
+                r, offset = ReadAndOffset('>B', data, offset)
+                metaType = r[0]
+                metaLength, offset = ReadVariableLengthQuantity(data, offset)
+                metaOffset = offset
+                if metaType == 0x2F:
+                    isTrackEnd = True
+                elif metaType == 0x51:
+                    r, suboffset = ReadAndOffset('>3B', data, offset)
+                    microsecondsPerQuarterNote = (r[0] << 16) | (r[1] << 8) | r[2]
+
+                offset += metaLength
+            else:
+                # MIDI event
+                if eventType < 0x80:
+                    print('warning: eventType less than 0x80..............')
+                    continue
+
+                mainType = eventType & 0xF0
+                if mainType == 0x80 or mainType == 0x90 or mainType == 0xA0 or mainType == 0xB0 or mainType == 0xE0 or eventType == 0xF2:
+                    if mainType == 0x80:
+                        # Note Off event
+                        noteEnd = curTicks
+                        if (noteEnd < noteStart):
+                            print('error: noteEnd < noteStart', noteEnd, noteStart)
+                            continue
+
+                        noteStartTime = noteStart / division * microsecondsPerQuarterNote / 1000.0
+                        noteStartTime = round(noteStartTime)
+                        noteEndTime = noteEnd / division * microsecondsPerQuarterNote / 1000.0
+                        noteEndTime = round(noteEndTime)
+                        midiNotes.append([noteStartTime, noteEndTime - noteStartTime, notePitch])
+                    elif mainType == 0x90:
+                        # Note On event
+                        noteStart = curTicks
+                        r, subOffset = ReadAndOffset('>B', data, offset)
+                        notePitch = r[0]
+                    offset += 2
+                elif mainType == 0xC0 or mainType == 0xD0 or eventType == 0xF3:
+                    offset += 1
+                elif eventType == 0xF0:
+                    while True:
+                        r, offset = ReadAndOffset('>B', data, offset)
+                        if r[0] == 0xF7:
+                            break
+                else:
+                    pass
+            
+        offset = eventsStart + trackLength
+
+    midiNotes = np.array(midiNotes)
+    # singingStartTime = midiNotes[:, 0]
+    # SaveInstantValue(singingStartTime, filename, 'singingstart')
+    return midiNotes    
 
 def PackAndOffset(buffer, offset, fmt, *args):
     pack_into(fmt, buffer, offset, *args)
