@@ -342,6 +342,7 @@ def LoadMidi(filename):
         noteStart = 0
         noteEnd = 0
         curTicks = 0
+        wordCount = 0
         while (offset < eventsStart + trackLength) or (not isTrackEnd):
             deltaTime, offset = ReadVariableLengthQuantity(data, offset)
             curTicks += deltaTime 
@@ -362,13 +363,15 @@ def LoadMidi(filename):
                 elif metaType == 0x51:
                     r, suboffset = ReadAndOffset('>3B', data, offset)
                     microsecondsPerQuarterNote = (r[0] << 16) | (r[1] << 8) | r[2]
+                elif metaType == 0x05:
+                    wordCount += 1 
 
                 offset += metaLength
             else:
                 # MIDI event
                 if eventType < 0x80:
-                    print('warning: eventType less than 0x80..............')
-                    continue
+                    print('warning: eventType less than 0x80..............', filename)
+                    return []
 
                 mainType = eventType & 0xF0
                 if mainType == 0x80 or mainType == 0x90 or mainType == 0xA0 or mainType == 0xB0 or mainType == 0xE0 or eventType == 0xF2:
@@ -380,10 +383,16 @@ def LoadMidi(filename):
                             continue
 
                         noteStartTime = noteStart / division * microsecondsPerQuarterNote / 1000.0
-                        noteStartTime = round(noteStartTime)
+                        noteStartTime = round(noteStartTime) / 1000.0
                         noteEndTime = noteEnd / division * microsecondsPerQuarterNote / 1000.0
-                        noteEndTime = round(noteEndTime)
-                        midiNotes.append([noteStartTime, noteEndTime - noteStartTime, notePitch])
+                        noteEndTime = round(noteEndTime) / 1000.0
+                        lenMidiNotes = len(midiNotes)
+                        if lenMidiNotes > 0 and midiNotes[lenMidiNotes - 1][3] == wordCount:
+                            # 一个词可能唱多个音符，如果是同一个词，更新长度
+                            lastNote = midiNotes[lenMidiNotes - 1]
+                            lastNote[1] = noteEndTime - lastNote[0]
+                        else:
+                            midiNotes.append([noteStartTime, noteEndTime - noteStartTime, notePitch, wordCount])
                     elif mainType == 0x90:
                         # Note On event
                         noteStart = curTicks
@@ -403,6 +412,7 @@ def LoadMidi(filename):
         offset = eventsStart + trackLength
 
     midiNotes = np.array(midiNotes)
+    midiNotes = midiNotes[:, 0:3]
     # singingStartTime = midiNotes[:, 0]
     # SaveInstantValue(singingStartTime, filename, 'singingstart')
     return midiNotes    
