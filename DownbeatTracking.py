@@ -15,16 +15,30 @@ import pickle
 
 FPS = 100
 
-def SaveInstantValue(beats, filename, postfix = ''):
-    #保存时间点数据
+def MakeInstantValueFileName(filename, postfix = ''):
     outname = os.path.splitext(filename)[0]
     outname = outname + postfix + '.csv'
+    return outname
+
+def SaveInstantValue(beats, filename, postfix = ''):
+    #保存时间点数据
+    outname = MakeInstantValueFileName(filename, postfix)
     with open(outname, 'w') as file:
         for obj in beats:
             file.write(str(obj) + '\n')
 
     return True
 
+def LoadInstantValue(filename, postfix = ''):
+    filename = MakeInstantValueFileName(filename, postfix)
+    vals = []
+    with open(filename, 'r') as file:
+        for line in file:
+            line = line.replace('\r', '\n')
+            line = line.replace('\n', '')
+            vals.append(float(line))
+
+    return vals
 
 def list_file(path):
     files = [os.path.join(path, f) for f in listdir(path) if os.path.splitext(f)[1] in ('.mp3', '.m4a', '.ogg')]
@@ -540,11 +554,6 @@ def CalcPreferenceBeatCount(bpm, duration):
     count = round((minNotePerBeat + rate * (maxNotePerBeat - minNotePerBeat)) * beat)
     return count
 
-def SaveOnsetActivation(filepath, onsets):
-    with open(filepath, 'w') as file:
-        for val in onsets:
-            file.write(str(val) + '\n')
-
 def PickOnsetFromFile(filename, bpm, duration, onsets = None):
     
     # filename = r'd:\librosa\RhythmMaster\foxishaonv\foxishaonv.mp3'
@@ -556,7 +565,7 @@ def PickOnsetFromFile(filename, bpm, duration, onsets = None):
     else:
         samples = onsets
 
-    SaveOnsetActivation(filename + '_onset_activation.csv', samples)
+    SaveInstantValue(samples, filename, '_onset_activation')
     count = CalcPreferenceBeatCount(bpm, duration)
 
     # print(type(samples), samples.shape, len(samples))
