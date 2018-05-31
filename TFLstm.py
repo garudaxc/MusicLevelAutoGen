@@ -388,7 +388,7 @@ class TrainDataDynSinging(TrainDataBase):
         count = x.shape[0]
 
         if (not y is None): 
-            y = y[:, 0:3]
+            y = y[:, 0:self.lableDim]
             print('y shape', y.shape, 'y sample count', len(y), 'y sum', np.sum(y, axis=0))
 
             self.BuildBatch(x, y)
@@ -599,8 +599,9 @@ def GenerateLevel():
     song = ['dainiqulvxing']
     song = ['foxishaonv']
     debugET = 768
-    song = ['xiagelukoujian']
-    debugET = 2959
+    # song = ['xiagelukoujian']
+    # debugET = 2959
+    # song = ['caocao']
     # song = ['dear my lady']
     # song = ['tian kong zhi cheng']
     # song = ['kanong']
@@ -608,6 +609,8 @@ def GenerateLevel():
     # song = ['zuichibi']
     # song = ['shero']
     # song = ['hxdssan']
+    # song = ['xiancaomi']
+    # song = ['zhongguohua']
 
     # 
     # song = ['100580']
@@ -620,8 +623,8 @@ def GenerateLevel():
     # debugET = 682
     # song = ['jinjuebianjingxian']
     # debugET = 6694
-    # song = ['ouxiangwanwansui']
-    # debugET = 571
+    song = ['ouxiangwanwansui']
+    debugET = 571
     # song = ['blue planet']
     # debugET = 1615
     # song = ['xingzhixing']
@@ -668,7 +671,7 @@ def GenerateLevel():
             print('predicts shape', predicts.shape) 
 
         print('calc bpm')
-        DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET)
+        # DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET)
 
     if not useOnsetForShort:
         # levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
@@ -781,10 +784,10 @@ def _Main():
 
     #testx, testy = PrepareTrainDataFromPack(featureFile)
     testx, testy = PrepareTrainDataFromPack(rootDir + 'data/midi_singing_bg.raw')
-    testxRM, testyRM = PrepareTrainDataFromPack(rootDir + 'data/rm_singing_bg.raw')
-    print('frame count: ', len(testx), len(testxRM))
-    testx = np.concatenate((testx, testxRM))
-    testy = np.concatenate((testy, testyRM))
+    testxLevel, testyLevel = PrepareTrainDataFromPack(rootDir + 'data/level_singing_bg.raw')
+    print('frame count: ', len(testx), len(testxLevel))
+    testx = np.concatenate((testx, testxLevel))
+    testy = np.concatenate((testy, testyLevel))
     print('frame count: ', len(testx))
     data = TrainData(batchSize, numSteps, testx, testy)
     numBatches = data.numBatches
@@ -1093,15 +1096,17 @@ def MarkMidiLabel():
 
             duration, bpm, et = LevelInfo.LoadMusicInfo(filePath)
             onsettime = PickOnsetForSingingTrain(filePath, bpm)
-            midiNotes = LoadMidiTranData(MakeSongDataPathName(song, 'midi_train'))
-            midiNotes = midiNotes[:, 0]
+            midiNotesData = LoadMidiTranData(MakeSongDataPathName(song, 'midi_train'))
+            midiNotes = midiNotesData[:, 0]
+            midiDuration = midiNotesData[:, 1]
             
 
             singTimes, bgTimes = MarkOnsetTimeWithMidiTime(onsettime, midiNotes, bpm)
             DownbeatTracking.SaveInstantValue(singTimes, filePath, '_midi_singing')
-            DownbeatTracking.SaveInstantValue(bgTimes, filePath, '_midi_bg')
+            DownbeatTracking.SaveInstantValue(bgTimes, filePath, '_midi_bg')       
+            DownbeatTracking.SaveInstantValue(midiDuration, filePath, '_midi_duration')
 
-def GenerateFeatureAndLabelByTimes(songFilePath, singingTimes, bgTimes):
+def GenerateFeatureAndLabelByTimes(songFilePath, singingTimes, bgTimes, durations = None):
     features = myprocesser.LoadAndProcessAudio(songFilePath)
     numSample = len(features)
     labels = [[1.0, 0.0, 0.0, 0.0, 0.0]] * numSample
@@ -1111,6 +1116,14 @@ def GenerateFeatureAndLabelByTimes(songFilePath, singingTimes, bgTimes):
     for t in singingTimes:
         frameIndex = FrameIndex(t * 1000, 10)
         labels[frameIndex] = [0.0, 1.0, 0.0, 0.0, 0.0]
+
+    if durations is not None:
+        for idx in range(0, len(singingTimes)):
+            frameIndexStart = FrameIndex(singingTimes[idx] * 1000, 10)
+            frameIndexEnd = FrameIndex((singingTimes[idx] + durations[idx]) * 1000, 10)
+            for subIdx in range(frameIndexStart + 1, frameIndexEnd):
+                labels[subIdx] = [0.0, 0.0, 0.0, 1.0, 0.0]
+
 
     return features, labels
 
@@ -1127,6 +1140,7 @@ def GenerateMarkedMidiFeature():
             pathname = MakeMp3Pathname(song)
             singingTimes = DownbeatTracking.LoadInstantValue(pathname, '_midi_singing')
             bgTimes = DownbeatTracking.LoadInstantValue(pathname, '_midi_bg')
+            # durations = DownbeatTracking.LoadInstantValue(pathname, '_midi_duration')
 
             features, labels = GenerateFeatureAndLabelByTimes(pathname, singingTimes, bgTimes)
             xDatas.append(features)
@@ -1137,6 +1151,9 @@ def GenerateMarkedMidiFeature():
             # bg = np.array(labels)
             # bg = bg[:, 2]
             # DownbeatTracking.SaveInstantValue(bg, pathname, '_bg_label')
+            # durs = np.array(labels)
+            # durs = durs[:, 3]
+            # DownbeatTracking.SaveInstantValue(durs, pathname, '_dur_label')
 
     xDatas = np.vstack(xDatas)
     yDatas = np.vstack(yDatas)
@@ -1225,6 +1242,47 @@ def GenerateRhythmMasterTrainData():
     yDatas = np.vstack(yDatas)
 
     dataFilePath = rootDir + 'data/rm_singing_bg.raw'
+    with open(dataFilePath, 'wb') as file:
+        pickle.dump(xDatas, file)
+        pickle.dump(yDatas, file)
+        print('raw file saved', xDatas.shape, yDatas.shape)
+
+# @run
+def GenerateLevelMarkTrainData():
+    levelMarkFileDir = rootDir + 'MusicLevelAutoGen/level_mark_singing'
+    xDatas = []
+    yDatas = []
+    for f in os.listdir(levelMarkFileDir):
+        texts = os.path.splitext(f)
+        song = texts[0]
+        ext = texts[1]
+        if (ext != '.xml'):
+            continue
+        
+        print('process ', f)
+        pathname = os.path.join(levelMarkFileDir, f)
+        notes = LevelInfo.LoadIdolInfo(pathname)
+        bpm, et = LevelInfo.LoadBpmET(pathname)
+        et = et * 1000.0
+        notes.sort()
+        songFilePath = MakeMp3Pathname(song)
+        DownbeatTracking.CalcMusicInfoFromFile(songFilePath, debugET=et, debugBPM=bpm)
+        duration, bpm, et = LevelInfo.LoadMusicInfo(songFilePath)
+        onsetTimes = PickOnsetForSingingTrain(songFilePath, bpm)
+        singingTimes, bgTimes = MarkOnsetTimeWithMidiTime(onsetTimes, notes, bpm)
+
+        features, labels = GenerateFeatureAndLabelByTimes(songFilePath, singingTimes, bgTimes)
+        xDatas.append(features)
+        yDatas.append(labels)
+
+        LevelInfo.SaveInstantValue(singingTimes, songFilePath, '_level_singing')
+        LevelInfo.SaveInstantValue(bgTimes, songFilePath, '_level_bg')
+        # SaveFeatures(MakeSongDataPathName(song, '_feature'), features)
+
+    xDatas = np.vstack(xDatas)
+    yDatas = np.vstack(yDatas)
+
+    dataFilePath = rootDir + 'data/level_singing_bg.raw'
     with open(dataFilePath, 'wb') as file:
         pickle.dump(xDatas, file)
         pickle.dump(yDatas, file)

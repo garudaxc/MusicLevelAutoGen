@@ -262,7 +262,7 @@ def SaveDownbeat(bpm, et, lastBeat, filename):
     SaveInstantValue(downbeat, filename, '_downbeat')
 
 
-def CalcMusicInfoFromFile(filename, debugET = -1):
+def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1):
     y, sr = librosa.load(filename, mono=True, sr=44100)
     logger.info('loaded')
     duration = librosa.get_duration(y=y, sr=sr)
@@ -287,6 +287,10 @@ def CalcMusicInfoFromFile(filename, debugET = -1):
     if (debugET >= 0):
         print('force set et:', debugET)
         etAuto = debugET / 1000
+
+    if (debugBPM > 0):
+        print('force set bpm:', debugBPM)
+        bpm = debugBPM
 
     print('bpm', bpm, 'et', etAuto)
 

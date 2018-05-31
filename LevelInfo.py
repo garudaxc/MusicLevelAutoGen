@@ -112,7 +112,7 @@ def TransfromNotes(bpm, enterTime, notes):
     barInterval = (60.0 / bpm) * 4
     posInterval = barInterval / 64
 
-    result = [n[0] * barInterval + n[1] * posInterval + enterTime for n in notes]
+    result = [(n[0] - 1) * barInterval + n[1] * posInterval + enterTime for n in notes]
     return result
 
 def LoadIdolInfo(pathname):
@@ -136,8 +136,8 @@ def LoadIdolInfo(pathname):
         if e.tag == 'CombineNote':
             n = e[0]
         
-        bar = int(n.attribb['Bar'])
-        pos = int(n.attribb['Pos'])
+        bar = int(n.attrib['Bar'])
+        pos = int(n.attrib['Pos'])
         notes.append((bar, pos))
         # print(bar, pos)
 
@@ -148,6 +148,18 @@ def LoadIdolInfo(pathname):
 
     print(bpm, et)
 
+def LoadBpmET(pathname):
+    text=open(pathname, encoding='utf-8').read()
+    xmlparser = ElementTree.XMLParser(encoding='utf-8')
+    tree = ElementTree.fromstring(text)
+
+    root = tree
+    levelInfo = root.find('LevelInfo')
+    node = levelInfo.find('BPM')
+    bpm = float(node.text)
+    node = levelInfo.find('EnterTimeAdjust')
+    et = float(node.text) / 1000.0
+    return bpm, et
 
 def ReadAndOffset(fmt, buffer, offset):
     r = unpack_from(fmt, buffer, offset)
