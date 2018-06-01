@@ -719,6 +719,115 @@ def AlignNotesWithBeat(notes, maxNotePerBeat):
 
     return alignedNotes
 
+
+def GetTrackPosInfo(notes, trackCount):
+    trackPosDic = []
+    for i in range(0, trackCount):
+        trackPosDic.append({})
+
+    for note in notes:
+        bar, pos, type, value, track = note
+        notePos = CalcNotePos(bar, pos)
+        if type == shortNote:
+            trackPosDic[track][notePos] = True
+        elif type == slideNote:
+            trackPosDic[track][notePos] = True
+            trackPosDic[CorrespondingTrack(track)][notePos] = True
+        elif type == longNote:
+            endBar, endPos = value
+            endNotePos = CalcNotePos(endBar, endPos)
+            dic = trackPosDic[track]
+            for i in range(notePos, endNotePos):
+                dic[i] = True
+        else:
+            # 组合音符
+            pass
+    return trackPosDic
+    
+
+def CheckNotes(notes):
+    '''
+    最后检查音符，处理对齐音符等阶段可能出现的同一个位置多个轨道有音符等情况
+    '''
+    samePosNoteCount = 2
+    trackCount = 4
+    posDic = {}
+
+    for note in notes:
+        bar, pos, type, value, track = note
+        notePos = CalcNotePos(bar, pos)
+        if notePos in posDic:
+            posDic[notePos].append(note)
+        else:
+            posDic[notePos] = [note]
+
+    trackPosInfo = GetTrackPosInfo(notes, trackCount)
+
+    for notePos in posDic:
+        arr = posDic[notePos]
+        noteArr = arr
+
+        if len(arr) > samePosNoteCount:
+            shortNotes = []
+            otherNotes = []
+            for note in arr:
+                bar, pos, type, value, track = note
+                if type == shortNote:
+                    shortNotes.append(note)
+                else:
+                    otherNotes.append(note)
+            otherNotesCount = len(otherNotes)
+            if otherNotesCount >= samePosNoteCount:
+                noteArr = otherNotes[0:samePosNoteCount]
+            else:
+                count = samePosNoteCount - otherNotesCount
+                noteArr = shortNotes[0:count] + otherNotes
+
+        if len(noteArr) == samePosNoteCount:
+            noteA = noteArr[0]
+            noteB = noteArr[1]
+            trackA = noteA[4]
+            trackB = noteB[4]
+            if int(trackA / 2) == int(trackB / 2):
+                typeA = noteA[3]
+                typeB = noteB[3]
+                if typeA != shortNote and typeB != shortNote:
+                    print('two long note in same side. remove one')
+                    noteArr = [noteA]
+                elif typeA == shortNote:
+                    trackA = trackCount - 1 - trackB
+                    pos = CalcNotePos(noteA[0], noteA[1])
+                    if pos in trackPosInfo[trackA]:
+                        print('short note conflict with other, remove. a')
+                        noteArr = [noteB]
+                    else:
+                        trackPosInfo[trackA][pos] = True
+                        noteArr[0] = (noteA[0], noteA[1], noteA[2], noteA[3], trackA)
+                else:
+                    trackB = trackCount - 1 - trackA
+                    pos = CalcNotePos(noteB[0], noteB[1])
+                    if pos in trackPosInfo[trackB]:
+                        print('short note conflict with other, remove. b')
+                        noteArr = [noteA]
+                    else:
+                        trackPosInfo[trackB][pos] = True
+                        noteArr[1] = (noteB[0], noteB[1], noteB[2], noteB[3], trackB)
+                
+        posDic[notePos] = noteArr
+
+    tempNotes = []
+    for note in notes:
+        bar, pos, type, value, track = note
+        notePos = CalcNotePos(bar, pos)
+        noteArr = posDic[notePos]
+        for tempNote in noteArr:
+            tempNotes.append(tempNote)
+
+        posDic[notePos] = []
+
+    return tempNotes
+
+
 def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     '''
     保存到心动模式关卡文件
@@ -756,6 +865,7 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     print('number of notes', len(notes))
 
     notes = AlignNotesWithBeat(notes, 2)
+    notes = CheckNotes(notes)
 
     root = tree
     levelInfo = root.find('LevelInfo')
