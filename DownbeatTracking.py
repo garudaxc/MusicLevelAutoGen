@@ -268,22 +268,24 @@ def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1):
     duration = librosa.get_duration(y=y, sr=sr)
     print('duration', duration)
 
-    processer = madmom.features.downbeats.RNNDownBeatProcessor()
-    downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda = 1000, fps=FPS)
-    
-    act = processer(y)
-    beat = downbeatTracking(act)
-    print('fitst beat', beat[:2])
-    firstBeat, lastBeat = normalizeInterval(beat)
+    calcRealInfo = debugET < 0 or debugBPM < 0
+    if calcRealInfo:
+        processer = madmom.features.downbeats.RNNDownBeatProcessor()
+        downbeatTracking = madmom.features.downbeats.DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda = 1000, fps=FPS)
+        
+        act = processer(y)
+        beat = downbeatTracking(act)
+        print('fitst beat', beat[:2])
+        firstBeat, lastBeat = normalizeInterval(beat)
 
-    if firstBeat == -1:
-        print('generate error, abnormal rate %f' % (lastBeat))
-        return
+        if firstBeat == -1:
+            print('generate error, abnormal rate %f' % (lastBeat))
+            return
 
-    bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
-    beatInter = 60.0 / bpm
+        bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
+        beatInter = 60.0 / bpm
 
-    lastBeat = beat[-1, 0]
+        lastBeat = beat[-1, 0]
     if (debugET >= 0):
         print('force set et:', debugET)
         etAuto = debugET / 1000

@@ -792,13 +792,13 @@ def CheckNotes(notes):
                 typeA = noteA[3]
                 typeB = noteB[3]
                 if typeA != shortNote and typeB != shortNote:
-                    print('two long note in same side. remove one')
+                    print('[CheckNotes] two long note in same side. remove one')
                     noteArr = [noteA]
                 elif typeA == shortNote:
                     trackA = trackCount - 1 - trackB
                     pos = CalcNotePos(noteA[0], noteA[1])
                     if pos in trackPosInfo[trackA]:
-                        print('short note conflict with other, remove. a')
+                        print('[CheckNotes] short note conflict with other, remove. a')
                         noteArr = [noteB]
                     else:
                         trackPosInfo[trackA][pos] = True
@@ -807,7 +807,7 @@ def CheckNotes(notes):
                     trackB = trackCount - 1 - trackA
                     pos = CalcNotePos(noteB[0], noteB[1])
                     if pos in trackPosInfo[trackB]:
-                        print('short note conflict with other, remove. b')
+                        print('[CheckNotes] short note conflict with other, remove. b')
                         noteArr = [noteA]
                     else:
                         trackPosInfo[trackB][pos] = True
@@ -825,7 +825,30 @@ def CheckNotes(notes):
 
         posDic[notePos] = []
 
-    return tempNotes
+    trackPosInfo = GetTrackPosInfo(tempNotes, trackCount)
+    validNotes = []
+    for note in tempNotes:
+        bar, pos, type, value, track = note
+        if type != shortNote:
+            validNotes.append(note)
+            continue
+
+        curNote = note
+        notePos = CalcNotePos(bar, pos)
+        correspondingTrack = CorrespondingTrack(track)
+        if notePos in trackPosInfo[correspondingTrack]:
+            targetTrack = trackCount - 1 - track
+            if notePos in trackPosInfo[targetTrack]:
+                trackCount = trackCount - 1 - correspondingTrack
+                if notePos in trackPosInfo[targetTrack]:
+                    print('[CheckNotes] short note conflict with other, remove. c')
+                    continue
+
+            curNote = (note[0], note[1], note[2], note[3], targetTrack)            
+        
+        validNotes.append(curNote)
+
+    return validNotes
 
 
 def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
