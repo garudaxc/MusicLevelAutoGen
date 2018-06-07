@@ -839,7 +839,7 @@ def CheckNotes(notes):
         if notePos in trackPosInfo[correspondingTrack]:
             targetTrack = trackCount - 1 - track
             if notePos in trackPosInfo[targetTrack]:
-                trackCount = trackCount - 1 - correspondingTrack
+                targetTrack = trackCount - 1 - correspondingTrack
                 if notePos in trackPosInfo[targetTrack]:
                     print('[CheckNotes] short note conflict with other, remove. c')
                     continue
