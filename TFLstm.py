@@ -23,6 +23,7 @@ batchSize = 16
 numSteps = 512
 numSteps = 128
 inputDim = 314
+numLayers = 3
 # outputDim = 2
 learning_rate = 0.001
 bSaveModel = True
@@ -42,7 +43,7 @@ songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai',
 'hongri', 'huahuangshou', 'huashuo', 'ificoulefly', 'ineedmore', 'iwantmytearsback',  'rippingthebackside', 
  'whencaniseeyouagain', 'wingsofpiano', 'wocanggwz', 'ygrightnow']
 
-songList = ['inthegame', 'remains', 'ilikeit', 'haodan', 'ai', 
+songList = ['inthegame', 'remains', 'ilikeit', 'ai', 
 '1987wbzhyjn', 'tictic', 'aiqingkele', 'feiyuedexin', 'hewojiaowangba', 'myall', 'unreal', 'faraway',
 'fengniao', 'wangfei', 'wodemuyang', 'mrx', 'rageyourdream', 'redhot', 'yilububian', 'yiqiyaobai', 'yiranaini', 'yiyejingxi']
 
@@ -140,7 +141,7 @@ def SamplesToSoftmax(samples):
 def GetSamplePath():
     path = '/Users/xuchao/Documents/rhythmMaster/'
     if os.name == 'nt':
-        path = 'D:/librosa/RhythmMaster/'
+        path = 'I:/librosa/RhythmMaster/'
     return path
 
 def MakeMp3Pathname(song):
@@ -196,7 +197,7 @@ def PrepareTrainData(songList, batchSize = 32, loadTestData = True):
 
 # @run
 def RhythmMasterLevelPorcess():
-    # pathname = r'd:\librosa\RhythmMaster\hangengxman\hangengxman_4k_nm.imd'
+    # pathname = r'I:\librosa\RhythmMaster\hangengxman\hangengxman_4k_nm.imd'
     # level = LevelInfo.LoadRhythmMasterLevel(pathname)
     # print(type(level))
     # count = 0
@@ -298,7 +299,7 @@ class TrainDataDynShortNoteSinging(TrainDataBase):
             print('numbatch', self.numBatches) 
 
     def GetModelPathName():
-        return 'd:/work/model_shortnote_singing.ckpt'
+        return 'I:/work/model_shortnote_singing.ckpt'
 
     def RawDataFileName(song):
         path = MakeMp3Dir(song)
@@ -355,7 +356,7 @@ class TrainDataDynShortNoteBeat(TrainDataBase):
             print('numbatch', self.numBatches) 
 
     def GetModelPathName():
-        return 'd:/work/model_shortnote_beat.ckpt'
+        return 'I:/work/model_shortnote_beat.ckpt'
 
     def RawDataFileName(song):
         path = MakeMp3Dir(song)
@@ -402,7 +403,7 @@ class TrainDataDynLongNote(TrainDataBase):
 
 
     def GetModelPathName():
-        return 'd:/work/model_longnote.ckpt'
+        return 'I:/work/model_longnote.ckpt'
 
     def RawDataFileName(song):
         path = MakeMp3Dir(song)
@@ -419,7 +420,7 @@ class TrainDataDynLongNote(TrainDataBase):
         # predicts = postprocess.pick(evaluate, kernelSize=11)
         print('predicts', predicts.shape)
 
-        # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
+        # postprocess.SaveResult(predicts, testy, 0, r'I:\work\result.log')
         
         acceptThrehold = 0.8
         pred = predicts[:,1]
@@ -431,13 +432,9 @@ class TrainDataDynLongNote(TrainDataBase):
         # LevelInfo.SaveInstantValue(notes, pathname, '_region')
 
 
-def BuildDynamicRnn(X, Y, seqlen, learningRate, TrainData):
+def BuildDynamicRnn(X, Y, seqlen, learningRate, TrainData, states=None):
     result = {}
-
-    weights = tf.Variable(tf.random_normal(shape=[2*numHidden, TrainData.lableDim]))
-    bais = tf.Variable(tf.random_normal(shape=[TrainData.lableDim]))
     
-    numLayers = 3
     cells = []
     dropoutCell = []
     for i in range(numLayers * 2):
@@ -446,13 +443,31 @@ def BuildDynamicRnn(X, Y, seqlen, learningRate, TrainData):
         c = tf.nn.rnn_cell.DropoutWrapper(c, output_keep_prob=0.6)
         dropoutCell.append(c)
     
-    output, _, _ = rnn.stack_bidirectional_dynamic_rnn(
-        dropoutCell[0:numLayers], dropoutCell[numLayers:], 
-        X, sequence_length=seqlen, dtype=tf.float32)
+    if states == None:
+        init_state_fw = None
+        init_state_bw = None
+    else:
+        numStates = 2 * numLayers
+        # assert states.shape() == 2 * numStates
+        states = tf.unstack(states)
+        print(len(states), states[0])
+
+        init_state_fw = [None] * numLayers
+        init_state_bw = [None] * numLayers
+        for i in range(numLayers):
+            init_state_fw[i] = rnn.LSTMStateTuple(states[i*2+0], states[i*2+1])
+            init_state_bw[i] = rnn.LSTMStateTuple(states[i*2+0+numStates], states[i*2+1+numStates])
+
+    output, final_state_fw, final_state_bw = rnn.stack_bidirectional_dynamic_rnn(
+        dropoutCell[0:numLayers], dropoutCell[numLayers:], inputs=X, 
+        initial_states_fw=init_state_fw, initial_states_bw=init_state_bw,
+        sequence_length=seqlen, dtype=tf.float32)
 
     outlayerDim = tf.shape(output)[2]
     output = tf.reshape(output, [batchSize*numSteps, outlayerDim])
 
+    weights = tf.Variable(tf.random_normal(shape=[2*numHidden, TrainData.lableDim]))
+    bais = tf.Variable(tf.random_normal(shape=[TrainData.lableDim]))
     logits = tf.matmul(output, weights) + bais
 
     Y = tf.reshape(Y, [batchSize*numSteps, TrainData.lableDim])
@@ -480,18 +495,36 @@ def BuildDynamicRnn(X, Y, seqlen, learningRate, TrainData):
     accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
     result['accuracy'] = accuracy
     
+    finalStates = []
+    for s in final_state_fw:
+        finalStates.append(s.c)
+        finalStates.append(s.h)
+    
+    for s in final_state_bw:
+        finalStates.append(s.c)
+        finalStates.append(s.h)
+    result['final_state'] = tf.stack(finalStates, 0)
+    
+
     # prediction without dropout
-    output, _, _ = rnn.stack_bidirectional_dynamic_rnn(
+    output, final_state_fw, final_state_bw = rnn.stack_bidirectional_dynamic_rnn(
         cells[0:numLayers], cells[numLayers:], 
         X, sequence_length=seqlen, dtype=tf.float32)
-
-    # output = tf.reshape(output, [batchSize*maxSeqLen, outlayerDim])
     
     output = tf.reshape(output, [batchSize*numSteps, outlayerDim])
     logits = tf.matmul(output, weights) + bais
-
     predict_op = tf.nn.softmax(logits, name='predict_op')
-    result['predict_op'] = predict_op
+
+    finalStates = []
+    for s in final_state_fw:
+        tf.assign
+        finalStates.append(s.c)
+        finalStates.append(s.h)
+    
+    for s in final_state_bw:
+        finalStates.append(s.c)
+        finalStates.append(s.h)
+    output_state = tf.stack(finalStates, 0, name='output_state')
 
     print('build rnn done')
     return result
@@ -518,23 +551,29 @@ def EvaluateWithModel(modelFile, song, rawFile, TrainData):
         print('predict_op', predict_op)         
         X = tf.get_default_graph().get_tensor_by_name('X:0')
         seqLenHolder = tf.get_default_graph().get_tensor_by_name('seqLen:0')
+        output_state = tf.get_default_graph().get_tensor_by_name('output_state:0')
+        input_state = tf.get_default_graph().get_tensor_by_name('input_state:0')
     
         testx, _ = PrepareTrainData(song, batchSize, loadTestData = False)
-
         data = TrainData(batchSize, numSteps, testx)
         
         evaluate = []
+        
+        numStateTensor = 2 * numLayers * 2
+        real_states = np.zeros((numStateTensor, batchSize, numHidden))
+
         for i in range(data.numBatches):
             xData, _, seqLen = data.GetBatch(i)
-            t = sess.run(predict_op, feed_dict={X:xData, seqLenHolder:seqLen})
+            feed_dict={X:xData, seqLenHolder:seqLen, input_state:real_states}
+            t, real_states = sess.run([predict_op, output_state], feed_dict=feed_dict)
             t = t[0:numSteps,:]
             evaluate.append(t)
 
         predicts = np.stack(evaluate).reshape(-1, TrainData.lableDim)
 
-        with open(rawFile, 'wb') as file:
-            pickle.dump(predicts, file)
-            print('raw file saved', predicts.shape)
+    with open(rawFile, 'wb') as file:
+        pickle.dump(predicts, file)
+        print('raw file saved', predicts.shape)
 
     return predicts
 
@@ -561,7 +600,7 @@ def GenerateLevel():
     pathname = MakeMp3Pathname(song[0])
     
     print(pathname)
-    if False:
+    if True:
         # gen raw data
 
         # TrainData = TrainDataDynLongNote
@@ -572,11 +611,13 @@ def GenerateLevel():
 
         # TrainData.GenerateLevel(predicts, pathname)
         
-        # TrainData = TrainDataDynShortNoteBeat
-        # rawFile = TrainData.RawDataFileName(song[0])
-        # modelFile = TrainData.GetModelPathName()
-        # predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)  
-        # print('predicts shape', predicts.shape) 
+        TrainData = TrainDataDynShortNoteBeat
+        rawFile = TrainData.RawDataFileName(song[0])
+        modelFile = TrainData.GetModelPathName()
+        predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)  
+        print('predicts shape', predicts.shape)
+
+        return
 
         # TrainData.GenerateLevel(predicts, pathname)
 
@@ -584,7 +625,7 @@ def GenerateLevel():
         DownbeatTracking.CalcMusicInfoFromFile(pathname)
 
     if False:
-        levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
+        levelFile = 'I:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
         duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
         
         rawFileLong = TrainDataDynLongNote.RawDataFileName(song[0])
@@ -593,8 +634,8 @@ def GenerateLevel():
 
         LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
 
-    if True:
-        levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
+    if False:
+        levelFile = 'I:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
         duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
 
         # postprocess.SaveDownbeat(bpm, et/1000.0, duration/1000.0, pathname)
@@ -614,7 +655,7 @@ def LoadRawData(useSoftmax = True):
     songList = ['hangengxman']
     songList = ['jilejingtu']
 
-    with open('d:/work/evaluate_data.raw', 'rb') as file:
+    with open('I:/work/evaluate_data.raw', 'rb') as file:
         evaluate = pickle.load(file)
         print(type(evaluate))
         
@@ -628,7 +669,7 @@ def LoadRawData(useSoftmax = True):
 
         predicts = postprocess.pick(evaluate)
 
-    # postprocess.SaveResult(predicts, testy, 0, r'D:\work\result.log')
+    # postprocess.SaveResult(predicts, testy, 0, r'I:\work\result.log')
 
         if useSoftmax:
             predicts = predicts[:,1]
@@ -641,7 +682,7 @@ def LoadRawData(useSoftmax = True):
         pathname = MakeMp3Pathname(songList[0])
         duration, bpm, entertime = LoadMusicInfo(pathname)
         levelNotes = postprocess.ConvertToLevelNote(notes, bpm, entertime)
-        levelFilename = 'd:/work/%s.xml' % (songList[0])
+        levelFilename = 'I:/work/%s.xml' % (songList[0])
         LevelInfo.GenerateIdolLevel(levelFilename, levelNotes, bpm, entertime, duration)
 
         notes = notes[:,0]
@@ -649,79 +690,86 @@ def LoadRawData(useSoftmax = True):
 
 
 # @run
-def _Main():    
-    # testx, testy = PrepareTrainData(songList, batchSize)
-    TrainData = TrainDataDynLongNote
-
-    testx, testy = PrepareTrainDataFromPack()
-    
-    data = TrainData(batchSize, numSteps, testx, testy)
-    numBatches = data.numBatches
+def _Main():
+    # TrainData = TrainDataDynLongNote
+    TrainData = TrainDataDynShortNoteBeat    
     
     seqlenHolder = tf.placeholder(tf.int32, [None], name='seqLen')
     X = tf.placeholder(dtype=tf.float32, shape=(batchSize, numSteps, inputDim), name='X')
     Y = tf.placeholder(dtype=tf.float32, shape=(batchSize, numSteps, TrainData.lableDim), name='Y')
     learningRate = tf.placeholder(dtype=tf.float32, name='learn_rate')
 
-    result = BuildDynamicRnn(X, Y, seqlenHolder, learningRate, TrainData)
+    # two state in one layer in forward net, and so as backward net
+    numStateTensor = 2 * numLayers * 2
+    state_tensor = tf.placeholder(dtype=tf.float32, shape=(numStateTensor, batchSize, numHidden), name='input_state')
+    print('state_tensor', state_tensor)
+    
+    result = BuildDynamicRnn(X, Y, seqlenHolder, learningRate, TrainData, state_tensor)
 
     maxAcc = 0.0
     notIncreaseCount = 0
     currentLearningRate = learning_rate
     learningRateFined = False
+
     # Start training
-    with tf.Session() as sess:
-        # Run the initializer
-        sess.run(tf.global_variables_initializer())
-        SaveModel(sess, TrainData.GetModelPathName(), saveMeta=True)
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
 
-        for j in range(epch):
-            loss = []
-            acc = []
+    SaveModel(sess, TrainData.GetModelPathName(), saveMeta=True)
 
-            for i in range(numBatches):
-                xData, yData, seqLen = data.GetBatch(i)
+    testx, testy = PrepareTrainData(songList, batchSize)
+    data = TrainData(batchSize, numSteps, testx, testy)
+    numBatches = data.numBatches
+    for j in range(epch):
+        loss = []
+        acc = []
+        # real_states = [np.zeros((batchSize, numHidden))] * numStateTensor
 
-                if i % 6 == 0:
-                    l, a = sess.run([result['loss_op'], result['accuracy']], 
-                    feed_dict={X:xData, Y:yData, seqlenHolder:seqLen})
-                    
-                    loss.append(l)
-                    acc.append(a)
-                else:
-                    t = sess.run(result['train_op'], feed_dict={X:xData, Y:yData, seqlenHolder:seqLen, learningRate:currentLearningRate})
-                
-            lossValue = sum(loss) / len(loss)
-            accValue = sum(acc) / len(acc)
+        real_states = np.zeros((numStateTensor, batchSize, numHidden))
 
-            notIncreaseCount += 1
-            if accValue > maxAcc:
-                maxAcc = accValue
-                notIncreaseCount = 0
-                # save checkpoint
-                print('save checkpoint')
-                SaveModel(sess, TrainData.GetModelPathName())
+        for i in range(numBatches):
+            xData, yData, seqLen = data.GetBatch(i)
+            feed_dict={X:xData, Y:yData, seqlenHolder:seqLen, state_tensor:real_states}
+
+            if i % 6 == 0:
+                l, a, real_states = sess.run([result['loss_op'], result['accuracy'], result['final_state']], feed_dict=feed_dict)                
+                loss.append(l)
+                acc.append(a)
+            else:
+                feed_dict[learningRate] = currentLearningRate
+                t, real_states = sess.run([result['train_op'], result['final_state']], feed_dict=feed_dict)
             
-            if notIncreaseCount > 10:
-                print('stop learning')
-                break
+        lossValue = sum(loss) / len(loss)
+        accValue = sum(acc) / len(acc)
 
-            # if notIncreaseCount > 10 and not learningRateFined:
-            #     currentLearningRate = currentLearningRate / 2
-            #     print('change learning rate', currentLearningRate)
-            #     notIncreaseCount = 0
-            #     learningRateFined = True
+        notIncreaseCount += 1
+        if accValue > maxAcc:
+            maxAcc = accValue
+            notIncreaseCount = 0
+            # save checkpoint
+            print('save checkpoint')
+            SaveModel(sess, TrainData.GetModelPathName())
+        
+        if notIncreaseCount > 10:
+            print('stop learning')
+            break
 
-            # if notIncreaseCount > 15 and learningRateFined:
-            #     print('stop learning')
-            #     break
-            
-            print('epch', j, 'loss', lossValue, 'accuracy', accValue, 'not increase', notIncreaseCount)
-            
-            data.ShuffleBatch()
+        # if notIncreaseCount > 10 and not learningRateFined:
+        #     currentLearningRate = currentLearningRate / 2
+        #     print('change learning rate', currentLearningRate)
+        #     notIncreaseCount = 0
+        #     learningRateFined = True
+
+        # if notIncreaseCount > 15 and learningRateFined:
+        #     print('stop learning')
+        #     break
+        
+        print('epch', j, 'loss', lossValue, 'accuracy', accValue, 'not increase', notIncreaseCount)
+        
+        data.ShuffleBatch()
 
 # @run
-def SaveShortNoteFile(pathname=r'd:\librosa\RhythmMaster\breakfree\breakfree_4k_nm.imd'):
+def SaveShortNoteFile(pathname=r'I:\librosa\RhythmMaster\breakfree\breakfree_4k_nm.imd'):
     # 读取节奏大师关卡，生成文件
     duration = LevelInfo.ReadRhythmMasterLevelTime(pathname)
 
@@ -784,7 +832,7 @@ def ReadTrainningRegion(file):
 def LoadMarkedTrainningLable():
     # 加载标记信息
     path = '/Users/xuchao/Documents/python/MusicLevelAutoGen/train'
-    path = 'D:/librosa/MusicLevelAutoGen/train'
+    path = 'I:/librosa/MusicLevelAutoGen/train'
     filelist = os.listdir(path)
     lables = ([], [])
     lableDuration = [0, 0]
@@ -812,8 +860,8 @@ def LoadMarkedTrainningLable():
 
     return lables
 
-# featureFile = r'D:\librosa\MusicLevelAutoGen\train\beat_train_feature.raw'
-featureFile = r'D:\librosa\MusicLevelAutoGen\train\singing_train_feature.raw'
+# featureFile = r'I:\librosa\MusicLevelAutoGen\train\beat_train_feature.raw'
+featureFile = r'I:\librosa\MusicLevelAutoGen\train\singing_train_feature.raw'
 
 # @run
 def LoadAllTrainningLable():
