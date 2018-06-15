@@ -737,7 +737,8 @@ def GetTrackPosInfo(notes, trackCount):
             endBar, endPos = value
             endNotePos = CalcNotePos(endBar, endPos)
             dic = trackPosDic[track]
-            for i in range(notePos, endNotePos):
+            # 先把end的位置也算做是被占用了,要不不好处理同侧的轨道在end处出现音符的情况
+            for i in range(notePos, endNotePos + 1):
                 dic[i] = True
         else:
             # 组合音符
@@ -838,11 +839,10 @@ def CheckNotes(notes):
         correspondingTrack = CorrespondingTrack(track)
         if notePos in trackPosInfo[correspondingTrack]:
             targetTrack = trackCount - 1 - track
-            if notePos in trackPosInfo[targetTrack]:
-                targetTrack = trackCount - 1 - correspondingTrack
-                if notePos in trackPosInfo[targetTrack]:
-                    print('[CheckNotes] short note conflict with other, remove. c')
-                    continue
+            targetCorrespondingTrack = CorrespondingTrack(track)
+            if notePos in trackPosInfo[targetTrack] or notePos in trackPosInfo[targetCorrespondingTrack]:
+                print('[CheckNotes] short note conflict with other, remove. c')
+                continue
 
             curNote = (note[0], note[1], note[2], note[3], targetTrack)            
         
