@@ -355,11 +355,23 @@ def LoadMidi(filename):
         noteEnd = 0
         curTicks = 0
         wordCount = 0
+        lastEventType = -1
         while (offset < eventsStart + trackLength) or (not isTrackEnd):
             deltaTime, offset = ReadVariableLengthQuantity(data, offset)
             curTicks += deltaTime 
             r, offset = ReadAndOffset('>B', data, offset)
             eventType = r[0]
+            # MIDI event
+            if eventType < 0x80:
+                if lastEventType < 0:
+                    print('first event type less than 0x80, failed')
+                    return []
+                else:
+                    # print('event type less than 0x80, use last type.', lastEventType)
+                    eventType = lastEventType
+                    offset = offset - 1
+            
+            lastEventType = eventType
             if eventType == 0xF0 or eventType == 0xF7:
                 # sysex event
                 eventLength, offset = ReadVariableLengthQuantity(data, offset)
@@ -380,14 +392,13 @@ def LoadMidi(filename):
 
                 offset += metaLength
             else:
-                # MIDI event
-                if eventType < 0x80:
-                    print('warning: eventType less than 0x80..............', filename)
-                    return []
-
                 mainType = eventType & 0xF0
                 if mainType == 0x80 or mainType == 0x90 or mainType == 0xA0 or mainType == 0xB0 or mainType == 0xE0 or eventType == 0xF2:
-                    if mainType == 0x80:
+                    r, subOffset = ReadAndOffset('>B', data, offset)
+                    val1 = r[0]
+                    r, subOffset = ReadAndOffset('>B', data, subOffset)
+                    val2 = r[0]
+                    if mainType == 0x80 or (mainType == 0x90 and val2 == 0):
                         # Note Off event
                         noteEnd = curTicks
                         if (noteEnd < noteStart):
@@ -408,8 +419,7 @@ def LoadMidi(filename):
                     elif mainType == 0x90:
                         # Note On event
                         noteStart = curTicks
-                        r, subOffset = ReadAndOffset('>B', data, offset)
-                        notePitch = r[0]
+                        notePitch = val1
                     offset += 2
                 elif mainType == 0xC0 or mainType == 0xD0 or eventType == 0xF3:
                     offset += 1
