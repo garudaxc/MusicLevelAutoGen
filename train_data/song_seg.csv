@@ -214,7 +214,7 @@ yiqiannianyihou_2,0,109.900,120.000
 yiqiannianyihou_2,0,120.000,136.200
 yiqiannianyihou_2,0,136.200,150.700
 nidaodiaishui,1,0.000,21.500
-nidaodiaishui,1,21.500,35.000
+nidaodiaishui,0,21.500,35.000
 nidaodiaishui,0,35.000,48.500
 nidaodiaishui,0,48.500,62.300
 nidaodiaishui,0,62.300,76.500
@@ -228,8 +228,8 @@ gaibianziji,0,69.800,85.250
 gaibianziji,0,89.700,108.200
 gaibianziji,0,108.200,117.400
 gaibianziji,1,156.400,174.000
-nibushizhenzhengdekuaile,1,0.000,27.500
-nibushizhenzhengdekuaile,0,27.500,43.500
+nibushizhenzhengdekuaile,1,0.000,26.500
+nibushizhenzhengdekuaile,0,26.500,43.500
 nibushizhenzhengdekuaile,0,43.500,49.500
 nibushizhenzhengdekuaile,0,49.500,64.500
 nibushizhenzhengdekuaile,0,67.000,77.500
@@ -239,7 +239,7 @@ zhuzhige,1,4.000,29.000
 zhuzhige,0,29.000,43.100
 zhuzhige,0,43.100,58.800
 zhuzhige,0,61.000,79.500
-zhuzhige,0,79.500,95.000
+zhuzhige,1,79.500,95.000
 zhuzhige,0,95.000,111.800
 zhuzhige,0,113.800,121.000
 zhuzhige,0,121.000,131.200
