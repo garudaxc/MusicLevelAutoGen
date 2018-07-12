@@ -25,7 +25,6 @@ xiancaomi,1,0.000,14.800
 xiancaomi,1,14.800,24.600
 xiancaomi,0,24.600,35.400
 xiancaomi,0,35.400,44.800
-xiancaomi,0,46.400,44.800
 xiancaomi,0,44.800,56.700
 xiancaomi,0,56.700,66.700
 xiancaomi,1,66.700,72.400
@@ -53,7 +52,6 @@ liuxingyu,1,168.600,182.700
 liuxingyu,0,182.700,196.800
 liuxingyu,0,253.500,260.000
 zhongguohua_2,0,47.550,56.800
-zhongguohua_2,0,56.800,56.800
 zhongguohua_2,0,56.800,69.500
 haoqishasimao,1,0.000,21.600
 haoqishasimao,0,36.400,51.600
@@ -224,7 +222,6 @@ nidaodiaishui,0,76.500,91.800
 nidaodiaishui,0,91.800,110.800
 nidaodiaishui,1,110.800,138.400
 gaibianziji,0,17.200,27.800
-gaibianziji,0,28.800,27.800
 gaibianziji,0,27.800,37.000
 gaibianziji,0,38.000,55.250
 gaibianziji,0,69.800,85.250
@@ -259,10 +256,10 @@ danshengonghai,0,9.500,29.500
 danshengonghai,0,29.500,44.500
 danshengonghai,0,47.600,60.000
 danshengonghai,0,60.600,71.000
-danshengonghai,0,80.500,90,000
-danshengonghai,0,90,000,100,250
-danshengonghai,1,126,500,146,500
-danshengonghai,0,146,500,156,000
+danshengonghai,0,80.500,90.000
+danshengonghai,0,90.000,100.250
+danshengonghai,1,126.500,146.500
+danshengonghai,0,146.500,156.000
 sanguolian_2,1,2.500,31.200
 sanguolian_2,0,31.200,43.800
 sanguolian_2,0,43.800,56.500
