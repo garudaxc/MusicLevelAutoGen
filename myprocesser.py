@@ -60,10 +60,21 @@ def TestWrite(pathname):
 
     return d
 
+def FeatureStandardize(data):
+    featureMin = np.min(data)
+    featureMax = np.max(data)
+    delta = featureMax - featureMin
+    if delta > 0.0:
+        data = data * (1.0 / delta) - featureMin / delta
+    else:
+        print('audio feature delta not > 0.0, may error')
+
+    return data
 
 def LoadAndProcessAudio(pathname, fps=100):
     pre_processor = CreateProcesser(fps)
     d = pre_processor(pathname)
+    d = FeatureStandardize(d)
     print('audio processed ', d.shape)
     return d
 

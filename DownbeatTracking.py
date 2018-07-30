@@ -591,7 +591,6 @@ def PickOnsetFromFile(filename, bpm, duration, onsets = None):
             print('dis time is more than one beat. break')
             break
         dis_time += 0.0001
-        print('pick onset', len(onsettime), 'more than', count, '. continue with dis_time', dis_time)
 
     print(threhold, len(onsettime))
     SaveInstantValue(onsettime, filename, '_onset')    

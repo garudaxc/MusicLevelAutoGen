@@ -235,6 +235,27 @@ def EliminateShortSamples(long, threhold=300):
     
     return result
     
+def GetLongNoteInfo(long):
+    length = len(long)
+    idx = 0
+    searchBegin = True
+    begin = 0
+    end = 0
+    longArr = []
+    while idx < length:
+        if searchBegin:
+            if long[idx] > 0:
+                begin = idx
+                searchBegin = False
+        else:
+            if long[idx] <= 0 or idx == length - 1:
+                end = idx
+                searchBegin = True
+                longArr.append([begin, end])
+
+        idx += 1
+
+    return np.array(longArr)    
 
 def AlignNotePosition(short, long, threhold=100):
     '''
@@ -278,6 +299,36 @@ def AlignNotePosition(short, long, threhold=100):
 
     return long
 
+def AlignNotePositionEx(short, long, threhold=100):
+    '''
+    将挨得很近的长音符和短音符对齐到同一位置
+    threhold 范围内的会对齐 单位毫秒
+    '''
+    print('shape', short.shape, long.shape)
+    assert short.shape == long.shape
+
+    offset = int((threhold / 10) // 2)
+
+    longArr = GetLongNoteInfo(long)
+    long_new = np.zeros_like(long)
+    for longNote in longArr:
+        isValid = True
+        for idx in range(2):
+            begin = max(longNote[idx] - offset, 0)
+            end = min(longNote[idx] + offset, len(short))
+            pos = short[begin:end].nonzero()[0] + begin
+            if len(pos) > 0:
+                m = np.argmin(np.abs(pos - longNote[idx]))
+                longNote[idx] = pos[m]
+            elif idx == 0:
+                isValid = False
+                break
+
+        if isValid and longNote[0] < longNote[1]:
+            long_new[longNote[0]:longNote[1]] = 1 
+
+    return long_new
+
 
 def EliminateTooCloseSample(short, long, threhold=200):
     '''
@@ -313,7 +364,31 @@ def RandSide():
     r = 1 - l
     return l, r
 
-def MutateSamples(short, long):
+def NextNoteIdx(short, long, start):
+    arrLength = min(len(short), len(long))
+    i = start + 1
+    idxShort = arrLength
+    while i < arrLength:
+        if short[i] > 0:
+            idxShort = i
+            break
+        i += 1
+    
+    i = start + 1
+    idxLong = arrLength
+    while i < arrLength:
+        if long[i] > 0:
+            idxLong = i
+            break
+        i += 1
+
+    if idxShort < idxLong:
+        return idxShort
+
+    return -1
+    
+
+def MutateSamples(short, long, bpm):
     '''
     生成滑动音符，双按音符
     '''
@@ -368,7 +443,7 @@ def MutateSamples(short, long):
             end = bisect.bisect_right(edge, i)
             end = edge[end]
             
-            s = short[i:end].nonzero()[0]+i
+            s = short[i:end+1].nonzero()[0]+i
             if len(s) > 0:
                 # 暂时注掉组合音符
                 # #combine note
@@ -377,8 +452,34 @@ def MutateSamples(short, long):
                 # notes.append((i, LevelInfo.combineNode, cnotes, SideLeft))
             
                 notes.append((i, LevelInfo.longNote, end-i, SideLeft))
-                for p in s:                    
-                    notes.append((p, LevelInfo.shortNote, 0, SideRight))
+                
+                tempShort = []
+                lengthShort = len(s)
+                interval = ((60 / bpm) * 1000 * 0.95) // 10
+                beatInterval = ((60 / bpm) * 1000) // 10
+                for shortIdx in range(lengthShort):
+                    isValidShort = True
+                    p = s[shortIdx]
+                    if shortIdx > 0:
+                        if p - s[shortIdx - 1] < interval:
+                            isValidShort = False
+
+                    if shortIdx < lengthShort - 1:
+                        if s[shortIdx + 1] - p < interval:
+                            isValidShort = False
+
+                    if isValidShort or shortIdx == lengthShort - 1:
+                        if shortIdx == lengthShort - 1:
+                            tempShort.append(p)
+                        if len(tempShort) > 1:
+                            if tempShort[-1] - tempShort[0] > interval:
+                                notes.append((tempShort[0], LevelInfo.longNote, tempShort[-1] - tempShort[0], SideRight))
+                            elif p - (tempShort[0] + beatInterval) > interval:
+                                notes.append((tempShort[0], LevelInfo.longNote, beatInterval, SideRight))
+                        notes.append((p, LevelInfo.shortNote, 0, SideRight))
+                    else:
+                        tempShort.append(p)
+
             else:
                 #long note
                 notes.append((i, LevelInfo.longNote, end-i, SideLeft))
@@ -403,9 +504,23 @@ def MutateSamples(short, long):
             #             notes.append((i, LevelInfo.shortNote, 0, SideRight))
 
             i = end+1
-            SideLeft, SideRight = RandSide()
+            # SideLeft, SideRight = RandSide()
+            SideLeft = 1 - SideLeft
+            SideRight = 1 - SideRight
 
         elif shortMute[i] > 0 or short[i] > 0:
+            nextIdx = NextNoteIdx(short, long, i)
+            interval = ((60 / bpm) * 1000 * 1.1) // 10
+            maxLength = ((60 / bpm) * 1000 * 2) // 10
+            if nextIdx > 0 and nextIdx - i > interval:
+                longNoteLength = min(nextIdx - i, maxLength)
+                notes.append((i, LevelInfo.longNote, longNoteLength, SideLeft))
+                notes.append((nextIdx, LevelInfo.shortNote, 0, SideRight))
+                i = nextIdx + 1
+                SideLeft = 1 - SideLeft
+                SideRight = 1 - SideRight
+                continue
+
             if shortMute[i] == DoubleSlide:
                 notes.append((i, LevelInfo.slideNote, 0, SideLeft))
                 notes.append((i, LevelInfo.slideNote, 0, SideRight))
@@ -418,7 +533,9 @@ def MutateSamples(short, long):
                 notes.append((i, LevelInfo.shortNote, 0, SideLeft))
 
             i += 1
-            SideLeft, SideRight = RandSide()
+            # SideLeft, SideRight = RandSide()
+            SideLeft = 1 - SideLeft
+            SideRight = 1 - SideRight
         else:
             i += 1
 
@@ -579,7 +696,7 @@ def ProcessSampleToIdolLevel(rawFileLong, rawFileShort):
 
     return levelNotes
 
-def ProcessSampleToIdolLevel2(rawFileLong, short):
+def ProcessSampleToIdolLevel2(rawFileLong, short, bpm):
     # 
 
     np.random.seed(0)
@@ -588,18 +705,20 @@ def ProcessSampleToIdolLevel2(rawFileLong, short):
     with open(rawFileLong, 'rb') as file:
         predicts = pickle.load(file)
 
-    pre = predicts[:, 1]
+    pre = predicts[:, 3]
 
     short = short[:pre.shape[0]]
 
     long = BilateralFilter(pre, ratio=0.9)
-    long = EliminateShortSamples(long)
     
-    long = AlignNotePosition(short, long)
+    beatInterval = int((60 / bpm) * 1000)
+    long = AlignNotePositionEx(short, long, threhold=beatInterval * 2)
+    long = EliminateShortSamples(long, threhold=500)
 
-    short = EliminateTooCloseSample(short, long)
-
-    notes = MutateSamples(short, long) 
+    # short = EliminateTooCloseSample(short, long)
+    
+    # long = np.zeros_like(long)
+    notes = MutateSamples(short, long, bpm) 
     levelNotes = ConvertIntermediaNoteToLevelNote(notes)
 
     return levelNotes
