@@ -978,6 +978,123 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
     t.write(filename, encoding="utf-8",xml_declaration=True)
     print('done write file ' + filename)
 
+def GenerateIdolLevelForTangoDebug(filename, notes, bpm, et, musicTime):
+    '''
+    炫舞一tango调试用
+    '''
+    barInterval = 240.0 / bpm
+    barInterval *= 1000
+    posInterval = barInterval / 32.0
+
+    newNotes = []
+    for n in notes:
+        type = n[1]
+        r = ConvertTimeBar(n, barInterval, posInterval, et)
+        if type == combineNode:
+            value = n[2]
+            l = []
+            for subNote in value:
+                s = ConvertTimeBar(subNote, barInterval, posInterval, et)
+                l.append(s)
+            r = (r[0], r[1], r[2], l, r[4])
+             
+        newNotes.append(r)
+    notes = newNotes
+
+    text=open(rootDir + 'data/idol_template.xml', encoding='utf-8').read()
+    xmlparser = ElementTree.XMLParser(encoding='utf-8')
+    tree = ElementTree.fromstring(text)
+
+    lastNote = notes[-1]
+    lastBar = lastNote[0]
+    totalBar  = lastBar + 1
+
+    # 删除前面4小节和最后4小节的音符
+    enterBar = 0
+    # notes = [note for note in notes if note[0] > (enterBar-1) and note[0] < lastBar - 3]
+    # print('number of notes', len(notes))
+
+    notes = AlignNotesWithBeat(notes, 4)
+    # notes = CheckNotes(notes)
+
+    root = tree
+    levelInfo = root.find('LevelInfo')
+    node = levelInfo.find('BPM')
+    node.text = str(bpm)
+    node = levelInfo.find('EnterTimeAdjust')
+    node.text = str(et)    
+    node = levelInfo.find('LevelTime')
+    node.text = str(musicTime)
+    node = levelInfo.find('BarAmount')
+    node.text = str(totalBar)
+    node = levelInfo.find('BeginBarLen')
+    node.text = str(enterBar)
+
+    
+    musicName = os.path.split(filename)[1]
+    musicName = os.path.splitext(musicName)[0]
+    MusicInfo = root.find('MusicInfo')
+    node = MusicInfo.find('Title')
+    node.text = str(musicName)
+    node = MusicInfo.find('FilePath')
+    node.text = str('audio/bgm/'+musicName)
+    
+    # SectionSeq = root.find('SectionSeq')
+    # for node in SectionSeq:
+    #     if node.attrib['type'] == 'note':
+    #         node.attrib['endbar'] = str(totalBar - 4)
+    #     if node.attrib['type'] == 'showtime':
+    #         node.attrib['startbar'] = str(totalBar - 3)
+    #         node.attrib['endbar'] = str(totalBar)
+
+    notesNode = root.find('NoteInfo').find('Normal')
+    notesNode.clear()
+    for note in notes:
+        type = note[2]
+        
+        if type == combineNode:
+            e = ElementTree.Element('CombineNote')
+            value = note[3]
+            for subNote in value:
+                s = ConvertNoteToXml(subNote)
+                e.append(s)
+        else:
+            e = ConvertNoteToXml(note)
+
+        notesNode.append(e)
+
+    # numseq = (totalBar-enterBar-4) // 2
+    # print('numseq', totalBar, numseq * 2)
+    # ActionSeq = root.find('ActionSeq')
+    # seq = enterBar+1
+    # if totalBar % 2 == 1:
+    #     e = MakeActionListNode(seq, 1, 1)
+    #     ActionSeq.append(e)
+    #     seq += 1
+    
+    # for i in range(numseq):
+    #     e = MakeActionListNode(seq, 2, 2)
+    #     ActionSeq.append(e)
+    #     seq += 2
+        
+    # e = MakeActionListNode(seq, 4, 4)
+    # ActionSeq.append(e)
+
+    
+    # camera = root.find('CameraSeq').find('Camera')
+    # camera.attrib['end_bar'] = str(totalBar)
+       
+    # DancerSort = root.find('DancerSort')
+    # DancerSort.clear()
+    # for i in range(15, totalBar-2, 2):
+    #     e = ElementTree.Element('Bar')
+    #     e.text = str(i)
+    #     DancerSort.append(e)
+    
+    t = ElementTree.ElementTree(root)
+    t.write(filename, encoding="utf-8",xml_declaration=True)
+    print('done write file ' + filename)
+
 def SaveSamplesToRegionFile(samples, filename, postfix=''):
     '''
     每秒100帧的采样数据转换为连续区间    

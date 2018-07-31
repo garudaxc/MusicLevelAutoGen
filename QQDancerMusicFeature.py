@@ -146,6 +146,24 @@ def NormalizeInterval(beat, threhold = 0.02, abThrehold=0.333):
 
     return 0, len(beat)
 
+# 新版本移除了这个函数，暂时替换一下，考虑用新版本的函数
+def madmom_features_downbeats_filter_downbeats(beats):
+    """
+
+    Parameters
+    ----------
+    beats : numpy array, shape (num_beats, 2)
+        Array with beats and their position inside the bar as the second
+        column.
+
+    Returns
+    -------
+    downbeats : numpy array
+        Array with downbeat times.
+
+    """
+    # return only downbeats (timestamps)
+    return beats[beats[:, 1] == 1][:, 0]
 
 def CalcDownbeat(y, sr, duration, **args):
     # calc downbeat entertime
@@ -185,7 +203,7 @@ def CalcDownbeat(y, sr, duration, **args):
         return 0, 0
 
     newBeat = beatIndex[firstBeat:lastBeat]
-    downbeat = madmom.features.downbeats.filter_downbeats(newBeat)
+    downbeat = madmom_features_downbeats_filter_downbeats(newBeat)
     downbeat = downbeat + librosa.samples_to_time(clip, sr = sr)[0]
 
     barInter, etAuto = CalcBarInterval(downbeat)
@@ -464,8 +482,159 @@ def AnalysisMusicFeature(filename, **args):
     if genDebugFile:
         GenDebugFile(filename, duration, bpm, et, segTimes)
 
+    GenerateNote(filename, duration, bpm, et, segTimes[0], segTimes[1])
+
     return (True, result)
 
+def PickOnset(onsetActivation, bpm, et, fps, segBegin, segEnd, count):
+    threshold = 0.7
+    checkFrameIdxArr = GenerateCheckFrameIdxArr(bpm, et, fps, segBegin, segEnd)
+    onsetTimes = []
+    offset = min(max(1, SecondToFrameIdx(60 / bpm / 8, fps)), 3)
+    for arr in checkFrameIdxArr:
+        onsetTime = []
+        for frameIdx in arr:
+            # if len(onsetTime) >= count:
+            #     break
+
+            begin = max(frameIdx - offset, 0)
+            end = min(frameIdx + offset + 1, len(onsetActivation))
+            for subIdx in range(begin, end):
+                if onsetActivation[subIdx] >= threshold:
+                    onsetTime.append(frameIdx / fps)
+                    break
+
+        onsetTimes.append(onsetTime)
+
+    
+    def PickFromArr(onsetTime, curCount, targetCount):
+        if curCount >= targetCount:
+            return []
+
+        if curCount + len(onsetTime) <= targetCount:
+            return onsetTime
+
+        remainCount= targetCount - curCount
+        offset = len(onsetTime) / remainCount
+        arr = []
+        pickIdx = 0
+        while pickIdx < len(onsetTime):
+            idx = int(pickIdx)
+            if len(arr) == 0 or arr[-1] != onsetTime[idx]:
+                arr.append(onsetTime[idx])
+            
+            pickIdx += offset
+
+        return arr
+
+    pickOnsetTime = []
+    for onsetTime in onsetTimes:
+        pickOnsetTime = np.concatenate((pickOnsetTime, PickFromArr(onsetTime, len(pickOnsetTime), count)))
+
+    pickOnsetTime = np.sort(pickOnsetTime)
+    return pickOnsetTime
+
+def GenerateCheckFrameIdxArr(bpm, et, fps, segBegin, segEnd):
+    beatInterval = 60 / bpm
+
+    checkFrameIdxArrA = []
+    checkFrameIdxArrB = []
+    checkFrameIdxArrC = []
+
+    beatOffset = int((segBegin - et) / beatInterval)
+    # firstBeatTime = et + beatOffset * beatInterval
+    firstBeatTime = et + beatOffset * beatInterval
+    while firstBeatTime < segBegin:
+        firstBeatTime += beatInterval
+
+    curTime = firstBeatTime
+    while curTime < segEnd:
+        checkFrameIdxArrA.append(SecondToFrameIdx(curTime, fps))
+        curTime += beatInterval
+
+    curTime = firstBeatTime + beatInterval / 2
+    while curTime < segEnd:
+        checkFrameIdxArrB.append(SecondToFrameIdx(curTime, fps))
+        curTime += beatInterval
+
+    curTime = firstBeatTime + beatInterval / 4
+    while curTime < segEnd:
+        checkFrameIdxArrC.append(SecondToFrameIdx(curTime, fps))
+        curTime += (beatInterval / 2)
+
+    return [checkFrameIdxArrA, checkFrameIdxArrB, checkFrameIdxArrC]
+
+
+def SecondToFrameIdx(time, fps):
+    return int(time * fps)
+
+def SegmentTimeToFrameIdx(playSegCount, begin, end, bpm, fps, frameCount):
+    showTimeDuration = 60 / bpm * 4 * 4
+    playOffset = (end - showTimeDuration - begin) / playSegCount
+    timeArr = []
+    lastEnd = begin
+    for i in range(playSegCount):
+        timeArr.append((lastEnd, begin + (i + 1) * playOffset))
+        lastEnd = timeArr[-1][1]
+    timeArr.append((lastEnd, end))
+    
+    frameArr = []
+    for timeBegin, timeEnd in timeArr:
+        frameBegin = max(SecondToFrameIdx(timeBegin, fps), 0)
+        frameEnd = min(SecondToFrameIdx(timeEnd, fps), frameCount - 1)
+        frameArr.append((frameBegin, frameEnd))
+
+    return (frameArr[0:playSegCount], frameArr[playSegCount])
+
+
+def SegmentTimesToFrameIdx(duration, bpm, et, seg0, seg1, playSegCount, fps, frameCount):
+    segArr = []
+    segArr.append(SegmentTimeToFrameIdx(playSegCount, et, seg0, bpm, fps, frameCount))
+    segArr.append(SegmentTimeToFrameIdx(playSegCount, seg0, seg1, bpm, fps, frameCount))
+    segArr.append(SegmentTimeToFrameIdx(playSegCount, seg1, duration, bpm, fps, frameCount))
+    return segArr
+
+def GenerateNote(filename, duration, bpm, et, seg0, seg1):
+    barDuration = 60 / bpm * 4
+    barNoteCountArr = [2, 3.5, 5, 6.5, 8, 6.5, 5, 3.5, 2]
+    playSegCount = 3
+    fps = 100
+    onsetProcessor = madmom.features.onsets.CNNOnsetProcessor()
+    onsetActivation = onsetProcessor(filename)
+
+    segArr = SegmentTimesToFrameIdx(duration, bpm, et, seg0, seg1, playSegCount, fps, len(onsetActivation))
+    idx = 0
+    onsetTime = []
+    segTimeArr = []
+    for playSegArr, showTimeSeg in segArr:
+        for frameBegin, frameEnd in playSegArr:
+            timeBegin = frameBegin / fps
+            timeEnd = frameEnd / fps
+            segCount = int((timeEnd - timeBegin) / barDuration * barNoteCountArr[idx])
+            segOnsetTime = PickOnset(onsetActivation, bpm, et, fps, timeBegin, timeEnd, segCount)
+            idx += 1
+            onsetTime = np.concatenate((onsetTime, segOnsetTime))
+            if len(segTimeArr) == 0 or segTimeArr[-1] != timeBegin:
+                segTimeArr.append(timeBegin)
+            segTimeArr.append(timeEnd)
+
+    debugInfo = True
+    if debugInfo:
+        SaveInstantValue(onsetActivation, filename, '_onset_activation')
+        SaveInstantValue(onsetTime, filename, '_tango_pick')
+        SaveInstantValue(segTimeArr, filename, '_tango_seg_time')
+        import LevelInfo
+        levelNotes = []
+        beatInterval = 60 / bpm
+        posOffset = (beatInterval / 8 / 2) * 1000
+        for val in onsetTime:
+            levelNotes.append((val * 1000 + posOffset, LevelInfo.shortNote, 0, 0))
+        name = os.path.basename(filename).split('.')[0]
+        levelEditorRoot = 'E:/work/dl/audio/proj/LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'    
+        levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, name)
+        LevelInfo.GenerateIdolLevelForTangoDebug(levelFile, levelNotes, bpm, int(et * 1000), int(duration * 1000))
+
+    return onsetTime
 
 def TestSegm():
     y, sr = librosa.load(filename, mono=True, sr=44100)
@@ -535,6 +704,7 @@ def Run(filename = None):
     # filename = r'f:\music\侯宝林,郭启儒 - 抬杠.mp3'
     # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0178.ogg'
     # filename = r'f:\music\song_1698.ogg'
+    filename = r'E:\work\dl\audio\proj\rm\Andy Fortuna Productions - Amor\Andy Fortuna Productions - Amor.m4a'
 
 
     # if (len(sys.argv)) < 2:
@@ -622,8 +792,8 @@ def BatchTest():
 
 if __name__ == '__main__':
     
-    # Run()
-    BatchTest()
+    Run()
+    # BatchTest()
 
 
     
