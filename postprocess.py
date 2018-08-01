@@ -299,7 +299,7 @@ def AlignNotePosition(short, long, threhold=100):
 
     return long
 
-def AlignNotePositionEx(short, long, threhold=100):
+def AlignNotePositionEx(short, long, threhold=100, limitStartAndEnd = False):
     '''
     将挨得很近的长音符和短音符对齐到同一位置
     threhold 范围内的会对齐 单位毫秒
@@ -321,6 +321,9 @@ def AlignNotePositionEx(short, long, threhold=100):
                 m = np.argmin(np.abs(pos - longNote[idx]))
                 longNote[idx] = pos[m]
             elif idx == 0:
+                isValid = False
+                break
+            elif limitStartAndEnd:
                 isValid = False
                 break
 

@@ -10,6 +10,7 @@ import scipy
 import os.path
 import QQDancerLog
 import LevelMaker
+import bisect
 
 # 错误 code
 MUSIC_FILE_ERROR = 1    #打开音乐文件错误
@@ -482,17 +483,17 @@ def AnalysisMusicFeature(filename, **args):
     if genDebugFile:
         GenDebugFile(filename, duration, bpm, et, segTimes)
 
-    GenerateNote(filename, duration, bpm, et, segTimes[0], segTimes[1])
+    GenerateNote(filename, duration, bpm, et, segTimes[0], segTimes[1], r'E:\work\dl\audio\proj\model\model_longnote.ckpt')
 
     return (True, result)
 
 def PickOnset(onsetActivation, bpm, et, fps, segBegin, segEnd, count):
     threshold = 0.7
     checkFrameIdxArr = GenerateCheckFrameIdxArr(bpm, et, fps, segBegin, segEnd)
-    onsetTimes = []
+    onsetFrameIdxs = []
     offset = min(max(1, SecondToFrameIdx(60 / bpm / 8, fps)), 3)
     for arr in checkFrameIdxArr:
-        onsetTime = []
+        onsetFrameIdx = []
         for frameIdx in arr:
             # if len(onsetTime) >= count:
             #     break
@@ -501,38 +502,38 @@ def PickOnset(onsetActivation, bpm, et, fps, segBegin, segEnd, count):
             end = min(frameIdx + offset + 1, len(onsetActivation))
             for subIdx in range(begin, end):
                 if onsetActivation[subIdx] >= threshold:
-                    onsetTime.append(frameIdx / fps)
+                    onsetFrameIdx.append(frameIdx)
                     break
 
-        onsetTimes.append(onsetTime)
+        onsetFrameIdxs.append(onsetFrameIdx)
 
     
-    def PickFromArr(onsetTime, curCount, targetCount):
+    def PickFromArr(onsetFrameIdx, curCount, targetCount):
         if curCount >= targetCount:
             return []
 
-        if curCount + len(onsetTime) <= targetCount:
-            return onsetTime
+        if curCount + len(onsetFrameIdx) <= targetCount:
+            return onsetFrameIdx
 
         remainCount= targetCount - curCount
-        offset = len(onsetTime) / remainCount
+        offset = len(onsetFrameIdx) / remainCount
         arr = []
         pickIdx = 0
-        while pickIdx < len(onsetTime):
+        while pickIdx < len(onsetFrameIdx):
             idx = int(pickIdx)
-            if len(arr) == 0 or arr[-1] != onsetTime[idx]:
-                arr.append(onsetTime[idx])
+            if len(arr) == 0 or arr[-1] != onsetFrameIdx[idx]:
+                arr.append(onsetFrameIdx[idx])
             
             pickIdx += offset
 
         return arr
 
-    pickOnsetTime = []
-    for onsetTime in onsetTimes:
-        pickOnsetTime = np.concatenate((pickOnsetTime, PickFromArr(onsetTime, len(pickOnsetTime), count)))
+    pickIdx = []
+    for onsetFrameIdx in onsetFrameIdxs:
+        pickIdx = np.concatenate((pickIdx, PickFromArr(onsetFrameIdx, len(pickIdx), count)))
 
-    pickOnsetTime = np.sort(pickOnsetTime)
-    return pickOnsetTime
+    pickIdx = np.sort(pickIdx)
+    return pickIdx
 
 def GenerateCheckFrameIdxArr(bpm, et, fps, segBegin, segEnd):
     beatInterval = 60 / bpm
@@ -594,47 +595,212 @@ def SegmentTimesToFrameIdx(duration, bpm, et, seg0, seg1, playSegCount, fps, fra
     segArr.append(SegmentTimeToFrameIdx(playSegCount, seg1, duration, bpm, fps, frameCount))
     return segArr
 
-def GenerateNote(filename, duration, bpm, et, seg0, seg1):
+def CreateProcesser(fps=100):
+    from madmom.processors import ParallelProcessor, Processor, SequentialProcessor
+    from madmom.audio.signal import SignalProcessor, FramedSignalProcessor
+    from madmom.audio.stft import ShortTimeFourierTransformProcessor
+    from madmom.audio.spectrogram import (
+        FilteredSpectrogramProcessor, LogarithmicSpectrogramProcessor,
+        SpectrogramDifferenceProcessor)
+    
+    # define pre-processing chain
+    sig = SignalProcessor(num_channels=1, sample_rate=44100)
+    # process the multi-resolution spec & diff in parallel
+    # process the multi-resolution spec & diff in parallel
+    multi = ParallelProcessor([])
+    frame_sizes = [1024, 2048, 4096]
+    num_bands = [3, 6, 12]
+    for frame_size, num_bands in zip(frame_sizes, num_bands):
+        frames = FramedSignalProcessor(frame_size=frame_size, fps=fps)
+        stft = ShortTimeFourierTransformProcessor()  # caching FFT window
+        filt = FilteredSpectrogramProcessor(
+            num_bands=num_bands, fmin=30, fmax=17000, norm_filters=True)
+        spec = LogarithmicSpectrogramProcessor(mul=1, add=1)
+        diff = SpectrogramDifferenceProcessor(
+            diff_ratio=0.5, positive_diffs=True, stack_diffs=np.hstack)
+        # process each frame size with spec and diff sequentially
+        multi.append(SequentialProcessor((frames, stft, filt, spec, diff)))
+
+    # stack the features and processes everything sequentially
+    pre_processor = SequentialProcessor((sig, multi, np.hstack))
+    return pre_processor
+    
+def FeatureStandardize(data):
+    featureMin = np.min(data)
+    featureMax = np.max(data)
+    delta = featureMax - featureMin
+    if delta > 0.0:
+        data = data * (1.0 / delta) - featureMin / delta
+    else:
+        print('audio feature delta not > 0.0, may error')
+
+    return data
+
+def FeatureExtractFunc(pathname, fps=100):
+    pre_processor = CreateProcesser(fps)
+    d = pre_processor(pathname)
+    d = FeatureStandardize(d)
+    print('audio processed ', d.shape)
+    return d
+
+def RunModel(modelFile, songFile, featureFunc=FeatureExtractFunc):
+    import tensorflow as tf
+
+    predictGraph = tf.Graph()
+    graphFile = modelFile + '.meta'
+
+    with predictGraph.as_default():
+        saver = tf.train.import_meta_graph(graphFile)
+        with tf.Session(graph=predictGraph) as sess:
+            
+            saver.restore(sess, modelFile)
+            print('model loaded')
+
+            predict_op = tf.get_default_graph().get_tensor_by_name("predict_op:0")
+            print('predict_op', predict_op)         
+            X = tf.get_default_graph().get_tensor_by_name('X:0')
+            seqLenHolder = tf.get_default_graph().get_tensor_by_name('seqLen:0')
+            
+            reuseState = True
+            if reuseState:
+                initial_states = tf.get_default_graph().get_tensor_by_name('initial_states:0')
+                # batch_states = tf.get_default_graph().get_tensor_by_name('batch_states_predict:0')
+                batch_states = tf.get_default_graph().get_tensor_by_name('batch_states:0')
+                initialStatesZero = np.array([[0.0] * batch_states.shape[1]] * batch_states.shape[0])
+                currentInitialStates = initialStatesZero
+
+            x = FeatureExtractFunc(songFile)
+            batchSize = 16
+            numSteps = 128
+            count = len(x)
+            x = x[:-(count%numSteps)]
+            x = x.reshape(-1, 1, numSteps, len(x[0]))
+            x = np.repeat(x, batchSize, axis=1)
+            numBatches = len(x)
+            
+            evaluate = []
+            for i in range(numBatches):
+                xData = x[i]
+                seqLen = np.array([numSteps] * batchSize)
+                if not reuseState:
+                    t = sess.run(predict_op, feed_dict={X:xData, seqLenHolder:seqLen})
+                else:
+                    t, batchStates = sess.run([predict_op, batch_states], feed_dict={X:xData, seqLenHolder:seqLen, initial_states: currentInitialStates})
+                    currentInitialStates = batchStates
+                
+                t = t[0:numSteps,:]
+                evaluate.append(t)
+
+            lableDim = len(evaluate[0][0])
+            predicts = np.stack(evaluate).reshape(-1, lableDim)
+
+    return predicts
+
+def ProcessLongNote(long, short, showTimeFrameIdx, bpm):
+    import postprocess
+    long = postprocess.BilateralFilter(long, ratio=0.9)
+    
+    beatInterval = int((60 / bpm) * 1000)
+    short[showTimeFrameIdx] = 0
+    long = postprocess.AlignNotePositionEx(short, long, threhold=beatInterval * 2, limitStartAndEnd=True)
+    short[showTimeFrameIdx] = 1
+    long = postprocess.EliminateShortSamples(long, threhold=500)
+    return long
+
+def TransToNote(short, long):
+    notes = []
+    longBinary = long > 0
+    edge = (longBinary[1:] != longBinary[:-1]).nonzero()[0] + 1
+    i = 0
+    while i < len(short):
+        if long[i] > 0:
+            end = bisect.bisect_right(edge, i)
+            end = edge[end]
+            notes.append((i, 1, end-i))
+            i = end+1
+
+        elif short[i] > 0:
+            notes.append((i, 0, 0))
+            i += 1
+        else:
+            i += 1
+
+    return notes
+
+def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
     barDuration = 60 / bpm * 4
+    beatInterval = 60 / bpm
     barNoteCountArr = [2, 3.5, 5, 6.5, 8, 6.5, 5, 3.5, 2]
     playSegCount = 3
     fps = 100
     onsetProcessor = madmom.features.onsets.CNNOnsetProcessor()
-    onsetActivation = onsetProcessor(filename)
+    onsetActivation = onsetProcessor(songFilePath)
 
     segArr = SegmentTimesToFrameIdx(duration, bpm, et, seg0, seg1, playSegCount, fps, len(onsetActivation))
     idx = 0
-    onsetTime = []
+    onsetFrameIdx = []
     segTimeArr = []
+    showTimeFrameIdx = []
     for playSegArr, showTimeSeg in segArr:
         for frameBegin, frameEnd in playSegArr:
             timeBegin = frameBegin / fps
             timeEnd = frameEnd / fps
             segCount = int((timeEnd - timeBegin) / barDuration * barNoteCountArr[idx])
-            segOnsetTime = PickOnset(onsetActivation, bpm, et, fps, timeBegin, timeEnd, segCount)
+            segOnsetFrameIdx = PickOnset(onsetActivation, bpm, et, fps, timeBegin, timeEnd, segCount)
             idx += 1
-            onsetTime = np.concatenate((onsetTime, segOnsetTime))
+            onsetFrameIdx = np.concatenate((onsetFrameIdx, segOnsetFrameIdx))
             if len(segTimeArr) == 0 or segTimeArr[-1] != timeBegin:
                 segTimeArr.append(timeBegin)
             segTimeArr.append(timeEnd)
 
+        showTimeBegin = showTimeSeg[0] / fps
+        beatOffset = int((showTimeBegin - et) / beatInterval)
+        beatTimeA = et + beatOffset * beatInterval
+        beatTimeB = beatTimeA + beatInterval
+        if abs(beatTimeA - showTimeBegin) <= abs(beatTimeB - showTimeBegin):
+            showTimeFirstIdx = SecondToFrameIdx(beatTimeA, fps)
+        else:
+            showTimeFirstIdx = SecondToFrameIdx(beatTimeB, fps)
+        
+        while len(onsetFrameIdx) > 0 and showTimeFirstIdx <= onsetFrameIdx[-1]:
+            onsetFrameIdx = onsetFrameIdx[:-1]
+
+        onsetFrameIdx = np.append(onsetFrameIdx, showTimeFirstIdx)
+        showTimeFrameIdx.append(showTimeFirstIdx)
+
+    short = np.zeros_like(onsetActivation)
+    onsetFrameIdx = np.array(onsetFrameIdx).astype(int)
+    short[onsetFrameIdx] = 1
+
+    predicts = RunModel(modelFilePath, songFilePath)
+    long = predicts[:, 3]
+    lenArr = min(len(short), len(long))
+    short = short[0:lenArr]
+    long = long[0:lenArr]
+    long = ProcessLongNote(long, short, showTimeFrameIdx, bpm)
+
+    notes = TransToNote(short, long)
+
     debugInfo = True
     if debugInfo:
-        SaveInstantValue(onsetActivation, filename, '_onset_activation')
-        SaveInstantValue(onsetTime, filename, '_tango_pick')
-        SaveInstantValue(segTimeArr, filename, '_tango_seg_time')
+        SaveInstantValue(onsetActivation, songFilePath, '_onset_activation')
+        SaveInstantValue(onsetFrameIdx / fps, songFilePath, '_tango_pick')
+        SaveInstantValue(segTimeArr, songFilePath, '_tango_seg_time')
+        SaveInstantValue(long, songFilePath, '_tango_long')
         import LevelInfo
         levelNotes = []
-        beatInterval = 60 / bpm
         posOffset = (beatInterval / 8 / 2) * 1000
-        for val in onsetTime:
-            levelNotes.append((val * 1000 + posOffset, LevelInfo.shortNote, 0, 0))
-        name = os.path.basename(filename).split('.')[0]
+        for start, noteType, end in notes:
+            levelNoteType = LevelInfo.shortNote
+            if noteType != 0:
+                levelNoteType = LevelInfo.longNote
+            levelNotes.append((start / fps * 1000 + posOffset, levelNoteType, end / fps * 1000 + posOffset, 0))
+        name = os.path.basename(songFilePath).split('.')[0]
         levelEditorRoot = 'E:/work/dl/audio/proj/LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'    
         levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, name)
         LevelInfo.GenerateIdolLevelForTangoDebug(levelFile, levelNotes, bpm, int(et * 1000), int(duration * 1000))
 
-    return onsetTime
+    return notes
 
 def TestSegm():
     y, sr = librosa.load(filename, mono=True, sr=44100)
@@ -704,8 +870,6 @@ def Run(filename = None):
     # filename = r'f:\music\侯宝林,郭启儒 - 抬杠.mp3'
     # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0178.ogg'
     # filename = r'f:\music\song_1698.ogg'
-    filename = r'E:\work\dl\audio\proj\rm\Andy Fortuna Productions - Amor\Andy Fortuna Productions - Amor.m4a'
-
 
     # if (len(sys.argv)) < 2:
     #     print('missing music file(ogg) name as input!')
@@ -792,7 +956,20 @@ def BatchTest():
 
 if __name__ == '__main__':
     
-    Run()
+    songs = []
+    # songs.append('Emmanuel - Corazon de Melao')
+    # songs.append('Kaoma - Chacha la Vie')
+    # songs.append('Livan Nunez - Represent, Cuba')
+    # songs.append('Marc Anthony - Dímelo')
+    # songs.append('Marc Anthony - I Need to Know')
+    songs.append('Michael Bublé - Sway')
+    # songs.append('Michael Learns To Rock - Blue Night')
+    # songs.append('Nana Mouskouri - Rayito de Luna')
+    # songs.append('Santa Esmeralda - I Heart It Through The Grapevine／Latin Vers')
+    # songs.append('Andy Fortuna Productions - Amor')
+    for song in songs:
+        filename = r'E:\work\dl\audio\proj\rm\%s\%s.m4a' % (song, song)
+        Run(filename)
     # BatchTest()
 
 
