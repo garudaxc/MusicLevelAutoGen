@@ -696,14 +696,15 @@ def RunModel(modelFile, songFile, featureFunc=FeatureExtractFunc):
 
     return predicts
 
-def ProcessLongNote(long, short, showTimeFrameIdx, bpm):
+def ProcessLongNote(long, short, forceNoLongNoteIdx, bpm):
     import postprocess
     long = postprocess.BilateralFilter(long, ratio=0.9)
     
     beatInterval = int((60 / bpm) * 1000)
-    short[showTimeFrameIdx] = 0
+    temp = short[forceNoLongNoteIdx]
+    short[forceNoLongNoteIdx] = 0
     long = postprocess.AlignNotePositionEx(short, long, threhold=beatInterval * 2, limitStartAndEnd=True)
-    short[showTimeFrameIdx] = 1
+    short[forceNoLongNoteIdx] = temp
     long = postprocess.EliminateShortSamples(long, threhold=500)
     return long
 
@@ -777,7 +778,8 @@ def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
     lenArr = min(len(short), len(long))
     short = short[0:lenArr]
     long = long[0:lenArr]
-    long = ProcessLongNote(long, short, showTimeFrameIdx, bpm)
+    forceNoLongNoteIdx = np.concatenate((range(0, segArr[0][0][-1][1]), showTimeFrameIdx))
+    long = ProcessLongNote(long, short, forceNoLongNoteIdx, bpm)
 
     notes = TransToNote(short, long)
 
@@ -957,12 +959,12 @@ def BatchTest():
 if __name__ == '__main__':
     
     songs = []
-    # songs.append('Emmanuel - Corazon de Melao')
+    songs.append('Emmanuel - Corazon de Melao')
     # songs.append('Kaoma - Chacha la Vie')
     # songs.append('Livan Nunez - Represent, Cuba')
     # songs.append('Marc Anthony - Dímelo')
     # songs.append('Marc Anthony - I Need to Know')
-    songs.append('Michael Bublé - Sway')
+    # songs.append('Michael Bublé - Sway')
     # songs.append('Michael Learns To Rock - Blue Night')
     # songs.append('Nana Mouskouri - Rayito de Luna')
     # songs.append('Santa Esmeralda - I Heart It Through The Grapevine／Latin Vers')
