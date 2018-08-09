@@ -590,9 +590,10 @@ def SegmentTimeToFrameIdx(playSegCount, begin, end, bpm, fps, frameCount):
     return (frameArr[0:playSegCount], frameArr[playSegCount])
 
 
-def SegmentTimesToFrameIdx(duration, bpm, et, seg0, seg1, playSegCount, fps, frameCount):
+def SegmentTimesToFrameIdx(duration, bpm, et, seg0, seg1, playSegCount, fps, frameCount, beatPerBar):
     segArr = []
-    segArr.append(SegmentTimeToFrameIdx(playSegCount, et, seg0, bpm, fps, frameCount))
+    emptyTime = 60 / bpm * beatPerBar * 4
+    segArr.append(SegmentTimeToFrameIdx(playSegCount, et + emptyTime, seg0, bpm, fps, frameCount))
     segArr.append(SegmentTimeToFrameIdx(playSegCount, seg0, seg1, bpm, fps, frameCount))
     segArr.append(SegmentTimeToFrameIdx(playSegCount, seg1, duration, bpm, fps, frameCount))
     return segArr
@@ -689,25 +690,43 @@ def NoteType(bar, pos, beatLen):
 
     return 2
 
-def PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen):
+def PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter):
+    def IsThreeQuarter(noteIdxs, idx, fps, bpm, et, beatPerBar, beatLen):
+        halfBeatLen = beatLen / 2
+        if len(noteIdxs) < 3 or idx <= 0 or idx >= len(noteIdxs) - 1:
+            return False
+
+        lastBar, lastPos = FrameToBarPos(noteIdxs[idx - 1], fps, bpm, et, beatPerBar, beatLen)
+        nextBar, nextPos = FrameToBarPos(noteIdxs[idx + 1], fps, bpm, et, beatPerBar, beatLen)
+        lastAllPos = BarPosToAllPos(lastBar, lastPos, beatPerBar, beatLen)
+        nextAllPos = BarPosToAllPos(nextBar, nextPos, beatPerBar, beatLen)
+        return nextAllPos - lastAllPos == halfBeatLen
+
     halfBeatLen = beatLen / 2
     quarterBeatLen = beatLen / 4
     # 按策划提供的规则筛选音符
     tempNoteIdxs = []
     continueHalfInterval = 0
     lastHalfIntervalAllPos = 0
-    for noteIdx in noteIdxs:
+    for idx in range(len(noteIdxs)):
+        noteIdx = noteIdxs[idx]
         bar, pos = FrameToBarPos(noteIdx, fps, bpm, et, beatPerBar, beatLen)
         noteType = NoteType(bar, pos, beatLen)
         allPos = BarPosToAllPos(bar, pos, beatPerBar, beatLen)
         if noteType == 2:
-            # 四分之一拍只能跟着半拍或整拍
+            # 四分之一拍只能跟着整拍
             if len(tempNoteIdxs) <= 0:
                 continue
 
             lastBar, lastPos = FrameToBarPos(tempNoteIdxs[-1], fps, bpm, et, beatPerBar, beatLen)
-            if allPos - BarPosToAllPos(lastBar, lastPos, beatPerBar, beatLen) == quarterBeatLen:
-                tempNoteIdxs.append(noteIdx)
+            lastNoteType = NoteType(lastBar, lastPos, beatLen)
+            if lastNoteType != 0:
+                continue
+
+            if allPos - BarPosToAllPos(lastBar, lastPos, beatPerBar, beatLen) != quarterBeatLen:
+                continue
+
+            tempNoteIdxs.append(noteIdx)
         else:
             # 连续的半拍间隔最多6个
             if continueHalfInterval >= 6:
@@ -723,20 +742,29 @@ def PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen):
 
     noteIdxs = tempNoteIdxs
     tempNoteIdxs = []
-    lastQuarterIntervalAllPos = 0
-    for noteIdx in noteIdxs:
+    continueQuaterNote = 0
+    lastQuarterNoteAllPos = 0
+    lastQuarterIsThree = False
+    for idx in range(len(noteIdxs)):
+        noteIdx = noteIdxs[idx]
         bar, pos = FrameToBarPos(noteIdx, fps, bpm, et, beatPerBar, beatLen)
         noteType = NoteType(bar, pos, beatLen)
         allPos = BarPosToAllPos(bar, pos, beatPerBar, beatLen)
         if noteType == 2:
             if len(tempNoteIdxs) > 0:
-                if lastQuarterIntervalAllPos > 0:
-                    if allPos - lastQuarterIntervalAllPos >= beatLen + halfBeatLen:
-                        lastQuarterIntervalAllPos = allPos
-                        tempNoteIdxs.append(noteIdx)
-                else:
-                    lastQuarterIntervalAllPos = allPos
-                    tempNoteIdxs.append(noteIdx)
+                isThreeQuarter = IsThreeQuarter(noteIdxs, idx, fps, bpm, et, beatPerBar, beatLen)
+                if (isThreeQuarter and (not allowThreeQuarter)) or continueQuaterNote >= 4 or (lastQuarterIsThree and isThreeQuarter):
+                    continueQuaterNote = 0
+                    lastQuarterIsThree = False
+                    continue
+
+                if lastQuarterNoteAllPos == 0 or (allPos - lastQuarterNoteAllPos > beatLen):
+                    continueQuaterNote = 0
+                    
+                continueQuaterNote += 1
+                lastQuarterIsThree = isThreeQuarter
+                lastQuarterNoteAllPos = allPos
+                tempNoteIdxs.append(noteIdx)
         else:
             tempNoteIdxs.append(noteIdx)
 
@@ -794,11 +822,11 @@ def AppendNoteIfNeed(noteIdxs, fps, bpm, et, beatPerBar, beatLen):
         tempNoteIdxs.append(noteIdxs[idx])
     return tempNoteIdxs
 
-def PickNote(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen):
-    noteIdxs = PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen)
+def PickNote(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter):
+    noteIdxs = PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter)
     if len(noteIdxs) > count:
         noteIdxs = PickNoteRandom(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen)
-        noteIdxs = PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen)
+        noteIdxs = PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter)
 
     return noteIdxs
 
@@ -811,7 +839,10 @@ def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
     onsetProcessor = madmom.features.onsets.CNNOnsetProcessor()
     onsetActivation = onsetProcessor(songFilePath)
 
-    segArr = SegmentTimesToFrameIdx(duration, bpm, et, seg0, seg1, playSegCount, fps, len(onsetActivation))
+    beatPerBar = 4
+    beatLen = 8
+
+    segArr = SegmentTimesToFrameIdx(duration, bpm, et, seg0, seg1, playSegCount, fps, len(onsetActivation), beatPerBar)
     idx = 0
     onsetFrameIdxs = []
     segTimeArr = []
@@ -845,22 +876,20 @@ def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
         onsetFrameIdxs[-1] = onsetFrameIdx
         showTimeFrameIdx.append(showTimeFirstIdx)
 
-    beatPerBar = 4
-    beatLen = 8
     noteCountScaleArr = [1, 1.2, 1.25, 1.3, 1.5, 1.3, 1.3, 1, 1]
     pickFrameIdx = []
     tempFrameIdx = []
     baseCount = len(onsetFrameIdxs[4]) * 1.0
     for idx in range(len(onsetFrameIdxs)):
         frameIdxArr = onsetFrameIdxs[idx]
-        res = PickNote(frameIdxArr, int(baseCount * (noteCountScaleArr[idx] / noteCountScaleArr[4])), fps, bpm, et, beatPerBar, beatLen)
+        res = PickNote(frameIdxArr, int(baseCount * (noteCountScaleArr[idx] / noteCountScaleArr[4])), fps, bpm, et, beatPerBar, beatLen, idx > 1)
         tempFrameIdx = np.concatenate((tempFrameIdx, res))
         if idx % playSegCount == playSegCount - 1:
-            tempFrameIdx = PickNoteWithRule(tempFrameIdx, fps, bpm, et, beatPerBar, beatLen)
+            tempFrameIdx = PickNoteWithRule(tempFrameIdx, fps, bpm, et, beatPerBar, beatLen, True)
             segIdx = idx // playSegCount
             if showTimeFrameIdx[segIdx] > tempFrameIdx[-1]:
                 tempFrameIdx = np.append(tempFrameIdx, showTimeFrameIdx[segIdx])
-                
+
             tempFrameIdx = AppendNoteIfNeed(tempFrameIdx, fps, bpm, et, beatPerBar, beatLen)
             pickFrameIdx = np.concatenate((pickFrameIdx, tempFrameIdx))
             tempFrameIdx = []
