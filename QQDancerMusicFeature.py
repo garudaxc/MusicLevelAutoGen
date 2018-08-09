@@ -689,7 +689,7 @@ def NoteType(bar, pos, beatLen):
 
     return 2
 
-def PickNoteWithRule(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen):
+def PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen):
     halfBeatLen = beatLen / 2
     quarterBeatLen = beatLen / 4
     # 按策划提供的规则筛选音符
@@ -795,10 +795,10 @@ def AppendNoteIfNeed(noteIdxs, fps, bpm, et, beatPerBar, beatLen):
     return tempNoteIdxs
 
 def PickNote(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen):
-    noteIdxs = PickNoteWithRule(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen)
+    noteIdxs = PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen)
     if len(noteIdxs) > count:
         noteIdxs = PickNoteRandom(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen)
-        noteIdxs = PickNoteWithRule(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen)
+        noteIdxs = PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen)
 
     return noteIdxs
 
@@ -856,10 +856,11 @@ def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
         res = PickNote(frameIdxArr, int(baseCount * (noteCountScaleArr[idx] / noteCountScaleArr[4])), fps, bpm, et, beatPerBar, beatLen)
         tempFrameIdx = np.concatenate((tempFrameIdx, res))
         if idx % playSegCount == playSegCount - 1:
+            tempFrameIdx = PickNoteWithRule(tempFrameIdx, fps, bpm, et, beatPerBar, beatLen)
             segIdx = idx // playSegCount
             if showTimeFrameIdx[segIdx] > tempFrameIdx[-1]:
                 tempFrameIdx = np.append(tempFrameIdx, showTimeFrameIdx[segIdx])
-
+                
             tempFrameIdx = AppendNoteIfNeed(tempFrameIdx, fps, bpm, et, beatPerBar, beatLen)
             pickFrameIdx = np.concatenate((pickFrameIdx, tempFrameIdx))
             tempFrameIdx = []
