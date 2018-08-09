@@ -12,6 +12,7 @@ import QQDancerLog
 import LevelMaker
 import bisect
 import random
+import xml
 
 # 错误 code
 MUSIC_FILE_ERROR = 1    #打开音乐文件错误
@@ -641,30 +642,33 @@ def FrameIdxToBeatPos(notes, fps, bpm, et, beatPerBar, beatLen):
 
     return posNotes
 
-def SaveNotes(filePath, notes, seg0, seg1, bpm, et, beatPerBar, beatLen):
-    bpmStr = 'bpm=' + str(bpm)
-    beatPerBarStr = 'BeatPerBar=' + str(beatPerBar)
-    beatLenStr = 'BeatLen=' + str(beatLen)
-    enterTimeStr = 'EnterTime=' + str((int(et * 1000)))
-    artistStr = 'Artist=xxx'
-    seg0Str = 'seg0=(%d %d)' % seg0
-    seg1Str = 'seg1=(%d %d)' % seg1
-    noteStr = 'note='
+def SaveNotes(filePath, song, notes, seg0, seg1, bpm, et, beatPerBar, beatLen):
+    def AppendChild(doc, node, name, text = None):
+        childNode = doc.createElement(name)
+        node.appendChild(childNode)
+        if text is not None:
+            childNode.appendChild(doc.createTextNode(str(text)))
+        return childNode
+
+    doc = xml.dom.minidom.Document()
+    TangoMiddle = doc.createElement('TangoMiddle')
+    doc.appendChild(TangoMiddle)
+    AppendChild(doc, TangoMiddle, 'song', song)
+    AppendChild(doc, TangoMiddle, 'bpm', bpm)
+    AppendChild(doc, TangoMiddle, 'BeatPerBar', beatPerBar)
+    AppendChild(doc, TangoMiddle, 'BeatLen', beatLen)
+    AppendChild(doc, TangoMiddle, 'EnterTime', int(et * 1000))
+    AppendChild(doc, TangoMiddle, 'Artist', 'xxx')
+    AppendChild(doc, TangoMiddle, 'seg0', int(BarPosToAllPos(seg0[0], seg0[1], beatPerBar, beatLen)))
+    AppendChild(doc, TangoMiddle, 'seg1', int(BarPosToAllPos(seg1[0], seg1[1], beatPerBar, beatLen)))
+    NoteSequence = AppendChild(doc, TangoMiddle, 'NoteSequence')
     for idx in range(len(notes)):
         bar, pos = notes[idx]
-        if idx > 0:
-            noteStr += ',(%d %d)' % (bar, pos)
-        else:
-            noteStr += '(%d %d)' % (bar, pos)
+        allpos = BarPosToAllPos(bar, pos, beatPerBar, beatLen)
+        AppendChild(doc, NoteSequence, 'Note', int(allpos))
+
     with open(filePath, 'w') as file:
-        file.write(bpmStr + '\n')
-        file.write(beatPerBarStr + '\n')
-        file.write(beatLenStr + '\n')
-        file.write(enterTimeStr + '\n')
-        file.write(artistStr + '\n')
-        file.write(seg0Str + '\n')
-        file.write(seg1Str + '\n')
-        file.write(noteStr)
+        doc.writexml(file, addindent='\t', newl='\n', encoding='UTF-8')
 
     return True
 
@@ -870,8 +874,9 @@ def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
     posNotes = FrameIdxToBeatPos(short, fps, bpm, et, beatPerBar, beatLen)
     seg0 = FrameToBarPos(segArr[0][1][1], fps, bpm, et, beatPerBar, beatLen)
     seg1 = FrameToBarPos(segArr[1][1][1], fps, bpm, et, beatPerBar, beatLen)
-    notePath = filename.split('.')[0] + '_note.txt'
-    SaveNotes(notePath, posNotes, seg0, seg1, bpm, et, beatPerBar, beatLen)
+    notePath = filename.split('.')[0] + '_note.xml'
+    songName = os.path.basename(filename).split('.')[0] + '.ogg'
+    SaveNotes(notePath, songName, posNotes, seg0, seg1, bpm, et, beatPerBar, beatLen)
 
     debugInfo = True
     if debugInfo:
