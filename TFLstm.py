@@ -913,7 +913,7 @@ def AutoGenerateLevelTool():
     longModelPath = 'model/long/model_longnote.ckpt'
     for songFilePath in songFileArr:
         print('generate ' + songFilePath)
-        songFileName = os.path.basename(songFilePath).split('.')[0]
+        songFileName = os.path.splitext(os.path.basename(songFilePath))[0]
         levelFilePath = os.path.join(levelFileDir, songFileName + '.xml')
         AutoGenerateLevel(songFilePath, singModelPath, longModelPath, levelFilePath)
 
