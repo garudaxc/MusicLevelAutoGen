@@ -699,20 +699,14 @@ def ProcessSampleToIdolLevel(rawFileLong, rawFileShort):
 
     return levelNotes
 
-def ProcessSampleToIdolLevel2(rawFileLong, short, bpm):
+def ProcessSampleToIdolLevel2(long, short, bpm):
     # 
 
     np.random.seed(0)
 
-    print('load raw file')
-    with open(rawFileLong, 'rb') as file:
-        predicts = pickle.load(file)
+    short = short[:long.shape[0]]
 
-    pre = predicts[:, 3]
-
-    short = short[:pre.shape[0]]
-
-    long = BilateralFilter(pre, ratio=0.9)
+    long = BilateralFilter(long, ratio=0.9)
     
     beatInterval = int((60 / bpm) * 1000)
     long = AlignNotePositionEx(short, long, threhold=beatInterval * 2)

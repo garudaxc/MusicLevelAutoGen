@@ -656,7 +656,14 @@ def SaveModel(sess, filename, saveMeta = False):
 
 def EvaluateWithModel(modelFile, song, rawFile, TrainData, featureFunc=myprocesser.LoadAndProcessAudio):
     # 加载训练好的模型，将结果保存到二进制文件
-    
+    predicts = RunModel(modelFile, MakeMp3Pathname(song), TrainData, featureFunc)
+    with open(rawFile, 'wb') as file:
+        pickle.dump(predicts, file)
+        print('raw file saved', predicts.shape)
+
+    return predicts
+
+def RunModel(modelFile, songFile, TrainData, featureFunc=myprocesser.LoadAndProcessAudio):    
     predictGraph = tf.Graph()
     graphFile = modelFile + '.meta'
 
@@ -680,7 +687,7 @@ def EvaluateWithModel(modelFile, song, rawFile, TrainData, featureFunc=myprocess
                 initialStatesZero = np.array([[0.0] * batch_states.shape[1]] * batch_states.shape[0])
                 currentInitialStates = initialStatesZero
 
-            testx, _ = PrepareTrainData(song, batchSize, loadTestData = False, featureFunc=featureFunc)
+            testx = featureFunc(songFile)
 
             data = TrainData(batchSize, numSteps, testx)
             
@@ -698,10 +705,6 @@ def EvaluateWithModel(modelFile, song, rawFile, TrainData, featureFunc=myprocess
 
 
             predicts = np.stack(evaluate).reshape(-1, TrainData.lableDim)
-
-            with open(rawFile, 'wb') as file:
-                pickle.dump(predicts, file)
-                print('raw file saved', predicts.shape)
 
     return predicts
 
@@ -817,6 +820,108 @@ def AlignNoteWithBPMAndET(notes, frameInterval, bpm, et):
 
     return np.array(newNotes)
 
+def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, templateFilePath, saveDebugFile = False):
+    predicts = shortPredicts
+    pathname = songFilePath
+    singingActivation = predicts[:, 1]
+    if saveDebugFile:
+        DownbeatTracking.SaveInstantValue(singingActivation, pathname, '_result_singing')
+        if len(predicts[0]) > 2:
+            DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_result_bg')
+        if len(predicts[0]) > 3:
+            DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_result_dur')
+        DownbeatTracking.SaveInstantValue(predicts[:, 0], pathname, '_result_no_label')
+    short = DownbeatTracking.PickOnsetFromFile(pathname, bpm, duration, None, saveDebugFile)
+    dis_time = 60 / bpm / 8
+    singingPicker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=0.7, smooth=0.0, pre_max=dis_time, post_max=dis_time, fps=100)
+    singingTimes = singingPicker(singingActivation)
+
+    if saveDebugFile:
+        DownbeatTracking.SaveInstantValue(singingTimes, pathname, '_result_singing_pick')
+
+    singingTimes = singingTimes * 100
+    singingTimes = singingTimes.astype(int)
+    frameCount = len(short)
+    singing = np.array([0] * frameCount)
+    singing[singingTimes] = 1
+    idxOffsetPre = int(60 / bpm * 1 * 100 * 0.9)
+    idxOffsetPost = int(60 / bpm * 1 * 100 * 0.9)
+    for singIdx in range(0, frameCount):
+        if (singing[singIdx] < 1):
+            continue
+        
+        idxStart = max(singIdx - idxOffsetPre, 0)
+        idxEnd = min(singIdx + idxOffsetPost, frameCount)
+        for idx in range(idxStart, idxEnd):
+            short[idx] = 0
+
+    checkShortCount = 0
+    for val in short:
+        if val > 0:
+            checkShortCount += 1
+    print('remove some short by singing. remain ', checkShortCount)
+    short[singingTimes] = 1
+    short = AlignNoteWithBPMAndET(short, 10, bpm, et)
+
+    long = longPredicts[:, 3]
+    levelNotes = postprocess.ProcessSampleToIdolLevel2(long, short, bpm)
+
+    LevelInfo.GenerateIdolLevel(levelFilePath, levelNotes, bpm, et, duration, templateFilePath)
+
+def AutoGenerateLevel(songFilePath, shortModelPath, longModelPath, levelFilePath):
+    longPredicts = RunModel(longModelPath, songFilePath, TrainDataDynLongNote)
+    shortPredicts = RunModel(shortModelPath, songFilePath, TrainDataDynSinging)
+    duration, bpm, et = DownbeatTracking.CalcMusicInfoFromFile(songFilePath, -1, -1, False)
+    duration = int(duration * 1000)
+    et = int(et * 1000)
+    GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, 'idol_template.xml', False)
+
+# @run
+def AutoGenerateLevelTool():
+    configFilePath = 'config.txt'
+    if not os.path.exists(configFilePath):
+        print('configFilePath config.txt not found')
+        return False
+
+    print('find config.txt succeed')
+    levelFileDir = ''
+    songFileArr = []
+    with open(configFilePath, 'r') as file:
+        idx = 0
+        for line in file:
+            line = line.replace('\r', '\n')
+            line = line.replace('\n', '')
+            if idx == 0:
+                levelFileDir = line
+            else:
+                if len(line) > 0:
+                    songFileArr.append(line)
+            idx += 1
+
+    if not os.path.exists(levelFileDir):
+        print('levelFileDir not exist')
+        return False
+    
+    print('check levelFileDir ' + levelFileDir + 'end')
+    for songFilePath in songFileArr:
+        if not os.path.exists(songFilePath):
+            print('songFilePath not exist' + songFilePath)
+            return False
+
+    print('check song list end')
+    singModelPath = 'model/short/model_singing.ckpt'
+    longModelPath = 'model/long/model_longnote.ckpt'
+    for songFilePath in songFileArr:
+        print('generate ' + songFilePath)
+        songFileName = os.path.basename(songFilePath).split('.')[0]
+        levelFilePath = os.path.join(levelFileDir, songFileName + '.xml')
+        AutoGenerateLevel(songFilePath, singModelPath, longModelPath, levelFilePath)
+
+    print(' ')
+    print('all song level generate end ==========================')
+
+    return True
+
 @run
 def GenerateLevel():
     print('gen level')
@@ -834,7 +939,7 @@ def GenerateLevel():
     song = ['CheapThrills']
     song = ['dainiqulvxing']
     song = ['liuxingyu']
-    song = ['101358xia_lian']
+    song = ['Emmanuel - Corazon de Melao']
     # song = ['shaonianzhongguo']
     # song = ['danshengonghai']
     # song = ['sanguolian_2']
@@ -850,7 +955,7 @@ def GenerateLevel():
     # song = ['kanong']
     # song = ['qinghuaci']
     # song = ['zuichibi']
-    song = ['buchaobuyonghuaqian']
+    # song = ['buchaobuyonghuaqian']
     # song = ['hxdssan']
     # song = ['zhongguohua']
     # song = ['100576SEXY_LOVE']
@@ -877,8 +982,8 @@ def GenerateLevel():
     # debugET = 29543
     # song = ['jianyunzhe']
     # debugET = 682
-    # song = ['jinjuebianjingxian']
-    # debugET = 6694
+    song = ['jinjuebianjingxian']
+    debugET = 6694
     # song = ['ouxiangwanwansui']
     # debugET = 571
     # song = ['blue planet']
@@ -923,7 +1028,7 @@ def GenerateLevel():
         TrainData = TrainDataDynLongNote
         rawFile = TrainData.RawDataFileName(song[0])
         modelFile = TrainData.GetModelPathName()
-        predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)
+        predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)
         DownbeatTracking.SaveInstantValue(predicts[:, 1], pathname, '_long_short')   
         DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_long_start')   
         DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_long_dur')   
@@ -935,7 +1040,7 @@ def GenerateLevel():
             TrainData = TrainDataDynShortNoteBeat
             rawFile = TrainData.RawDataFileName(song[0])
             modelFile = TrainData.GetModelPathName()
-            predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData)  
+            predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)  
             print('predicts shape', predicts.shape) 
 
         # TrainData.GenerateLevel(predicts, pathname)
@@ -944,28 +1049,11 @@ def GenerateLevel():
             TrainData = TrainDataDynSinging
             rawFile = TrainData.RawDataFileName(song[0])
             modelFile = TrainData.GetModelPathName()
-            predicts = EvaluateWithModel(modelFile, song, rawFile, TrainData, featureExtractFunc)  
+            predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData, featureExtractFunc)  
             print('predicts shape', predicts.shape) 
 
         print('calc bpm')
         DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM)
-
-    if not useOnsetForShort:
-        # levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
-        levelEditorRoot = rootDir + 'LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'
-        levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, song[0])
-        duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
-        
-        rawFileLong = TrainDataDynLongNote.RawDataFileName(song[0])
-        rawFileShort = TrainDataDynShortNoteBeat.RawDataFileName(song[0])
-        with open(rawFileShort, 'rb') as file:
-            predicts = pickle.load(file)
-
-        short = predicts[:, 1]
-        short = DownbeatTracking.PickOnsetFromFile(pathname, bpm, duration, onsets=short)
-        levelNotes = postprocess.ProcessSampleToIdolLevel2(rawFileLong, short, bpm)
-
-        LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
 
     if useOnsetForShort:
         # levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
@@ -978,51 +1066,10 @@ def GenerateLevel():
         with open(rawFileSinging, 'rb') as file:
             predicts = pickle.load(file)
 
-        predictsMaxIdx = np.argmax(predicts, axis=1)
-        maxsingingTimes = []
-        for i in range(len(predictsMaxIdx)):
-            if predictsMaxIdx[i] == 1:
-                maxsingingTimes.append(i * 0.01)
-        DownbeatTracking.SaveInstantValue(maxsingingTimes, pathname, '_result_singing_max')
+        with open(rawFileLong, 'rb') as file:
+            longPredicts = pickle.load(file)
 
-        singingActivation = predicts[:, 1]
-        DownbeatTracking.SaveInstantValue(singingActivation, pathname, '_result_singing')
-        if len(predicts[0]) > 2:
-            DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_result_bg')
-        if len(predicts[0]) > 3:
-            DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_result_dur')
-        DownbeatTracking.SaveInstantValue(predicts[:, 0], pathname, '_result_no_label')
-        short = DownbeatTracking.PickOnsetFromFile(pathname, bpm, duration)
-        dis_time = 60 / bpm / 8
-        singingPicker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=0.7, smooth=0.0, pre_max=dis_time, post_max=dis_time, fps=100)
-        singingTimes = singingPicker(singingActivation)
-        DownbeatTracking.SaveInstantValue(singingTimes, pathname, '_result_singing_pick')
-        singingTimes = singingTimes * 100
-        singingTimes = singingTimes.astype(int)
-        frameCount = len(short)
-        singing = np.array([0] * frameCount)
-        singing[singingTimes] = 1
-        idxOffsetPre = int(60 / bpm * 1 * 100 * 0.9)
-        idxOffsetPost = int(60 / bpm * 1 * 100 * 0.9)
-        for singIdx in range(0, frameCount):
-            if (singing[singIdx] < 1):
-                continue
-            
-            idxStart = max(singIdx - idxOffsetPre, 0)
-            idxEnd = min(singIdx + idxOffsetPost, frameCount)
-            for idx in range(idxStart, idxEnd):
-                short[idx] = 0
-
-        checkShortCount = 0
-        for val in short:
-            if val > 0:
-                checkShortCount += 1
-        print('remove some short by singing. remain ', checkShortCount)
-        short[singingTimes] = 1
-        short = AlignNoteWithBPMAndET(short, 10, bpm, et)
-        levelNotes = postprocess.ProcessSampleToIdolLevel2(rawFileLong, short, bpm)
-
-        LevelInfo.GenerateIdolLevel(levelFile, levelNotes, bpm, et, duration)
+        GenerateLevelImp(pathname, duration, bpm, et, predicts, longPredicts, levelFile, rootDir + 'data/idol_template.xml', True)
     
 
 def LoadRawData(useSoftmax = True):
@@ -1098,7 +1145,6 @@ def _Main():
     learningRate = tf.placeholder(dtype=tf.float32, name='learn_rate')
 
     result = BuildDynamicRnn(X, Y, seqlenHolder, learningRate, TrainData)
-    # result = BuildDynamicRnn_Encoder_Decoder(X, Y, seqlenHolder, learningRate, TrainData)
 
     maxAcc = 0.0
     minLoss = 10000.0

@@ -262,7 +262,7 @@ def SaveDownbeat(bpm, et, lastBeat, filename):
     SaveInstantValue(downbeat, filename, '_downbeat')
 
 
-def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1):
+def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1, saveToFile=True):
     y, sr = librosa.load(filename, mono=True, sr=44100)
     logger.info('loaded')
     duration = librosa.get_duration(y=y, sr=sr)
@@ -296,12 +296,13 @@ def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1):
 
     print('bpm', bpm, 'et', etAuto)
 
-    dir = os.path.dirname(filename) + os.path.sep
-    infoFileName = dir + 'info.txt'
-    with open(infoFileName, 'w') as file:
-        file.write('duration=%f\nbpm=%f\net=%f' % (duration, bpm, etAuto))
+    if saveToFile:
+        dir = os.path.dirname(filename) + os.path.sep
+        infoFileName = dir + 'info.txt'
+        with open(infoFileName, 'w') as file:
+            file.write('duration=%f\nbpm=%f\net=%f' % (duration, bpm, etAuto))
 
-    # SaveDownbeat(bpm, etAuto, lastBeat, filename)
+    return duration, bpm, etAuto
 
 
 def CalcMusicInfo():
@@ -560,7 +561,7 @@ def CalcPreferenceBeatCount(bpm, duration):
     count = round((minNotePerBeat + rate * (maxNotePerBeat - minNotePerBeat)) * beat)
     return count
 
-def PickOnsetFromFile(filename, bpm, duration, onsets = None):
+def PickOnsetFromFile(filename, bpm, duration, onsets = None, saveDebugFile = False):
     
     # filename = r'd:\librosa\RhythmMaster\foxishaonv\foxishaonv.mp3'
     # filename = r'd:\librosa\RhythmMaster\CheapThrills\CheapThrills.mp3'
@@ -571,7 +572,8 @@ def PickOnsetFromFile(filename, bpm, duration, onsets = None):
     else:
         samples = onsets
 
-    SaveInstantValue(samples, filename, '_onset_activation')
+    if saveDebugFile:
+        SaveInstantValue(samples, filename, '_onset_activation')
     count = CalcPreferenceBeatCount(bpm, duration)
 
     # print(type(samples), samples.shape, len(samples))
@@ -593,7 +595,8 @@ def PickOnsetFromFile(filename, bpm, duration, onsets = None):
         dis_time += 0.0001
 
     print(threhold, len(onsettime))
-    SaveInstantValue(onsettime, filename, '_onset')    
+    if saveDebugFile:
+        SaveInstantValue(onsettime, filename, '_onset')    
 
     onsettime = onsettime * 100
     onsettime = onsettime.astype(int)

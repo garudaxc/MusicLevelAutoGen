@@ -861,7 +861,7 @@ def CheckNotes(notes):
     return validNotes
 
 
-def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
+def GenerateIdolLevel(filename, notes, bpm, et, musicTime, templateFilePath = None):
     '''
     保存到心动模式关卡文件
     '''
@@ -884,7 +884,9 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime):
         newNotes.append(r)
     notes = newNotes
 
-    text=open(rootDir + 'data/idol_template.xml', encoding='utf-8').read()
+    if templateFilePath is None:
+        templateFilePath = rootDir + 'data/idol_template.xml'
+    text=open(templateFilePath, encoding='utf-8').read()
     xmlparser = ElementTree.XMLParser(encoding='utf-8')
     tree = ElementTree.fromstring(text)
 
