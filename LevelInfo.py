@@ -756,7 +756,7 @@ def GetTrackPosInfo(notes, trackCount):
     return trackPosDic
     
 
-def CheckNotes(notes):
+def CheckNotes(notes, noteEndBar):
     '''
     最后检查音符，处理对齐音符等阶段可能出现的同一个位置多个轨道有音符等情况
     '''
@@ -841,6 +841,18 @@ def CheckNotes(notes):
     for note in tempNotes:
         bar, pos, type, value, track = note
         if type != shortNote:
+            if type == longNote:
+                endBar, endPos = value
+                if endBar >= noteEndBar:
+                    endBar = noteEndBar
+                    endPos = 0
+                    startNotePos = CalcNotePos(bar, pos)
+                    endNotePos = CalcNotePos(endBar, endPos)
+                    if endNotePos - startNotePos < 8:
+                        print('skip long note too short after clip out of endbar')
+                        continue
+                    note = (bar, pos, type, (endBar, endPos), track)
+                    print('clip long note out of endbar')
             validNotes.append(note)
             continue
 
@@ -900,7 +912,7 @@ def GenerateIdolLevel(filename, notes, bpm, et, musicTime, templateFilePath = No
     print('number of notes', len(notes))
 
     notes = AlignNotesWithBeat(notes, 2)
-    notes = CheckNotes(notes)
+    notes = CheckNotes(notes, lastBar - 3)
 
     root = tree
     levelInfo = root.find('LevelInfo')
