@@ -886,7 +886,7 @@ def AutoGenerateLevelTool():
     print('find config.txt succeed')
     levelFileDir = ''
     songFileArr = []
-    with open(configFilePath, 'r', 1, 'utf-8') as file:
+    with open(configFilePath, 'r') as file:
         idx = 0
         for line in file:
             line = line.replace('\r', '\n')
