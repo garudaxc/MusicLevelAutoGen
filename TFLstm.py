@@ -317,7 +317,7 @@ class TrainDataDynShortNoteSinging(TrainDataBase):
         else:
             self._y = [None] * count
 
-            x = x[:-(count%numSteps)]
+            x = x[0:(count - count%numSteps)]
             x = x.reshape(-1, 1, numSteps, inputDim)
             self._x = np.repeat(x, batchSize, axis=1)
             print('x shape', self._x.shape)
@@ -374,7 +374,7 @@ class TrainDataDynShortNoteBeat(TrainDataBase):
         else:
             self._y = [None] * count
 
-            x = x[:-(count%numSteps)]
+            x = x[0:(count - count%numSteps)]
             x = x.reshape(-1, 1, numSteps, inputDim)
             self._x = np.repeat(x, batchSize, axis=1)
             print('x shape', self._x.shape)
@@ -416,7 +416,7 @@ class TrainDataDynSinging(TrainDataBase):
         else:
             self._y = [None] * count
 
-            x = x[:-(count%numSteps)]
+            x = x[0:(count - count%numSteps)]
             x = x.reshape(-1, 1, numSteps, inputDim)
             self._x = np.repeat(x, batchSize, axis=1)
             print('x shape', self._x.shape)
@@ -470,7 +470,7 @@ class TrainDataDynLongNote(TrainDataBase):
         else:
             self._y = [None] * count
 
-            x = x[:-(count%numSteps)]
+            x = x[0:(count - count%numSteps)]
             x = x.reshape(-1, 1, numSteps, inputDim)
             self._x = np.repeat(x, batchSize, axis=1)
             print('x shape', self._x.shape)
@@ -886,7 +886,7 @@ def AutoGenerateLevelTool():
     print('find config.txt succeed')
     levelFileDir = ''
     songFileArr = []
-    with open(configFilePath, 'r') as file:
+    with open(configFilePath, 'r', 1, 'utf-8') as file:
         idx = 0
         for line in file:
             line = line.replace('\r', '\n')
@@ -899,23 +899,32 @@ def AutoGenerateLevelTool():
             idx += 1
 
     if not os.path.exists(levelFileDir):
-        print('levelFileDir not exist')
+        print('error! levelFileDir not exist. path: ' + levelFileDir)
         return False
     
     print('check levelFileDir ' + levelFileDir + 'end')
     for songFilePath in songFileArr:
         if not os.path.exists(songFilePath):
-            print('songFilePath not exist' + songFilePath)
+            print('error! song file not found. path: ' + songFilePath)
             return False
+        else:
+            print('song path: ' + songFilePath)
 
-    print('check song list end')
+    songCount = len(songFileArr)
+    songIdx = 0
+
+    print('check song list end. start generate...')
     singModelPath = 'model/short/model_singing.ckpt'
     longModelPath = 'model/long/model_longnote.ckpt'
     for songFilePath in songFileArr:
-        print('generate ' + songFilePath)
+        songIdx += 1
+        print('~~~~~')
+        print('generate %d/%d %s' % (songIdx, songCount, songFilePath))
+        print('~~~~~')
         songFileName = os.path.splitext(os.path.basename(songFilePath))[0]
         levelFilePath = os.path.join(levelFileDir, songFileName + '.xml')
         AutoGenerateLevel(songFilePath, singModelPath, longModelPath, levelFilePath)
+        
 
     print(' ')
     print('all song level generate end ==========================')
@@ -982,8 +991,8 @@ def GenerateLevel():
     # debugET = 29543
     # song = ['jianyunzhe']
     # debugET = 682
-    song = ['jinjuebianjingxian']
-    debugET = 6694
+    # song = ['jinjuebianjingxian']
+    # debugET = 6694
     # song = ['ouxiangwanwansui']
     # debugET = 571
     # song = ['blue planet']
@@ -1014,6 +1023,7 @@ def GenerateLevel():
     # song = ['xiangrikuideyueding']
     # debugBPM = 158
     # debugET = 115
+    song = ['Human Legacy']
 
     # postprocess.ProcessSampleToIdolLevel(song[0])
     # return
