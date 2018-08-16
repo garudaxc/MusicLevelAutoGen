@@ -690,7 +690,7 @@ def NoteType(bar, pos, beatLen):
 
     return 2
 
-def PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter):
+def PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter, allowQuarterNote):
     def IsThreeQuarter(noteIdxs, idx, fps, bpm, et, beatPerBar, beatLen):
         halfBeatLen = beatLen / 2
         if len(noteIdxs) < 3 or idx <= 0 or idx >= len(noteIdxs) - 1:
@@ -714,6 +714,9 @@ def PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuar
         noteType = NoteType(bar, pos, beatLen)
         allPos = BarPosToAllPos(bar, pos, beatPerBar, beatLen)
         if noteType == 2:
+            if not allowQuarterNote:
+                continue
+
             # 四分之一拍只能跟着整拍
             if len(tempNoteIdxs) <= 0:
                 continue
@@ -751,6 +754,9 @@ def PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuar
         noteType = NoteType(bar, pos, beatLen)
         allPos = BarPosToAllPos(bar, pos, beatPerBar, beatLen)
         if noteType == 2:
+            if not allowQuarterNote:
+                continue
+
             if len(tempNoteIdxs) > 0:
                 isThreeQuarter = IsThreeQuarter(noteIdxs, idx, fps, bpm, et, beatPerBar, beatLen)
                 if (isThreeQuarter and (not allowThreeQuarter)) or continueQuaterNote >= 4 or (lastQuarterIsThree and isThreeQuarter):
@@ -822,11 +828,11 @@ def AppendNoteIfNeed(noteIdxs, fps, bpm, et, beatPerBar, beatLen):
         tempNoteIdxs.append(noteIdxs[idx])
     return tempNoteIdxs
 
-def PickNote(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter):
-    noteIdxs = PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter)
+def PickNote(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter, allowQuarterNote):
+    noteIdxs = PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter, allowQuarterNote)
     if len(noteIdxs) > count:
         noteIdxs = PickNoteRandom(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen)
-        noteIdxs = PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter)
+        noteIdxs = PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuarter, allowQuarterNote)
 
     return noteIdxs
 
@@ -876,16 +882,17 @@ def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
         onsetFrameIdxs[-1] = onsetFrameIdx
         showTimeFrameIdx.append(showTimeFirstIdx)
 
-    noteCountScaleArr = [1, 1.2, 1.25, 1.3, 1.5, 1.3, 1.3, 1, 1]
+    noteCountScaleArr = [1, 1.2, 1.25, 1.3, 1.5, 1.3, 1.3, 1.1, 1]
     pickFrameIdx = []
     tempFrameIdx = []
     baseCount = len(onsetFrameIdxs[4]) * 1.0
+    allowQuarterNote = False
     for idx in range(len(onsetFrameIdxs)):
         frameIdxArr = onsetFrameIdxs[idx]
-        res = PickNote(frameIdxArr, int(baseCount * (noteCountScaleArr[idx] / noteCountScaleArr[4])), fps, bpm, et, beatPerBar, beatLen, idx > 1)
+        res = PickNote(frameIdxArr, int(baseCount * (noteCountScaleArr[idx] / noteCountScaleArr[4])), fps, bpm, et, beatPerBar, beatLen, idx > 1, allowQuarterNote)
         tempFrameIdx = np.concatenate((tempFrameIdx, res))
         if idx % playSegCount == playSegCount - 1:
-            tempFrameIdx = PickNoteWithRule(tempFrameIdx, fps, bpm, et, beatPerBar, beatLen, True)
+            tempFrameIdx = PickNoteWithRule(tempFrameIdx, fps, bpm, et, beatPerBar, beatLen, True, allowQuarterNote)
             segIdx = idx // playSegCount
             if showTimeFrameIdx[segIdx] > tempFrameIdx[-1]:
                 tempFrameIdx = np.append(tempFrameIdx, showTimeFrameIdx[segIdx])
@@ -898,8 +905,6 @@ def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
     pickFrameIdx = np.array(pickFrameIdx).astype(int)
     short[pickFrameIdx] = 1
     short[showTimeFrameIdx] = 1
-
-    notes = TransToNote(short, np.zeros_like(short))
 
     posNotes = FrameIdxToBeatPos(short, fps, bpm, et, beatPerBar, beatLen)
     seg0 = FrameToBarPos(segArr[0][1][1], fps, bpm, et, beatPerBar, beatLen)
@@ -916,17 +921,17 @@ def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
         import LevelInfo
         levelNotes = []
         posOffset = (beatInterval / 8 / 2) * 1000
-        for start, noteType, end in notes:
-            levelNoteType = LevelInfo.shortNote
-            if noteType != 0:
-                levelNoteType = LevelInfo.longNote
-            levelNotes.append((start / fps * 1000 + posOffset, levelNoteType, end / fps * 1000 + posOffset, 0))
+        for idx in range(len(short)):
+            if short[idx] <= 0:
+                continue
+
+            levelNotes.append((idx / fps * 1000 + posOffset, LevelInfo.shortNote, 0, 0))
         name = os.path.basename(songFilePath).split('.')[0]
         levelEditorRoot = 'E:/work/dl/audio/proj/LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'    
         levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, name)
         LevelInfo.GenerateIdolLevelForTangoDebug(levelFile, levelNotes, bpm, int(et * 1000), int(duration * 1000))
 
-    return notes
+    return posNotes
 
 def TestSegm():
     y, sr = librosa.load(filename, mono=True, sr=44100)
