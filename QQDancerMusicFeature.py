@@ -489,9 +489,9 @@ def AnalysisMusicFeature(filename, **args):
 
     return (True, result)
 
-def PickOnset(onsetActivation, bpm, et, fps, segBegin, segEnd, count):
+def PickOnset(onsetActivation, bpm, et, fps, segBegin, segEnd, count, allowQuarterNote):
     threshold = 0.7
-    checkFrameIdxArr = GenerateCheckFrameIdxArr(bpm, et, fps, segBegin, segEnd)
+    checkFrameIdxArr = GenerateCheckFrameIdxArr(bpm, et, fps, segBegin, segEnd, allowQuarterNote)
     onsetFrameIdxs = []
     offset = min(max(1, SecondToFrameIdx(60 / bpm / 8, fps)), 3)
     for arr in checkFrameIdxArr:
@@ -537,7 +537,7 @@ def PickOnset(onsetActivation, bpm, et, fps, segBegin, segEnd, count):
     pickIdx = np.sort(pickIdx)
     return pickIdx
 
-def GenerateCheckFrameIdxArr(bpm, et, fps, segBegin, segEnd):
+def GenerateCheckFrameIdxArr(bpm, et, fps, segBegin, segEnd, allowQuarterNote):
     beatInterval = 60 / bpm
 
     checkFrameIdxArrA = []
@@ -560,10 +560,11 @@ def GenerateCheckFrameIdxArr(bpm, et, fps, segBegin, segEnd):
         checkFrameIdxArrB.append(SecondToFrameIdx(curTime, fps))
         curTime += beatInterval
 
-    curTime = firstBeatTime + beatInterval / 4
-    while curTime < segEnd:
-        checkFrameIdxArrC.append(SecondToFrameIdx(curTime, fps))
-        curTime += (beatInterval / 2)
+    if allowQuarterNote:
+        curTime = firstBeatTime + beatInterval / 4
+        while curTime < segEnd:
+            checkFrameIdxArrC.append(SecondToFrameIdx(curTime, fps))
+            curTime += (beatInterval / 2)
 
     return [checkFrameIdxArrA, checkFrameIdxArrB, checkFrameIdxArrC]
 
@@ -853,12 +854,13 @@ def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
     onsetFrameIdxs = []
     segTimeArr = []
     showTimeFrameIdx = []
+    allowQuarterNote = False
     for playSegArr, showTimeSeg in segArr:
         for frameBegin, frameEnd in playSegArr:
             timeBegin = frameBegin / fps
             timeEnd = frameEnd / fps
             segCount = int((timeEnd - timeBegin) / barDuration * barNoteCountArr[idx])
-            segOnsetFrameIdx = PickOnset(onsetActivation, bpm, et, fps, timeBegin, timeEnd, segCount)
+            segOnsetFrameIdx = PickOnset(onsetActivation, bpm, et, fps, timeBegin, timeEnd, segCount, allowQuarterNote)
             idx += 1
             onsetFrameIdxs.append(segOnsetFrameIdx)
             if len(segTimeArr) == 0 or segTimeArr[-1] != timeBegin:
@@ -885,8 +887,11 @@ def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
     noteCountScaleArr = [1, 1.2, 1.25, 1.3, 1.5, 1.3, 1.3, 1.1, 1]
     pickFrameIdx = []
     tempFrameIdx = []
-    baseCount = len(onsetFrameIdxs[4]) * 1.0
-    allowQuarterNote = False
+
+    tempframeIdxArr = onsetFrameIdxs[4]
+    tempRes = PickNote(tempframeIdxArr, len(tempframeIdxArr), fps, bpm, et, beatPerBar, beatLen, True, allowQuarterNote)
+    baseCount = len(tempRes)
+
     for idx in range(len(onsetFrameIdxs)):
         frameIdxArr = onsetFrameIdxs[idx]
         res = PickNote(frameIdxArr, int(baseCount * (noteCountScaleArr[idx] / noteCountScaleArr[4])), fps, bpm, et, beatPerBar, beatLen, idx > 1, allowQuarterNote)
