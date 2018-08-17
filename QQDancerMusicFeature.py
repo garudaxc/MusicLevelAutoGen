@@ -435,7 +435,7 @@ def GenDebugFile(filename, duration, bpm, et, seg = None):
         SaveInstantValue(seg, filename, '_seg')
 
 
-def AnalysisMusicFeature(filename, **args):
+def AnalysisMusicFeature(filename, levelFilePath, **args):
     '''
     计算音乐文件的特征数据
     返回值 tuple(a, b)
@@ -485,7 +485,7 @@ def AnalysisMusicFeature(filename, **args):
     if genDebugFile:
         GenDebugFile(filename, duration, bpm, et, segTimes)
 
-    GenerateNote(filename, duration, bpm, et, segTimes[0], segTimes[1], r'E:\work\dl\audio\proj\model\model_longnote.ckpt')
+    GenerateNote(filename, duration, bpm, et, segTimes[0], segTimes[1], levelFilePath)
 
     return (True, result)
 
@@ -733,9 +733,9 @@ def PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, allowThreeQuar
             tempNoteIdxs.append(noteIdx)
         else:
             # 连续的半拍间隔最多6个
-            if continueHalfInterval >= 6:
-                continueHalfInterval = 0
-                continue
+            # if continueHalfInterval >= 6:
+            #     continueHalfInterval = 0
+            #     continue
             
             if allPos - lastHalfIntervalAllPos != halfBeatLen:
                 continueHalfInterval = 0
@@ -837,7 +837,7 @@ def PickNote(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen, allowThreeQuart
 
     return noteIdxs
 
-def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
+def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, levelFilePath):
     barDuration = 60 / bpm * 4
     beatInterval = 60 / bpm
     barNoteCountArr = [16] * 9
@@ -914,27 +914,27 @@ def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, modelFilePath):
     posNotes = FrameIdxToBeatPos(short, fps, bpm, et, beatPerBar, beatLen)
     seg0 = FrameToBarPos(segArr[0][1][1], fps, bpm, et, beatPerBar, beatLen)
     seg1 = FrameToBarPos(segArr[1][1][1], fps, bpm, et, beatPerBar, beatLen)
-    notePath = filename.split('.')[0] + '_note.xml'
-    songName = os.path.basename(filename).split('.')[0] + '.ogg'
-    SaveNotes(notePath, songName, posNotes, seg0, seg1, bpm, et, beatPerBar, beatLen)
+    songName = os.path.basename(songFilePath).split('.')[0] + '.ogg'
+    if levelFilePath is not None:
+        SaveNotes(levelFilePath, songName, posNotes, seg0, seg1, bpm, et, beatPerBar, beatLen)
 
-    debugInfo = True
-    if debugInfo:
-        SaveInstantValue(onsetActivation, songFilePath, '_onset_activation')
-        SaveInstantValue(pickFrameIdx / fps, songFilePath, '_tango_pick')
-        SaveInstantValue(segTimeArr, songFilePath, '_tango_seg_time')
-        import LevelInfo
-        levelNotes = []
-        posOffset = (beatInterval / 8 / 2) * 1000
-        for idx in range(len(short)):
-            if short[idx] <= 0:
-                continue
+    # debugInfo = True
+    # if debugInfo:
+    #     SaveInstantValue(onsetActivation, songFilePath, '_onset_activation')
+    #     SaveInstantValue(pickFrameIdx / fps, songFilePath, '_tango_pick')
+    #     SaveInstantValue(segTimeArr, songFilePath, '_tango_seg_time')
+    #     import LevelInfo
+    #     levelNotes = []
+    #     posOffset = (beatInterval / 8 / 2) * 1000
+    #     for idx in range(len(short)):
+    #         if short[idx] <= 0:
+    #             continue
 
-            levelNotes.append((idx / fps * 1000 + posOffset, LevelInfo.shortNote, 0, 0))
-        name = os.path.basename(songFilePath).split('.')[0]
-        levelEditorRoot = 'E:/work/dl/audio/proj/LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'    
-        levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, name)
-        LevelInfo.GenerateIdolLevelForTangoDebug(levelFile, levelNotes, bpm, int(et * 1000), int(duration * 1000))
+    #         levelNotes.append((idx / fps * 1000 + posOffset, LevelInfo.shortNote, 0, 0))
+    #     name = os.path.basename(songFilePath).split('.')[0]
+    #     levelEditorRoot = 'E:/work/dl/audio/proj/LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'    
+    #     levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, name)
+    #     LevelInfo.GenerateIdolLevelForTangoDebug(levelFile, levelNotes, bpm, int(et * 1000), int(duration * 1000))
 
     return posNotes
 
@@ -992,7 +992,7 @@ def GenerateLevelFile(filename, musicInfo, logger):
     pass
     print('call GenerateLevelFile')
 
-def Run(filename = None):
+def Run(filename = None, levelFilePath = None):
     # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1351.ogg'
     # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0201.ogg'
     # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0858.ogg'
@@ -1037,12 +1037,12 @@ def Run(filename = None):
 
     logger.info('args', args)
     
-    success, info = AnalysisMusicFeature(filename, **args)
+    success, info = AnalysisMusicFeature(filename, levelFilePath, **args)
 
-    if success:
-        info['diffculty'] = args['-diffculty']
-        LevelMaker.GenerateLevelFile(levelFile, info, logger)
-        #GenerateLevelFile(levelFile, info, logger)
+    # if success:
+    #     info['diffculty'] = args['-diffculty']
+    #     LevelMaker.GenerateLevelFile(levelFile, info, logger)
+    #     #GenerateLevelFile(levelFile, info, logger)
     
     logger.info('result', info)
 
@@ -1090,23 +1090,75 @@ def BatchTest():
     print()
     print('done in %.1f minute' % ((time.time() - startTime) / 60.0))
 
-if __name__ == '__main__':
+def AutoGenerateNoteTool():
+    configFilePath = 'config.txt'
+    if not os.path.exists(configFilePath):
+        print('configFilePath config.txt not found')
+        return False
+
+    print('find config.txt succeed')
+    levelFileDir = ''
+    songFileArr = []
+    with open(configFilePath, 'r') as file:
+        idx = 0
+        for line in file:
+            line = line.replace('\r', '\n')
+            line = line.replace('\n', '')
+            if idx == 0:
+                levelFileDir = line
+            else:
+                if len(line) > 0:
+                    songFileArr.append(line)
+            idx += 1
+
+    if not os.path.exists(levelFileDir):
+        print('error! levelFileDir not exist. path: ' + levelFileDir)
+        return False
     
-    ext = '.m4a'
-    songs = []
-    songs.append('Emmanuel - Corazon de Melao')
-    songs.append('Kaoma - Chacha la Vie')
-    songs.append('Livan Nunez - Represent, Cuba')
-    songs.append('Marc Anthony - Dímelo')
-    songs.append('Marc Anthony - I Need to Know')
-    songs.append('Michael Bublé - Sway')
-    songs.append('Michael Learns To Rock - Blue Night')
-    songs.append('Nana Mouskouri - Rayito de Luna')
-    songs.append('Santa Esmeralda - I Heart It Through The Grapevine／Latin Vers')
-    songs.append('Andy Fortuna Productions - Amor')
-    for song in songs:
-        filename = r'E:\work\dl\audio\proj\rm\%s\%s%s' % (song, song, ext)
-        Run(filename)
+    print('check levelFileDir ' + levelFileDir + ' end')
+    for songFilePath in songFileArr:
+        if not os.path.exists(songFilePath):
+            print('error! song file not found. path: ' + songFilePath)
+            return False
+        else:
+            print('song path: ' + songFilePath)
+
+    songCount = len(songFileArr)
+    songIdx = 0
+
+    print('check song list end. start generate...')
+    for songFilePath in songFileArr:
+        songIdx += 1
+        print('~~~~~')
+        print('generate %d/%d %s' % (songIdx, songCount, songFilePath))
+        print('~~~~~')
+        songFileName = os.path.splitext(os.path.basename(songFilePath))[0]
+        levelFilePath = os.path.join(levelFileDir, songFileName + '.xml')
+        Run(songFilePath, levelFilePath)
+
+    print(' ')
+    print('all song level generate end ==========================')
+
+    return True
+
+if __name__ == '__main__':
+
+    AutoGenerateNoteTool()    
+    # ext = '.mp3'
+    # songs = []
+    # songs.append('Emmanuel - Corazon de Melao')
+    # songs.append('Kaoma - Chacha la Vie')
+    # songs.append('Livan Nunez - Represent, Cuba')
+    # songs.append('Marc Anthony - Dímelo')
+    # songs.append('Marc Anthony - I Need to Know')
+    # songs.append('Michael Bublé - Sway')
+    # songs.append('Michael Learns To Rock - Blue Night')
+    # songs.append('Nana Mouskouri - Rayito de Luna')
+    # songs.append('Santa Esmeralda - I Heart It Through The Grapevine／Latin Vers')
+    # songs.append('Andy Fortuna Productions - Amor')
+    # for song in songs:
+    #     filename = r'E:\work\dl\audio\proj\rm\%s\%s%s' % (song, song, ext)
+    #     Run(filename)
     # BatchTest()
 
 
