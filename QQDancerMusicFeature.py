@@ -171,7 +171,7 @@ def madmom_features_downbeats_filter_downbeats(beats):
 def CalcDownbeat(y, sr, duration, **args):
     # calc downbeat entertime
     analysisLength = args['-duration']
-    minimumMusicLength = 165
+    minimumMusicLength = 110
     maximumMusicLength = 360
     numThread = args['-thread']
     threhold = args['-threhold']
