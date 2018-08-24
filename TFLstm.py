@@ -771,56 +771,64 @@ def AlignNoteWithBPMAndET(notes, frameInterval, bpm, et):
         if idx >= len(notes):
             continue
 
+        # 只移除孤立的半拍
         if pos % maxNotePerBeat != 0:
             curHalfBeat = halfBeatInfoDic[pos]
-            if (pos - maxNotePerBeat not in halfBeatInfoDic) and (pos + maxNotePerBeat not in halfBeatInfoDic):
-                # if curHalfBeat[3] != 2:
+            if curHalfBeat[3] == 0:
                 halfBeatInfoDic.pop(pos)
                 continue
-            elif curHalfBeat[3] == 0:
-                threshold = 4
-                tempCount = 0
-                for tempIdx in range(-(threshold - 1), threshold):
-                    if pos + maxNotePerBeat * tempIdx not in halfBeatInfoDic:
-                        tempCount = 0
-                        continue
+
+
+        # if pos % maxNotePerBeat != 0:
+        #     curHalfBeat = halfBeatInfoDic[pos]
+        #     if (pos - maxNotePerBeat not in halfBeatInfoDic) and (pos + maxNotePerBeat not in halfBeatInfoDic):
+        #         # if curHalfBeat[3] != 2:
+        #         halfBeatInfoDic.pop(pos)
+        #         continue
+        #     elif curHalfBeat[3] == 0:
+        #         threshold = 4
+        #         tempCount = 0
+        #         for tempIdx in range(-(threshold - 1), threshold):
+        #             if pos + maxNotePerBeat * tempIdx not in halfBeatInfoDic:
+        #                 tempCount = 0
+        #                 continue
                     
-                    halfBeat = halfBeatInfoDic[pos + maxNotePerBeat * tempIdx]
-                    if halfBeat[3] == 0:
-                        tempCount += 1
+        #             halfBeat = halfBeatInfoDic[pos + maxNotePerBeat * tempIdx]
+        #             if halfBeat[3] == 0:
+        #                 tempCount += 1
                     
-                    if tempCount == threshold:
-                        break
+        #             if tempCount == threshold:
+        #                 break
 
-                if tempCount < threshold:
-                    halfBeatInfoDic.pop(pos)
-                    continue
+        #         if tempCount < threshold:
+        #             halfBeatInfoDic.pop(pos)
+        #             continue
 
-            elif not curHalfBeat[2]:
-                if pos - maxNotePerBeat not in halfBeatInfoDic:
-                    halfBeatInfoDic.pop(pos)
-                    continue
-                else:
-                    beat = halfBeatInfoDic[pos - maxNotePerBeat]
-                    if beat[3] != 2:
-                        halfBeatInfoDic.pop(pos)
-                        continue        
-            else:
-                if not curHalfBeat[1] and (pos - maxNotePerBeat not in halfBeatInfoDic):
-                    halfBeatInfoDic.pop(pos)
-                    continue
+        #     elif not curHalfBeat[2]:
+        #         if pos - maxNotePerBeat not in halfBeatInfoDic:
+        #             halfBeatInfoDic.pop(pos)
+        #             continue
+        #         else:
+        #             beat = halfBeatInfoDic[pos - maxNotePerBeat]
+        #             if beat[3] != 2:
+        #                 halfBeatInfoDic.pop(pos)
+        #                 continue        
+        #     else:
+        #         if not curHalfBeat[1] and (pos - maxNotePerBeat not in halfBeatInfoDic):
+        #             halfBeatInfoDic.pop(pos)
+        #             continue
 
-                if (pos - maxNotePerBeat in halfBeatInfoDic) and (pos - 2 * maxNotePerBeat in halfBeatInfoDic):
-                    beatA = halfBeatInfoDic[pos - maxNotePerBeat]
-                    beatB = halfBeatInfoDic[pos - 2 * maxNotePerBeat]
-                    if beatA[3] != 0 and beatB[3] != 0:
-                        halfBeatInfoDic.pop(pos)
-                        continue
+        #         if (pos - maxNotePerBeat in halfBeatInfoDic) and (pos - 2 * maxNotePerBeat in halfBeatInfoDic):
+        #             beatA = halfBeatInfoDic[pos - maxNotePerBeat]
+        #             beatB = halfBeatInfoDic[pos - 2 * maxNotePerBeat]
+        #             if beatA[3] != 0 and beatB[3] != 0:
+        #                 halfBeatInfoDic.pop(pos)
+        #                 continue
         newNotes[idx] = 1
 
     return np.array(newNotes)
 
-def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, templateFilePath, saveDebugFile = False):
+def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, templateFilePath, onsetThreshold, shortThreshold, saveDebugFile = False):
     predicts = shortPredicts
     pathname = songFilePath
     singingActivation = predicts[:, 1]
@@ -831,10 +839,11 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
         if len(predicts[0]) > 3:
             DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_result_dur')
         DownbeatTracking.SaveInstantValue(predicts[:, 0], pathname, '_result_no_label')
-    short = DownbeatTracking.PickOnsetFromFile(pathname, bpm, duration, None, saveDebugFile)
+    short = DownbeatTracking.PickOnsetFromFile(pathname, bpm, duration, onsetThreshold, None, saveDebugFile)
     dis_time = 60 / bpm / 8
-    singingPicker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=0.7, smooth=0.0, pre_max=dis_time, post_max=dis_time, fps=100)
+    singingPicker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=shortThreshold, smooth=0.0, pre_max=dis_time, post_max=dis_time, fps=100)
     singingTimes = singingPicker(singingActivation)
+    print('sing pick count', shortThreshold, len(singingTimes))
 
     if saveDebugFile:
         DownbeatTracking.SaveInstantValue(singingTimes, pathname, '_result_singing_pick')
@@ -862,26 +871,47 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
     print('remove some short by singing. remain ', checkShortCount)
     short[singingTimes] = 1
     short = AlignNoteWithBPMAndET(short, 10, bpm, et)
+    print('note after align', np.sum(short))
 
     long = longPredicts[:, 3]
-    levelNotes = postprocess.ProcessSampleToIdolLevel2(long, short, bpm)
+    levelNotes = postprocess.ProcessSampleToIdolLevel2(long, short, bpm, et)
 
     LevelInfo.GenerateIdolLevel(levelFilePath, levelNotes, bpm, et, duration, templateFilePath)
 
-def AutoGenerateLevel(songFilePath, shortModelPath, longModelPath, levelFilePath):
+def AutoGenerateLevel(songFilePath, shortModelPath, longModelPath, levelFilePath, onsetThreshold = 0.7, shortThreshold = 0.7):
     longPredicts = RunModel(longModelPath, songFilePath, TrainDataDynLongNote)
     shortPredicts = RunModel(shortModelPath, songFilePath, TrainDataDynSinging)
     duration, bpm, et = DownbeatTracking.CalcMusicInfoFromFile(songFilePath, -1, -1, False)
     duration = int(duration * 1000)
     et = int(et * 1000)
-    GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, 'idol_template.xml', False)
+    GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, 'idol_template.xml', onsetThreshold, shortThreshold, False)
 
 # @run
 def AutoGenerateLevelTool():
+    paramFilePath = 'param.txt'
     configFilePath = 'config.txt'
     if not os.path.exists(configFilePath):
-        print('configFilePath config.txt not found')
+        print('configFile config.txt not found')
         return False
+    if not os.path.exists(paramFilePath):
+        print('paramFile param.txt not found')
+        return False
+
+    onsetThreshold = 0.7
+    shortThreshold = 0.7
+    with open(paramFilePath, 'r') as file:
+        idx = 0
+        for line in file:
+            line = line.replace('\r', '\n')
+            line = line.replace('\n', '')
+            if idx == 0:
+                onsetThreshold = float(line)
+            else:
+                shortThreshold = float(line)
+                break
+            
+            idx += 1
+    print('threshold', onsetThreshold, shortThreshold)
 
     print('find config.txt succeed')
     levelFileDir = ''
@@ -902,7 +932,7 @@ def AutoGenerateLevelTool():
         print('error! levelFileDir not exist. path: ' + levelFileDir)
         return False
     
-    print('check levelFileDir ' + levelFileDir + 'end')
+    print('check levelFileDir ' + levelFileDir + ' end')
     for songFilePath in songFileArr:
         if not os.path.exists(songFilePath):
             print('error! song file not found. path: ' + songFilePath)
@@ -923,7 +953,7 @@ def AutoGenerateLevelTool():
         print('~~~~~')
         songFileName = os.path.splitext(os.path.basename(songFilePath))[0]
         levelFilePath = os.path.join(levelFileDir, songFileName + '.xml')
-        AutoGenerateLevel(songFilePath, singModelPath, longModelPath, levelFilePath)
+        AutoGenerateLevel(songFilePath, singModelPath, longModelPath, levelFilePath, onsetThreshold, shortThreshold)
         
 
     print(' ')
@@ -1032,38 +1062,38 @@ def GenerateLevel():
     print(pathname)
 
     useOnsetForShort = True
-    if True:
-        # gen raw data
+    # if True:
+    #     # gen raw data
 
-        TrainData = TrainDataDynLongNote
-        rawFile = TrainData.RawDataFileName(song[0])
-        modelFile = TrainData.GetModelPathName()
-        predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)
-        DownbeatTracking.SaveInstantValue(predicts[:, 1], pathname, '_long_short')   
-        DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_long_start')   
-        DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_long_dur')   
-        print('predicts shape', predicts.shape)
+    #     TrainData = TrainDataDynLongNote
+    #     rawFile = TrainData.RawDataFileName(song[0])
+    #     modelFile = TrainData.GetModelPathName()
+    #     predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)
+    #     DownbeatTracking.SaveInstantValue(predicts[:, 1], pathname, '_long_short')   
+    #     DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_long_start')   
+    #     DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_long_dur')   
+    #     print('predicts shape', predicts.shape)
 
-        # TrainData.GenerateLevel(predicts, pathname)
+    #     # TrainData.GenerateLevel(predicts, pathname)
 
-        if not useOnsetForShort:
-            TrainData = TrainDataDynShortNoteBeat
-            rawFile = TrainData.RawDataFileName(song[0])
-            modelFile = TrainData.GetModelPathName()
-            predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)  
-            print('predicts shape', predicts.shape) 
+    #     if not useOnsetForShort:
+    #         TrainData = TrainDataDynShortNoteBeat
+    #         rawFile = TrainData.RawDataFileName(song[0])
+    #         modelFile = TrainData.GetModelPathName()
+    #         predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)  
+    #         print('predicts shape', predicts.shape) 
 
-        # TrainData.GenerateLevel(predicts, pathname)
+    #     # TrainData.GenerateLevel(predicts, pathname)
 
-        if useOnsetForShort:
-            TrainData = TrainDataDynSinging
-            rawFile = TrainData.RawDataFileName(song[0])
-            modelFile = TrainData.GetModelPathName()
-            predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData, featureExtractFunc)  
-            print('predicts shape', predicts.shape) 
+    #     if useOnsetForShort:
+    #         TrainData = TrainDataDynSinging
+    #         rawFile = TrainData.RawDataFileName(song[0])
+    #         modelFile = TrainData.GetModelPathName()
+    #         predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData, featureExtractFunc)  
+    #         print('predicts shape', predicts.shape) 
 
-        print('calc bpm')
-        DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM)
+    #     print('calc bpm')
+    #     DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM)
 
     if useOnsetForShort:
         # levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
@@ -1079,7 +1109,7 @@ def GenerateLevel():
         with open(rawFileLong, 'rb') as file:
             longPredicts = pickle.load(file)
 
-        GenerateLevelImp(pathname, duration, bpm, et, predicts, longPredicts, levelFile, rootDir + 'data/idol_template.xml', True)
+        GenerateLevelImp(pathname, duration, bpm, et, predicts, longPredicts, levelFile, rootDir + 'data/idol_template.xml', 0.7, 0.7, True)
     
 
 def LoadRawData(useSoftmax = True):

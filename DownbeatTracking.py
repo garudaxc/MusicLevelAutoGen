@@ -561,7 +561,7 @@ def CalcPreferenceBeatCount(bpm, duration):
     count = round((minNotePerBeat + rate * (maxNotePerBeat - minNotePerBeat)) * beat)
     return count
 
-def PickOnsetFromFile(filename, bpm, duration, onsets = None, saveDebugFile = False):
+def PickOnsetFromFile(filename, bpm, duration, threhold = 0.7, onsets = None, saveDebugFile = False):
     
     # filename = r'd:\librosa\RhythmMaster\foxishaonv\foxishaonv.mp3'
     # filename = r'd:\librosa\RhythmMaster\CheapThrills\CheapThrills.mp3'
@@ -578,14 +578,13 @@ def PickOnsetFromFile(filename, bpm, duration, onsets = None, saveDebugFile = Fa
 
     # print(type(samples), samples.shape, len(samples))
 
-    threhold = 0.7
     dis_time = 0.1
     while True:
         picker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=threhold, smooth=0.0, 
         pre_max=dis_time, post_max=dis_time, 
         fps=100)
         onsettime = picker(samples)
-        # print(threhold, dis_time, len(onsettime))
+        print(threhold, dis_time, len(onsettime))
         if len(onsettime) < count:
             break
         # threhold += 0.0001
