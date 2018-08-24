@@ -750,6 +750,7 @@ def PickNoteWithRule(noteIdxs, fps, bpm, et, beatPerBar, beatLen, removeSameInte
         noteInfoArr.append((noteIdx, bar, pos, noteType, allPos, skipNext, noteIdxs[idx + 1]))
         
     maxRemoveCount = int(len(noteInfoArr) * removeSameIntervalRatio)
+    step = 1
     if maxRemoveCount > 0:
         step = max(int(len(noteInfoArr) / maxRemoveCount), 1)
     print('all remove note', len(noteInfoArr), 'ratio', removeSameIntervalRatio, 'max remove count', maxRemoveCount, 'step', step)
