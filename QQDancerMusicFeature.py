@@ -347,7 +347,7 @@ def Segmentation(y, sr, duration, bpm, et):
     # 分段点要偏移四小节
     offset = (et + barInterval * 4) / duration
     # 允许的，最早的分段点
-    mininumBarsPerSeg = (10 * barInterval) / duration
+    mininumBarsPerSeg = (3 * barInterval) / duration
     firstSeg = offset + mininumBarsPerSeg
     logger.info('firstSeg', firstSeg)
 
