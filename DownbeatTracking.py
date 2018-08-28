@@ -262,6 +262,23 @@ def SaveDownbeat(bpm, et, lastBeat, filename):
     SaveInstantValue(downbeat, filename, '_downbeat')
 
 
+def DecodeOffset(filename):
+    offset = 0
+    if os.path.splitext(filename)[1] == '.m4a':
+        offset = (2112 * 2 - 2048) / 44100
+
+    print('decode offset', offset)
+    return offset
+
+def AppendEmptyDataWithDecodeOffset(filename, arr, fps):
+    decodeOffset = DecodeOffset(filename)
+    count = round(decodeOffset * 100)
+    if count <= 0:
+        return arr
+
+    print('append decode offset frame count', count)
+    return np.concatenate(([0] * count, arr))
+
 def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1, saveToFile=True):
     y, sr = librosa.load(filename, mono=True, sr=44100)
     logger.info('loaded')
@@ -283,6 +300,9 @@ def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1, saveToFile=True
             return
 
         bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
+        print('et', etAuto)
+        etAuto = etAuto + DecodeOffset(filename)
+        print('et apply decode offset', etAuto)
         beatInter = 60.0 / bpm
 
         lastBeat = beat[-1, 0]
@@ -584,7 +604,7 @@ def PickOnsetFromFile(filename, bpm, duration, threhold = 0.7, onsets = None, sa
         pre_max=dis_time, post_max=dis_time, 
         fps=100)
         onsettime = picker(samples)
-        print(threhold, dis_time, len(onsettime))
+        # print(threhold, dis_time, len(onsettime))
         if len(onsettime) < count:
             break
         # threhold += 0.0001
