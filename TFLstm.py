@@ -828,10 +828,11 @@ def AlignNoteWithBPMAndET(notes, frameInterval, bpm, et):
 
     return np.array(newNotes)
 
-def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, templateFilePath, onsetThreshold, shortThreshold, saveDebugFile = False):
+def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, templateFilePath, onsetThreshold, shortThreshold, saveDebugFile = False):    
     predicts = shortPredicts
     pathname = songFilePath
     singingActivation = predicts[:, 1]
+    singingActivation = DownbeatTracking.AppendEmptyDataWithDecodeOffset(pathname, singingActivation, 100)
     if saveDebugFile:
         DownbeatTracking.SaveInstantValue(singingActivation, pathname, '_result_singing')
         if len(predicts[0]) > 2:
@@ -853,6 +854,14 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
     frameCount = len(short)
     singing = np.array([0] * frameCount)
     singing[singingTimes] = 1
+
+    countBefore = [np.sum(singing), np.sum(short)]
+    singing = AlignNoteWithBPMAndET(singing, 10, bpm, et)
+    short = AlignNoteWithBPMAndET(short, 10, bpm, et)
+    countAfter = [np.sum(singing), np.sum(short)]
+    print('count before', countBefore, 'count after', countAfter)
+
+    mergeShort = np.copy(short)
     idxOffsetPre = int(60 / bpm * 1 * 100 * 0.9)
     idxOffsetPost = int(60 / bpm * 1 * 100 * 0.9)
     for singIdx in range(0, frameCount):
@@ -862,19 +871,21 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
         idxStart = max(singIdx - idxOffsetPre, 0)
         idxEnd = min(singIdx + idxOffsetPost, frameCount)
         for idx in range(idxStart, idxEnd):
-            short[idx] = 0
+            mergeShort[idx] = 0
 
     checkShortCount = 0
-    for val in short:
+    for val in mergeShort:
         if val > 0:
             checkShortCount += 1
     print('remove some short by singing. remain ', checkShortCount)
-    short[singingTimes] = 1
-    short = AlignNoteWithBPMAndET(short, 10, bpm, et)
-    print('note after align', np.sum(short))
+    mergeShort[singing > mergeShort] = 1
+    countBefore = np.sum(mergeShort)
+    mergeShort = AlignNoteWithBPMAndET(mergeShort, 10, bpm, et)
+    print('count before', countBefore, 'count after', np.sum(mergeShort))
 
     long = longPredicts[:, 3]
-    levelNotes = postprocess.ProcessSampleToIdolLevel2(long, short, bpm, et)
+    long = DownbeatTracking.AppendEmptyDataWithDecodeOffset(pathname, long, 100)
+    levelNotes = postprocess.ProcessSampleToIdolLevel2(long, mergeShort, bpm, et)
 
     LevelInfo.GenerateIdolLevel(levelFilePath, levelNotes, bpm, et, duration, templateFilePath)
 
@@ -1053,7 +1064,6 @@ def GenerateLevel():
     # song = ['xiangrikuideyueding']
     # debugBPM = 158
     # debugET = 115
-    song = ['Human Legacy']
 
     # postprocess.ProcessSampleToIdolLevel(song[0])
     # return
@@ -1062,38 +1072,38 @@ def GenerateLevel():
     print(pathname)
 
     useOnsetForShort = True
-    # if True:
-    #     # gen raw data
+    if True:
+        # gen raw data
 
-    #     TrainData = TrainDataDynLongNote
-    #     rawFile = TrainData.RawDataFileName(song[0])
-    #     modelFile = TrainData.GetModelPathName()
-    #     predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)
-    #     DownbeatTracking.SaveInstantValue(predicts[:, 1], pathname, '_long_short')   
-    #     DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_long_start')   
-    #     DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_long_dur')   
-    #     print('predicts shape', predicts.shape)
+        TrainData = TrainDataDynLongNote
+        rawFile = TrainData.RawDataFileName(song[0])
+        modelFile = TrainData.GetModelPathName()
+        predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)
+        DownbeatTracking.SaveInstantValue(predicts[:, 1], pathname, '_long_short')   
+        DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_long_start')   
+        DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_long_dur')   
+        print('predicts shape', predicts.shape)
 
-    #     # TrainData.GenerateLevel(predicts, pathname)
+        # TrainData.GenerateLevel(predicts, pathname)
 
-    #     if not useOnsetForShort:
-    #         TrainData = TrainDataDynShortNoteBeat
-    #         rawFile = TrainData.RawDataFileName(song[0])
-    #         modelFile = TrainData.GetModelPathName()
-    #         predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)  
-    #         print('predicts shape', predicts.shape) 
+        if not useOnsetForShort:
+            TrainData = TrainDataDynShortNoteBeat
+            rawFile = TrainData.RawDataFileName(song[0])
+            modelFile = TrainData.GetModelPathName()
+            predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)  
+            print('predicts shape', predicts.shape) 
 
-    #     # TrainData.GenerateLevel(predicts, pathname)
+        # TrainData.GenerateLevel(predicts, pathname)
 
-    #     if useOnsetForShort:
-    #         TrainData = TrainDataDynSinging
-    #         rawFile = TrainData.RawDataFileName(song[0])
-    #         modelFile = TrainData.GetModelPathName()
-    #         predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData, featureExtractFunc)  
-    #         print('predicts shape', predicts.shape) 
+        if useOnsetForShort:
+            TrainData = TrainDataDynSinging
+            rawFile = TrainData.RawDataFileName(song[0])
+            modelFile = TrainData.GetModelPathName()
+            predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData, featureExtractFunc)  
+            print('predicts shape', predicts.shape) 
 
-    #     print('calc bpm')
-    #     DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM)
+        print('calc bpm')
+        DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM)
 
     if useOnsetForShort:
         # levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
