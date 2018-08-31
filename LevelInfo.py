@@ -318,7 +318,49 @@ def ReadVariableLengthQuantity(buffer, offset):
 def LoadMidi(filename):
     with open(filename, 'rb') as file:        
         data = file.read()
-        
+    
+    def TickToSecond(tick, division, microsecondsPerQuarterNoteArr):
+        count = len(microsecondsPerQuarterNoteArr)
+        if count <= 0:
+            return 0
+
+        usec = 0
+        if count == 1:
+            usec = tick / division * microsecondsPerQuarterNoteArr[0][1]
+        else:
+            idx = 1
+            curTick = 0
+            while idx < count:
+                tickStart, interval = microsecondsPerQuarterNoteArr[idx]
+                lastTickStart, lastInterval = microsecondsPerQuarterNoteArr[idx - 1]
+                if tickStart < tick:
+                    usec += (tickStart - lastTickStart) / division * lastInterval
+                    curTick = tickStart
+                else:
+                    usec += (tick - lastTickStart) / division * lastInterval
+                    curTick = tick
+                    break
+                idx += 1
+
+            if tick > curTick:
+                usec += (tick - curTick) / division * microsecondsPerQuarterNoteArr[-1][1]
+
+        second = int(round(usec / 1000.0)) / 1000.0
+        return second
+
+    def TickToBarInfo(tick, prefix, division, microsecondsPerQuarterNoteArr, tickFunc = TickToSecond):
+        beatInterval = division
+        barNum = int((tick / beatInterval) / 4)
+        beatNum = int((tick / beatInterval) - barNum * 4)
+        subCount = tick - barNum * 4 * beatInterval - beatNum * beatInterval
+        val = subCount / (beatInterval / (4 * 120))
+        subVal1 = int(val / 120)
+        subVal2 = (val - subVal1 * 120)
+        second = tickFunc(tick, division, microsecondsPerQuarterNoteArr)
+        minute = int(second // 60)
+        second = second - minute * 60
+        print(prefix, barNum + 1, beatNum + 1, subVal1 + 1, subVal2, '  time: ', minute, ':', second)
+
     offset = 0
     r, offset = ReadAndOffset('4s', data, offset)
     if r[0].decode() != 'MThd':
@@ -331,7 +373,7 @@ def LoadMidi(filename):
     division = r[3]
     print('track count:', numTrack)
     midiNotes = []
-    microsecondsPerQuarterNote = 0
+    microsecondsPerQuarterNoteArr = []
     for i in range(numTrack):
         print('parse track idx:', i)
         # chunk type: MTrk string
@@ -387,8 +429,10 @@ def LoadMidi(filename):
                 elif metaType == 0x51:
                     r, suboffset = ReadAndOffset('>3B', data, offset)
                     microsecondsPerQuarterNote = (r[0] << 16) | (r[1] << 8) | r[2]
+                    microsecondsPerQuarterNoteArr.append([curTicks, microsecondsPerQuarterNote])
                 elif metaType == 0x05:
-                    wordCount += 1 
+                    wordCount += 1
+                    # TickToBarInfo(curTicks, 'word', division, microsecondsPerQuarterNoteArr)
 
                 offset += metaLength
             else:
@@ -405,17 +449,13 @@ def LoadMidi(filename):
                             print('error: noteEnd < noteStart', noteEnd, noteStart)
                             continue
 
-                        noteStartTime = noteStart / division * microsecondsPerQuarterNote / 1000.0
-                        noteStartTime = round(noteStartTime) / 1000.0
-                        noteEndTime = noteEnd / division * microsecondsPerQuarterNote / 1000.0
-                        noteEndTime = round(noteEndTime) / 1000.0
                         lenMidiNotes = len(midiNotes)
                         if lenMidiNotes > 0 and midiNotes[lenMidiNotes - 1][3] == wordCount:
                             # 一个词可能唱多个音符，如果是同一个词，更新长度
                             lastNote = midiNotes[lenMidiNotes - 1]
-                            lastNote[1] = noteEndTime - lastNote[0]
+                            lastNote[1] = noteEnd
                         else:
-                            midiNotes.append([noteStartTime, noteEndTime - noteStartTime, notePitch, wordCount])
+                            midiNotes.append([noteStart, noteEnd, notePitch, wordCount])
                     elif mainType == 0x90:
                         # Note On event
                         noteStart = curTicks
@@ -432,6 +472,13 @@ def LoadMidi(filename):
                     pass
             
         offset = eventsStart + trackLength
+
+    print('tempo change count', len(microsecondsPerQuarterNoteArr))
+    for note in midiNotes:
+        # TickToBarInfo(note[0], 'note', division, microsecondsPerQuarterNoteArr)
+        note[0] = TickToSecond(note[0], division, microsecondsPerQuarterNoteArr)
+        note[1] = TickToSecond(note[1], division, microsecondsPerQuarterNoteArr)
+        note[1] = note[1] - note[0]
 
     midiNotes = np.array(midiNotes)
     midiNotes = midiNotes[:, 0:3]
