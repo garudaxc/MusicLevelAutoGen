@@ -12,6 +12,7 @@ import util
 import DownbeatTracking
 import madmom
 import shutil
+import sys
 
 rootDir = util.getRootDir()
 trainDataDir = rootDir + 'MusicLevelAutoGen/train_data/'
@@ -1499,6 +1500,54 @@ def SaveFeaturesAndLabels(dataFilePath, features, labels):
         pickle.dump(features, file)
         pickle.dump(labels, file)
         print('raw file saved', features.shape, labels.shape)
+
+# @run
+def AutoTransMidiTool():
+    if len(sys.argv) <= 1:
+        print('please set input file')
+        return False
+
+    inputFile = sys.argv[1]
+    offset = 0
+    if len(sys.argv) > 2:
+        offset = float(sys.argv[2])
+    
+    programDir = os.path.dirname(sys.argv[0])
+
+    # trainList, validateList = LoadMidiTrainAndValidateFileList()
+    # inputFile = midiDir + trainList[0][0] + '.midi'
+    # offset = -3210
+    # programDir = ''
+    
+    print('process', inputFile, 'offset', offset, 'ms')
+    
+    outputDir = os.path.join(os.path.dirname(programDir), 'csv')
+    offsetDir = os.path.join(os.path.dirname(programDir), 'offset')
+    filename = os.path.basename(inputFile)
+    outputFile = os.path.join(outputDir, os.path.splitext(filename)[0] + '.csv')
+    offsetFile = os.path.join(offsetDir, os.path.splitext(filename)[0] + '_offset' + '.csv')
+    if not os.path.exists(inputFile):
+        print('inputFile not found', inputFile)
+        return False
+
+    midiNotes = LevelInfo.LoadMidi(inputFile)
+    if len(midiNotes) <= 0:
+        return False
+
+    offset = offset / 1000.0
+    for note in midiNotes:
+        note[0] += offset
+
+    with open(outputFile, 'w') as file:
+        for note in midiNotes:
+            file.write(str(note[0]) + '\n')
+
+    with open(offsetFile, 'w') as file:
+        file.write(str(offset))
+
+    print('save csv to', outputFile)
+    return True    
+
 
 # @run
 def GenerateMidiTrainData():
