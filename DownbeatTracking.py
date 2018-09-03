@@ -575,13 +575,13 @@ def CalcPreferenceBeatCount(bpm, duration):
     rate = (bpm - minBpm) / (maxBpm - minBpm)
     rate = min(max(rate, 0.0), 1.0)
     beatPerBar = 4
-    minNotePerBeat = 3 / beatPerBar
-    maxNotePerBeat = 6 / beatPerBar
+    minNotePerBeat = 4 / beatPerBar
+    maxNotePerBeat = 8 / beatPerBar
     beat = duration / 60000 * bpm
     count = round((minNotePerBeat + rate * (maxNotePerBeat - minNotePerBeat)) * beat)
     return count
 
-def PickOnsetFromFile(filename, bpm, duration, threhold = 0.7, onsets = None, saveDebugFile = False):
+def PickOnsetFromFile(filename, bpm, duration, threhold = 0.7, onsets = None, saveDebugFile = False, isPureMusic = False):
     
     # filename = r'd:\librosa\RhythmMaster\foxishaonv\foxishaonv.mp3'
     # filename = r'd:\librosa\RhythmMaster\CheapThrills\CheapThrills.mp3'
@@ -595,6 +595,8 @@ def PickOnsetFromFile(filename, bpm, duration, threhold = 0.7, onsets = None, sa
     if saveDebugFile:
         SaveInstantValue(samples, filename, '_onset_activation')
     count = CalcPreferenceBeatCount(bpm, duration)
+    if isPureMusic:
+        count = count * 2
 
     # print(type(samples), samples.shape, len(samples))
 

@@ -683,8 +683,8 @@ def RunModel(modelFile, songFile, TrainData, featureFunc=myprocesser.LoadAndProc
             reuseState = True
             if reuseState:
                 initial_states = tf.get_default_graph().get_tensor_by_name('initial_states:0')
-                # batch_states = tf.get_default_graph().get_tensor_by_name('batch_states_predict:0')
-                batch_states = tf.get_default_graph().get_tensor_by_name('batch_states:0')
+                batch_states = tf.get_default_graph().get_tensor_by_name('batch_states_predict:0')
+                # batch_states = tf.get_default_graph().get_tensor_by_name('batch_states:0')
                 initialStatesZero = np.array([[0.0] * batch_states.shape[1]] * batch_states.shape[0])
                 currentInitialStates = initialStatesZero
 
@@ -830,41 +830,60 @@ def AlignNoteWithBPMAndET(notes, frameInterval, bpm, et):
     return np.array(newNotes)
 
 def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, templateFilePath, onsetThreshold, shortThreshold, saveDebugFile = False):    
-    predicts = shortPredicts
-    pathname = songFilePath
-    singingActivation = predicts[:, 1]
-    singingActivation = DownbeatTracking.AppendEmptyDataWithDecodeOffset(pathname, singingActivation, 100)
-    if saveDebugFile:
-        DownbeatTracking.SaveInstantValue(singingActivation, pathname, '_result_singing')
-        if len(predicts[0]) > 2:
-            DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_result_bg')
-        if len(predicts[0]) > 3:
-            DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_result_dur')
-        DownbeatTracking.SaveInstantValue(predicts[:, 0], pathname, '_result_no_label')
-    short = DownbeatTracking.PickOnsetFromFile(pathname, bpm, duration, onsetThreshold, None, saveDebugFile)
+    print('bpm', bpm, 'et', et, 'dur', duration)
+    fps = 100
+    frameInterval = int(1000 / fps)
+
+    onsetProcessor = madmom.features.onsets.CNNOnsetProcessor()
+    onsetActivation = onsetProcessor(songFilePath)
+    onsetActivation = DownbeatTracking.AppendEmptyDataWithDecodeOffset(songFilePath, onsetActivation, fps)
+    frameCount = len(onsetActivation)
+
+    singingPredicts = shortPredicts
+    singingActivation = singingPredicts[:, 1]
+    singingActivation = DownbeatTracking.AppendEmptyDataWithDecodeOffset(songFilePath, singingActivation, fps)
     dis_time = 60 / bpm / 8
-    singingPicker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=shortThreshold, smooth=0.0, pre_max=dis_time, post_max=dis_time, fps=100)
+    singingPicker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=shortThreshold, smooth=0.0, pre_max=dis_time, post_max=dis_time, fps=fps)
     singingTimes = singingPicker(singingActivation)
     print('sing pick count', shortThreshold, len(singingTimes))
 
-    if saveDebugFile:
-        DownbeatTracking.SaveInstantValue(singingTimes, pathname, '_result_singing_pick')
+    def IsPureMusic(singingTimes, bpm, duration):
+        minInterval = 60 / bpm * 4
+        minCount = int(duration / minInterval)
+        print('singingTimes', len(singingTimes), 'minCount', minCount)
+        return len(singingTimes) < minCount
 
-    singingTimes = singingTimes * 100
+    songIsPureMusic = IsPureMusic(singingTimes, bpm, duration / 1000)
+    print('pure music', songIsPureMusic)
+    if songIsPureMusic:
+        print('adjust onset threshold from', onsetThreshold, 'to', onsetThreshold /2, 'for pure music')
+        onsetThreshold = onsetThreshold / 2
+
+    singingTimes = singingTimes * fps
     singingTimes = singingTimes.astype(int)
-    frameCount = len(short)
-    singing = np.array([0] * frameCount)
+    singing = np.zeros_like(onsetActivation)
     singing[singingTimes] = 1
 
-    countBefore = [np.sum(singing), np.sum(short)]
-    singing = AlignNoteWithBPMAndET(singing, 10, bpm, et)
-    short = AlignNoteWithBPMAndET(short, 10, bpm, et)
-    countAfter = [np.sum(singing), np.sum(short)]
+    if saveDebugFile:
+        DownbeatTracking.SaveInstantValue(singingActivation, songFilePath, '_result_singing')
+        if len(singingPredicts[0]) > 2:
+            DownbeatTracking.SaveInstantValue(singingPredicts[:, 2], songFilePath, '_result_bg')
+        if len(singingPredicts[0]) > 3:
+            DownbeatTracking.SaveInstantValue(singingPredicts[:, 3], songFilePath, '_result_dur')
+        DownbeatTracking.SaveInstantValue(singingPredicts[:, 0], songFilePath, '_result_no_label')
+        DownbeatTracking.SaveInstantValue(singingTimes, songFilePath, '_result_singing_pick')
+
+    onset = DownbeatTracking.PickOnsetFromFile(songFilePath, bpm, duration, onsetThreshold, onsetActivation, saveDebugFile, songIsPureMusic)
+
+    countBefore = [np.sum(singing), np.sum(onset)]
+    singing = AlignNoteWithBPMAndET(singing, frameInterval, bpm, et)
+    onset = AlignNoteWithBPMAndET(onset, frameInterval, bpm, et)
+    countAfter = [np.sum(singing), np.sum(onset)]
     print('count before', countBefore, 'count after', countAfter)
 
-    mergeShort = np.copy(short)
-    idxOffsetPre = int(60 / bpm * 1 * 100 * 0.9)
-    idxOffsetPost = int(60 / bpm * 1 * 100 * 0.9)
+    mergeShort = np.copy(onset)
+    idxOffsetPre = int(60 / bpm * 1 * fps * 0.9)
+    idxOffsetPost = int(60 / bpm * 1 * fps * 0.9)
     for singIdx in range(0, frameCount):
         if (singing[singIdx] < 1):
             continue
@@ -881,12 +900,12 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
     print('remove some short by singing. remain ', checkShortCount)
     mergeShort[singing > mergeShort] = 1
     countBefore = np.sum(mergeShort)
-    mergeShort = AlignNoteWithBPMAndET(mergeShort, 10, bpm, et)
+    mergeShort = AlignNoteWithBPMAndET(mergeShort, frameInterval, bpm, et)
     print('count before', countBefore, 'count after', np.sum(mergeShort))
 
-    long = longPredicts[:, 3]
-    long = DownbeatTracking.AppendEmptyDataWithDecodeOffset(pathname, long, 100)
-    levelNotes = postprocess.ProcessSampleToIdolLevel2(long, mergeShort, bpm, et)
+    longActivation = longPredicts[:, 3]
+    longActivation = DownbeatTracking.AppendEmptyDataWithDecodeOffset(songFilePath, longActivation, fps)
+    levelNotes = postprocess.ProcessSampleToIdolLevel2(longActivation, mergeShort, bpm, et)
 
     LevelInfo.GenerateIdolLevel(levelFilePath, levelNotes, bpm, et, duration, templateFilePath)
 
