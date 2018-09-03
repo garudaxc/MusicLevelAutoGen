@@ -1502,50 +1502,64 @@ def SaveFeaturesAndLabels(dataFilePath, features, labels):
         print('raw file saved', features.shape, labels.shape)
 
 # @run
-def AutoTransMidiTool():
-    if len(sys.argv) <= 1:
-        print('please set input file')
-        return False
-
-    inputFile = sys.argv[1]
-    offset = 0
-    if len(sys.argv) > 2:
-        offset = float(sys.argv[2])
-    
+def AutoTransMidiTool():    
     programDir = os.path.dirname(sys.argv[0])
-
-    # trainList, validateList = LoadMidiTrainAndValidateFileList()
-    # inputFile = midiDir + trainList[0][0] + '.midi'
-    # offset = -3210
-    # programDir = ''
-    
-    print('process', inputFile, 'offset', offset, 'ms')
-    
+    inputDir = os.path.join(os.path.dirname(programDir), 'midi')
     outputDir = os.path.join(os.path.dirname(programDir), 'csv')
-    offsetDir = os.path.join(os.path.dirname(programDir), 'offset')
-    filename = os.path.basename(inputFile)
-    outputFile = os.path.join(outputDir, os.path.splitext(filename)[0] + '.csv')
-    offsetFile = os.path.join(offsetDir, os.path.splitext(filename)[0] + '_offset' + '.csv')
-    if not os.path.exists(inputFile):
-        print('inputFile not found', inputFile)
+    if not os.path.exists(inputDir):
+        print('input dir not found', inputDir)
         return False
 
-    midiNotes = LevelInfo.LoadMidi(inputFile)
-    if len(midiNotes) <= 0:
+    if not os.path.exists(outputDir):
+        print('output dir not found', outputDir)
+        return False    
+
+    offsetDir = os.path.join(programDir, 'offset')
+    if not os.path.exists(offsetDir):
+        print('offsetDir file not found', offsetDir)
         return False
 
-    offset = offset / 1000.0
-    for note in midiNotes:
-        note[0] += offset
+    fileList = []
+    offsetFileList = os.listdir(offsetDir)
+    for offsetFile in offsetFileList:
+        print(offsetFile)
+        if os.path.splitext(offsetFile)[1] != '.txt':
+            continue
 
-    with open(outputFile, 'w') as file:
+        filename = os.path.splitext(offsetFile)[0]
+        offsetFilePath = os.path.join(offsetDir, offsetFile)
+        offset = 0
+        if not os.path.exists(offsetFilePath):
+            print('offsetFilePath not found', offsetFilePath)
+            continue
+
+        with open(offsetFilePath, 'r') as f:
+            for line in f:
+                line = line.replace('\r', '\n')
+                line = line.replace('\n', '')
+                offset = float(line)
+                break   
+
+        fileList.append((filename, offset))
+    
+    for midiFileName, offset in fileList:
+        print('process', midiFileName, 'offset', offset)
+        inputFile = os.path.join(inputDir, midiFileName) + '.midi'
+        if not os.path.exists(inputFile):
+            inputFile = os.path.join(inputDir, midiFileName) + '.mid'
+            if not os.path.exists(inputFile):
+                print('midi file not found', inputFile)
+                continue
+
+        midiNotes = LevelInfo.LoadMidi(inputFile)
         for note in midiNotes:
-            file.write(str(note[0]) + '\n')
-
-    with open(offsetFile, 'w') as file:
-        file.write(str(offset))
-
-    print('save csv to', outputFile)
+            note[0] += offset
+    
+        outputFile = os.path.join(outputDir, midiFileName + '.csv')
+        with open(outputFile, 'w') as file:
+            for note in midiNotes:
+                file.write(str(note[0]) + '\n')
+    
     return True    
 
 
@@ -1557,6 +1571,9 @@ def GenerateMidiTrainData():
         print('process song:', song)
         offset = float(offset)
         midiFilePath = midiDir + midiFileName + '.midi'
+        if not os.path.exists(midiFilePath):
+            midiFilePath = midiDir + midiFileName + '.mid'
+
         midiNotes = LevelInfo.LoadMidi(midiFilePath)
         if len(midiNotes) <= 0:
             continue
