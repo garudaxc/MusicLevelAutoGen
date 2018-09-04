@@ -1592,6 +1592,8 @@ def AutoTransMidiToLevel():
     bpmColIdx = 12
     etColIdx = 13
     durationColIdx = 20
+    artistColIdx = 1
+    songNameColIdx = 4
     with open(songInfoFile, 'r') as file:
         for line in file:
             line = line.replace('\r', '\n')
@@ -1629,16 +1631,24 @@ def AutoTransMidiToLevel():
             midiNotes = LevelInfo.LoadMidi(midiFilePath, exInfo)
             if len(exInfo[0]) > 1:
                 continue
-            
+
             singingStartTimes = midiNotes[:, 0]
             print('singtimes ===================================', len(singingStartTimes), bpm, 60 / (exInfo[0][0][1] / 1000 / 1000), et, duration)
             levelNotes = []
-            singingStartTimes = singingStartTimes * 1000
-            for singingTime in singingStartTimes:
-                levelNotes.append((singingTime, LevelInfo.shortNote, 0, 0))
+            # singingStartTimes = singingStartTimes * 1000
+            # for singingTime in singingStartTimes:
+            #     levelNotes.append((singingTime, LevelInfo.shortNote, 0, 0))
 
-            outputFilePath = os.path.join(outputDir, 'level', os.path.splitext(name)[0] + '.xml')
-            LevelInfo.GenerateIdolLevelForMidiLabel(outputFilePath, levelNotes, bpm, et, duration)
+            songFileName = os.path.splitext(name)[0] + '_' + songInfo[artistColIdx] + '_' + songInfo[songNameColIdx] + '.csv'
+            songFileName = songFileName.replace('/', '-')
+            songFileName = songFileName.replace('\\', '-')
+            outputFilePath = os.path.join(outputDir, 'level', songFileName)
+            # LevelInfo.GenerateIdolLevelForMidiLabel(outputFilePath, levelNotes, bpm, et, duration)
+            
+            with open(outputFilePath, 'w') as outputFile:
+                for singingTime in singingStartTimes:
+                    outputFile.write(str(singingTime) + '\n')
+                    
             ouputInfoArr.append(songInfo)
             ouputCount += 1
 
