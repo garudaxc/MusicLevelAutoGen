@@ -850,6 +850,12 @@ def PickNote(noteIdxs, count, fps, bpm, et, beatPerBar, beatLen, removeSameInter
     return noteIdxs
 
 def GenerateNote(songFilePath, duration, bpm, et, seg0, seg1, levelFilePath):
+    # 策划需求bpm 160-200 减半处理
+    if bpm >= 160:
+        bpm = bpm / 2
+        print('bpm >= 160, change to half', bpm)
+
+    print('bpm', bpm)
     barDuration = 60 / bpm * 4
     beatInterval = 60 / bpm
     barNoteCountArr = [16] * 9
