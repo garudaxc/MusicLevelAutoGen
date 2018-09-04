@@ -1581,6 +1581,72 @@ def AutoTransMidiTool():
     
     return True    
 
+# @run
+def AutoTransMidiToLevel():
+    inputDir = r'E:\ktv_level'
+    subDirList = os.listdir(inputDir)
+    outputDir = 'outputlevel'
+    songInfoFile = trainDataDir + 'ktv_song_info.csv'
+    songInfoDic = {}
+    nameColIdx = 11
+    bpmColIdx = 12
+    etColIdx = 13
+    durationColIdx = 20
+    with open(songInfoFile, 'r') as file:
+        for line in file:
+            line = line.replace('\r', '\n')
+            line = line.replace('\n', '')
+            info = line.split(',')
+            if len(info) <= bpmColIdx:
+                print('line not valid', line)
+                continue
+            songInfoDic[info[nameColIdx]] = info
+    ouputCount = 0
+    ouputInfoArr = []
+    for subDirName in subDirList:
+        dirPath = os.path.join(inputDir, subDirName)
+        fileNameList = os.listdir(dirPath)
+        for name in fileNameList:
+            if os.path.splitext(name)[1] != '.midi':
+                continue
+
+            if name not in songInfoDic:
+                print('not found bpm info', name)
+                continue
+
+            songInfo = songInfoDic[name]
+            bpm = float(songInfo[bpmColIdx])
+            if bpm < 90:
+                continue
+
+            et = int(songInfo[etColIdx])
+            et = 0
+
+            duration = int(float(songInfo[durationColIdx]) * 1000.0)
+            duration = int(500 * 1000)
+            midiFilePath = os.path.join(dirPath, name)
+            exInfo = []
+            midiNotes = LevelInfo.LoadMidi(midiFilePath, exInfo)
+            if len(exInfo[0]) > 1:
+                continue
+            
+            singingStartTimes = midiNotes[:, 0]
+            print('singtimes ===================================', len(singingStartTimes), bpm, 60 / (exInfo[0][0][1] / 1000 / 1000), et, duration)
+            levelNotes = []
+            singingStartTimes = singingStartTimes * 1000
+            for singingTime in singingStartTimes:
+                levelNotes.append((singingTime, LevelInfo.shortNote, 0, 0))
+
+            outputFilePath = os.path.join(outputDir, 'level', os.path.splitext(name)[0] + '.xml')
+            LevelInfo.GenerateIdolLevelForMidiLabel(outputFilePath, levelNotes, bpm, et, duration)
+            ouputInfoArr.append(songInfo)
+            ouputCount += 1
+
+    ouputInfoArr = sorted(ouputInfoArr, key=lambda item:int(item[0]))
+    SaveFeatures(os.path.join(outputDir, 'song_info.csv'), ouputInfoArr)
+
+    print(ouputCount)
+
 
 # @run
 def GenerateMidiTrainData():
