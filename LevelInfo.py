@@ -315,7 +315,7 @@ def ReadVariableLengthQuantity(buffer, offset):
         
     return value, offset
 
-def LoadMidi(filename):
+def LoadMidi(filename, exInfo = None):
     with open(filename, 'rb') as file:        
         data = file.read()
     
@@ -360,6 +360,7 @@ def LoadMidi(filename):
         minute = int(second // 60)
         second = second - minute * 60
         print(prefix, barNum + 1, beatNum + 1, subVal1 + 1, subVal2, '  time: ', minute, ':', second)
+        return barNum, beatNum, subVal1, subVal2
 
     offset = 0
     r, offset = ReadAndOffset('4s', data, offset)
@@ -482,6 +483,8 @@ def LoadMidi(filename):
 
     midiNotes = np.array(midiNotes)
     midiNotes = midiNotes[:, 0:3]
+    if exInfo is not None:
+        exInfo.append(microsecondsPerQuarterNoteArr)
     # singingStartTime = midiNotes[:, 0]
     # SaveInstantValue(singingStartTime, filename, 'singingstart')
     return midiNotes    
@@ -1151,6 +1154,92 @@ def GenerateIdolLevelForTangoDebug(filename, notes, bpm, et, musicTime):
     #     e = ElementTree.Element('Bar')
     #     e.text = str(i)
     #     DancerSort.append(e)
+    
+    t = ElementTree.ElementTree(root)
+    t.write(filename, encoding="utf-8",xml_declaration=True)
+    print('done write file ' + filename)
+
+def GenerateIdolLevelForMidiLabel(filename, notes, bpm, et, musicTime):
+    barInterval = 240.0 / bpm
+    barInterval *= 1000
+    posInterval = barInterval / 32.0
+
+    newNotes = []
+    for n in notes:
+        type = n[1]
+        r = ConvertTimeBar(n, barInterval, posInterval, et)
+        if type == combineNode:
+            value = n[2]
+            l = []
+            for subNote in value:
+                s = ConvertTimeBar(subNote, barInterval, posInterval, et)
+                l.append(s)
+            r = (r[0], r[1], r[2], l, r[4])
+             
+        newNotes.append(r)
+    notes = newNotes
+
+    text=open(rootDir + 'data/idol_template.xml', encoding='utf-8').read()
+    xmlparser = ElementTree.XMLParser(encoding='utf-8')
+    tree = ElementTree.fromstring(text)
+
+    lastNote = notes[-1]
+    lastBar = lastNote[0]
+    totalBar  = lastBar + 4
+
+    # 删除前面4小节和最后4小节的音符
+    enterBar = 0
+    # notes = [note for note in notes if note[0] > (enterBar-1) and note[0] < lastBar - 3]
+    # print('number of notes', len(notes))
+
+    # notes = AlignNotesWithBeat(notes, 4)
+    # notes = CheckNotes(notes)
+
+    root = tree
+    levelInfo = root.find('LevelInfo')
+    node = levelInfo.find('BPM')
+    node.text = str(bpm)
+    node = levelInfo.find('EnterTimeAdjust')
+    node.text = str(et)    
+    node = levelInfo.find('LevelTime')
+    node.text = str(musicTime)
+    node = levelInfo.find('BarAmount')
+    node.text = str(totalBar)
+    node = levelInfo.find('BeginBarLen')
+    node.text = str(enterBar)
+
+    
+    musicName = os.path.split(filename)[1]
+    musicName = os.path.splitext(musicName)[0]
+    MusicInfo = root.find('MusicInfo')
+    node = MusicInfo.find('Title')
+    node.text = str(musicName)
+    node = MusicInfo.find('FilePath')
+    node.text = str('audio/bgm/'+musicName)
+
+    SectionSeq = root.find('SectionSeq')
+    for node in SectionSeq:
+        if node.attrib['type'] == 'note':
+            node.attrib['endbar'] = str(totalBar - 4)
+        if node.attrib['type'] == 'showtime':
+            node.attrib['startbar'] = str(totalBar - 3)
+            node.attrib['endbar'] = str(totalBar)
+
+    notesNode = root.find('NoteInfo').find('Normal')
+    notesNode.clear()
+    for note in notes:
+        type = note[2]
+        
+        if type == combineNode:
+            e = ElementTree.Element('CombineNote')
+            value = note[3]
+            for subNote in value:
+                s = ConvertNoteToXml(subNote)
+                e.append(s)
+        else:
+            e = ConvertNoteToXml(note)
+
+        notesNode.append(e)
     
     t = ElementTree.ElementTree(root)
     t.write(filename, encoding="utf-8",xml_declaration=True)
