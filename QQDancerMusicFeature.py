@@ -26,7 +26,8 @@ logger = None
 genDebugFile = False
 
 # 允许的最小bpm，如果如果算得小于该值，则需要自动翻倍
-MinimumBPM = 60
+MinimumBPM = 75
+MaxinumBPM = 160
 
 # 分段时可允许的偏移范围，范围越大，越容易分到音乐的变化处，但会导致段落的长度变化较大
 Segment_Neighbourhood = 0.2
@@ -463,8 +464,8 @@ def AnalysisMusicFeature(filename, levelFilePath, **args):
     duration = librosa.get_duration(y=y, sr=sr)
 
     bpm, et = CalcDownbeat(y, sr, duration, **args)
-    # 策划需求bpm 160-200 减半处理
-    if bpm >= 160:
+    # 策划需求bpm 160 以上 减半处理
+    if bpm >= MaxinumBPM:
         bpm = bpm / 2
         print('bpm >= 160, change to half', bpm)
         
