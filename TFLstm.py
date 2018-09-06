@@ -1521,67 +1521,6 @@ def SaveFeaturesAndLabels(dataFilePath, features, labels):
         print('raw file saved', features.shape, labels.shape)
 
 # @run
-def AutoTransMidiTool():    
-    programDir = os.path.dirname(sys.argv[0])
-    inputDir = os.path.join(os.path.dirname(programDir), 'midi')
-    outputDir = os.path.join(os.path.dirname(programDir), 'csv')
-    if not os.path.exists(inputDir):
-        print('input dir not found', inputDir)
-        return False
-
-    if not os.path.exists(outputDir):
-        print('output dir not found', outputDir)
-        return False    
-
-    offsetDir = os.path.join(programDir, 'offset')
-    if not os.path.exists(offsetDir):
-        print('offsetDir file not found', offsetDir)
-        return False
-
-    fileList = []
-    offsetFileList = os.listdir(offsetDir)
-    for offsetFile in offsetFileList:
-        print(offsetFile)
-        if os.path.splitext(offsetFile)[1] != '.txt':
-            continue
-
-        filename = os.path.splitext(offsetFile)[0]
-        offsetFilePath = os.path.join(offsetDir, offsetFile)
-        offset = 0
-        if not os.path.exists(offsetFilePath):
-            print('offsetFilePath not found', offsetFilePath)
-            continue
-
-        with open(offsetFilePath, 'r') as f:
-            for line in f:
-                line = line.replace('\r', '\n')
-                line = line.replace('\n', '')
-                offset = float(line)
-                break   
-
-        fileList.append((filename, offset))
-    
-    for midiFileName, offset in fileList:
-        print('process', midiFileName, 'offset', offset)
-        inputFile = os.path.join(inputDir, midiFileName) + '.midi'
-        if not os.path.exists(inputFile):
-            inputFile = os.path.join(inputDir, midiFileName) + '.mid'
-            if not os.path.exists(inputFile):
-                print('midi file not found', inputFile)
-                continue
-
-        midiNotes = LevelInfo.LoadMidi(inputFile)
-        for note in midiNotes:
-            note[0] += offset
-    
-        outputFile = os.path.join(outputDir, midiFileName + '.csv')
-        with open(outputFile, 'w') as file:
-            for note in midiNotes:
-                file.write(str(note[0]) + '\n')
-    
-    return True    
-
-# @run
 def AutoTransMidiToLevel():
     inputDir = r'E:\ktv_level'
     subDirList = os.listdir(inputDir)
