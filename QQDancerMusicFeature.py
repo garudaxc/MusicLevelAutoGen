@@ -436,7 +436,7 @@ def GenDebugFile(filename, duration, bpm, et, seg = None):
         SaveInstantValue(seg, filename, '_seg')
 
 
-def AnalysisMusicFeature(filename, levelFilePath, **args):
+def AnalysisMusicFeature(filename, levelFilePath, customInfo, **args):
     '''
     计算音乐文件的特征数据
     返回值 tuple(a, b)
@@ -463,17 +463,22 @@ def AnalysisMusicFeature(filename, levelFilePath, **args):
     
     duration = librosa.get_duration(y=y, sr=sr)
 
-    bpm, et = CalcDownbeat(y, sr, duration, **args)
-    # 策划需求bpm 160 以上 减半处理
-    if bpm >= MaxinumBPM:
-        bpm = bpm / 2
-        print('bpm >= 160, change to half', bpm)
-        
-    if bpm == 0:
-        return (False, None)        
-    if bpm < MinimumBPM:
-        logger.info('bpm too low')
-        bpm = bpm * 2
+    if len(customInfo) != 2:
+        bpm, et = CalcDownbeat(y, sr, duration, **args)
+        # 策划需求bpm 160 以上 减半处理
+        if bpm >= MaxinumBPM:
+            bpm = bpm / 2
+            print('bpm >= 160, change to half', bpm)
+            
+        if bpm == 0:
+            return (False, None)        
+        if bpm < MinimumBPM:
+            logger.info('bpm too low')
+            bpm = bpm * 2
+    else:
+        bpm = customInfo[0]
+        et = customInfo[1] / 1000.0
+        print('set to custom bpm et', bpm, et)
             
     logger.info('analysis segmentation', time.time() - t)    
     segTimes = Segmentation(y, sr, duration, bpm, et)
@@ -1012,7 +1017,7 @@ def GenerateLevelFile(filename, musicInfo, logger):
     pass
     print('call GenerateLevelFile')
 
-def Run(filename = None, levelFilePath = None):
+def Run(filename = None, levelFilePath = None, customInfo = []):
     # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_1351.ogg'
     # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0201.ogg'
     # filename = r'D:\ab\QQX5_Mainland\exe\resources\media\audio\Music\song_0858.ogg'
@@ -1057,7 +1062,7 @@ def Run(filename = None, levelFilePath = None):
 
     logger.info('args', args)
     
-    success, info = AnalysisMusicFeature(filename, levelFilePath, **args)
+    success, info = AnalysisMusicFeature(filename, levelFilePath, customInfo, **args)
 
     # if success:
     #     info['diffculty'] = args['-diffculty']
@@ -1128,7 +1133,11 @@ def AutoGenerateNoteTool():
                 levelFileDir = line
             else:
                 if len(line) > 0:
-                    songFileArr.append(line)
+                    arr = line.split(',')
+                    if len(arr) > 1:
+                        songFileArr.append((arr[0], [float(arr[1]), float(arr[2])]))
+                    else:
+                        songFileArr.append((line, []))
             idx += 1
 
     if not os.path.exists(levelFileDir):
@@ -1147,14 +1156,14 @@ def AutoGenerateNoteTool():
     songIdx = 0
 
     print('check song list end. start generate...')
-    for songFilePath in songFileArr:
+    for songFilePath, customInfo in songFileArr:
         songIdx += 1
         print('~~~~~')
         print('generate %d/%d %s' % (songIdx, songCount, songFilePath))
         print('~~~~~')
         songFileName = os.path.splitext(os.path.basename(songFilePath))[0]
         levelFilePath = os.path.join(levelFileDir, songFileName + '.xml')
-        Run(songFilePath, levelFilePath)
+        Run(songFilePath, levelFilePath, customInfo)
 
     print(' ')
     print('all song level generate end ==========================')
