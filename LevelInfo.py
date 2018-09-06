@@ -348,7 +348,7 @@ def LoadMidi(filename, exInfo = None):
         second = int(round(usec / 1000.0)) / 1000.0
         return second
 
-    def TickToBarInfo(tick, prefix, division, microsecondsPerQuarterNoteArr, tickFunc = TickToSecond):
+    def TickToBarInfo(tick, prefix, division, microsecondsPerQuarterNoteArr, tickFunc = TickToSecond, printLog = True):
         beatInterval = division
         barNum = int((tick / beatInterval) / 4)
         beatNum = int((tick / beatInterval) - barNum * 4)
@@ -359,8 +359,30 @@ def LoadMidi(filename, exInfo = None):
         second = tickFunc(tick, division, microsecondsPerQuarterNoteArr)
         minute = int(second // 60)
         second = second - minute * 60
-        print(prefix, barNum + 1, beatNum + 1, subVal1 + 1, subVal2, '  time: ', minute, ':', second)
+        if printLog:
+            print(prefix, barNum + 1, beatNum + 1, subVal1 + 1, subVal2, '  time: ', minute, ':', second)
         return barNum, beatNum, subVal1, subVal2
+
+    def TryDecodeStr(strData):
+        # 未完成
+        try:
+            text = strData.decode("gb2312")
+            return text
+        except:
+            pass
+        try:
+            text = strData.decode("ascii")
+            return text
+        except:
+            pass
+
+        try:
+            text = strData.decode("utf-8")
+            return text
+        except:
+            pass
+
+        return 'not decode'
 
     offset = 0
     r, offset = ReadAndOffset('4s', data, offset)
@@ -399,6 +421,7 @@ def LoadMidi(filename, exInfo = None):
         curTicks = 0
         wordCount = 0
         lastEventType = -1
+        curWord = ''
         while (offset < eventsStart + trackLength) or (not isTrackEnd):
             deltaTime, offset = ReadVariableLengthQuantity(data, offset)
             curTicks += deltaTime 
@@ -433,6 +456,14 @@ def LoadMidi(filename, exInfo = None):
                     microsecondsPerQuarterNoteArr.append([curTicks, microsecondsPerQuarterNote])
                 elif metaType == 0x05:
                     wordCount += 1
+                    curWord = ''
+                    # if metaLength > 0:                        
+                    #     strFmt = str(metaLength) + 's'
+                    #     r, suboffset = ReadAndOffset(strFmt, data, offset)
+                    #     text = TryDecodeStr(r[0])
+                    #     if len(text) > 0:
+                    #         if text != '\n' and text != '\r':
+                    #             curWord = text
                     # TickToBarInfo(curTicks, 'word', division, microsecondsPerQuarterNoteArr)
 
                 offset += metaLength
@@ -456,7 +487,7 @@ def LoadMidi(filename, exInfo = None):
                             lastNote = midiNotes[lenMidiNotes - 1]
                             lastNote[1] = noteEnd
                         else:
-                            midiNotes.append([noteStart, noteEnd, notePitch, wordCount])
+                            midiNotes.append([noteStart, noteEnd, notePitch, wordCount, curWord])
                     elif mainType == 0x90:
                         # Note On event
                         noteStart = curTicks
@@ -475,16 +506,19 @@ def LoadMidi(filename, exInfo = None):
         offset = eventsStart + trackLength
 
     print('tempo change count', len(microsecondsPerQuarterNoteArr))
+    wordArr = []
     for note in midiNotes:
-        # TickToBarInfo(note[0], 'note', division, microsecondsPerQuarterNoteArr)
         note[0] = TickToSecond(note[0], division, microsecondsPerQuarterNoteArr)
         note[1] = TickToSecond(note[1], division, microsecondsPerQuarterNoteArr)
         note[1] = note[1] - note[0]
+        wordArr.append(note[4])
 
+    # print(wordArr)
     midiNotes = np.array(midiNotes)
     midiNotes = midiNotes[:, 0:3]
     if exInfo is not None:
         exInfo.append(microsecondsPerQuarterNoteArr)
+        exInfo.append(wordArr)
     # singingStartTime = midiNotes[:, 0]
     # SaveInstantValue(singingStartTime, filename, 'singingstart')
     return midiNotes    
@@ -1159,15 +1193,19 @@ def GenerateIdolLevelForTangoDebug(filename, notes, bpm, et, musicTime):
     t.write(filename, encoding="utf-8",xml_declaration=True)
     print('done write file ' + filename)
 
-def GenerateIdolLevelForMidiLabel(filename, notes, bpm, et, musicTime):
+def GenerateIdolLevelForMidiLabel(filename, notes, bpm, et, musicTime, posPerBeat = 8):
     barInterval = 240.0 / bpm
     barInterval *= 1000
-    posInterval = barInterval / 32.0
+    posInterval = barInterval / (4 * posPerBeat)
 
     newNotes = []
     for n in notes:
-        type = n[1]
-        r = ConvertTimeBar(n, barInterval, posInterval, et)
+        if len(n) <= 4:
+            type = n[1]
+            r = ConvertTimeBar(n, barInterval, posInterval, et)
+        else:
+            type = n[2]
+            r = n
         if type == combineNode:
             value = n[2]
             l = []
@@ -1225,6 +1263,40 @@ def GenerateIdolLevelForMidiLabel(filename, notes, bpm, et, musicTime):
             node.attrib['startbar'] = str(totalBar - 3)
             node.attrib['endbar'] = str(totalBar)
 
+
+    def ConvertNoteToXmlEx(note):
+        trackName = ('Left2', 'Left1', 'Right1', 'Right2')
+        bar, pos, type, value, track = note
+
+        e = ElementTree.Element('Note')
+        e.attrib['Bar'] = str(bar+1)
+        e.attrib['Pos'] = str(pos)
+
+        if type == shortNote:
+            e.attrib['from_track'] = trackName[track]
+            e.attrib['target_track'] = trackName[track]
+            e.attrib['note_type'] = 'short'
+        elif type == slideNote:
+            e.attrib['target_track'] = trackName[track]
+            target = CorrespondingTrack(track)
+            e.attrib['end_track'] = trackName[target]
+            e.attrib['note_type'] = 'slip'
+        elif type == longNote:
+            e.attrib['from_track'] = trackName[track]
+            e.attrib['target_track'] = trackName[track]
+            e.attrib['note_type'] = 'long'
+            endBar, endPos = value
+            e.attrib['EndBar'] = str(endBar+1)
+            e.attrib['EndPos'] = str(endPos)
+        else:
+            assert False
+
+        return e
+
+    convertFunc = ConvertNoteToXml
+    if posPerBeat == 16:
+        convertFunc = ConvertNoteToXmlEx
+
     notesNode = root.find('NoteInfo').find('Normal')
     notesNode.clear()
     for note in notes:
@@ -1234,10 +1306,10 @@ def GenerateIdolLevelForMidiLabel(filename, notes, bpm, et, musicTime):
             e = ElementTree.Element('CombineNote')
             value = note[3]
             for subNote in value:
-                s = ConvertNoteToXml(subNote)
+                s = convertFunc(subNote)
                 e.append(s)
         else:
-            e = ConvertNoteToXml(note)
+            e = convertFunc(note)
 
         notesNode.append(e)
     
