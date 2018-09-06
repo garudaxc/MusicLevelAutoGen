@@ -1632,23 +1632,27 @@ def AutoTransMidiToLevel():
             if len(exInfo[0]) > 1:
                 continue
 
-            singingStartTimes = midiNotes[:, 0]
-            print('singtimes ===================================', len(singingStartTimes), bpm, 60 / (exInfo[0][0][1] / 1000 / 1000), et, duration)
-            levelNotes = []
-            # singingStartTimes = singingStartTimes * 1000
-            # for singingTime in singingStartTimes:
-            #     levelNotes.append((singingTime, LevelInfo.shortNote, 0, 0))
-
             songFileName = os.path.splitext(name)[0] + '_' + songInfo[artistColIdx] + '_' + songInfo[songNameColIdx] + '.csv'
             songFileName = songFileName.replace('/', '-')
             songFileName = songFileName.replace('\\', '-')
             outputFilePath = os.path.join(outputDir, 'level', songFileName)
-            # LevelInfo.GenerateIdolLevelForMidiLabel(outputFilePath, levelNotes, bpm, et, duration)
+
+            singingStartTimes = midiNotes[:, 0]
+            print('singtimes ===================================', len(singingStartTimes), bpm, 60 / (exInfo[0][0][1] / 1000 / 1000), et, duration)
+            levelNotes = []
+
+            # outputFilePath = os.path.splitext(outputFilePath)[0] + '.xml'
+            # singingStartTimes = singingStartTimes * 1000
+            # for singingTime in singingStartTimes:
+            #     levelNotes.append((singingTime, LevelInfo.shortNote, 0, 0))
+            # for bar, pos in exInfo[1]:
+            #     levelNotes.append((bar, pos, LevelInfo.shortNote, 0, 0))
+            # LevelInfo.GenerateIdolLevelForMidiLabel(outputFilePath, levelNotes, bpm, et, duration, 16)
             
             with open(outputFilePath, 'w') as outputFile:
                 for singingTime in singingStartTimes:
                     outputFile.write(str(singingTime) + '\n')
-                    
+
             ouputInfoArr.append(songInfo)
             ouputCount += 1
 
@@ -2009,11 +2013,8 @@ def GenerateLevelMarkTrainData():
             notes[i] = notes[i] + offset
 
         songFilePath = MakeMp3Pathname(song)
-        DownbeatTracking.CalcMusicInfoFromFile(songFilePath, debugET=et, debugBPM=bpm)
-        duration, bpm, et = LevelInfo.LoadMusicInfo(songFilePath)
         onsetTimes = PickOnsetForSingingTrain(songFilePath, bpm)
         singingTimes, bgTimes = MarkOnsetTimeWithMidiTime(onsetTimes, notes, bpm)
-
         features, labels = GenerateFeatureAndLabelByTimes(songFilePath, singingTimes, bgTimes)
 
         LevelInfo.SaveInstantValue(singingTimes, songFilePath, '_level_singing')
