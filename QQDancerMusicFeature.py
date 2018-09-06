@@ -1145,7 +1145,7 @@ def AutoGenerateNoteTool():
         return False
     
     print('check levelFileDir ' + levelFileDir + ' end')
-    for songFilePath in songFileArr:
+    for songFilePath, customInfo in songFileArr:
         if not os.path.exists(songFilePath):
             print('error! song file not found. path: ' + songFilePath)
             return False
