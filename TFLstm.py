@@ -1565,6 +1565,12 @@ def GenerateCsvSingingTrainData():
         csvFilePath = os.path.join(csvDataDir, name)
         songFilePath = MakeMp3Pathname(song)
         singingTimes = LoadCsvLabelData(csvFilePath)
+        for idx in range(0, len(singingTimes)-1):
+            if idx > 10 and idx < len(singingTimes) - 10:
+                continue
+
+            if singingTimes[idx + 1] - singingTimes[idx] > 30.000:
+                print('warning ========================== singing time interval is long, to check the data.', song, singingTimes[idx], singingTimes[idx + 1])
 
         infoPath = os.path.join(os.path.dirname(songFilePath), 'info.txt')
         if os.path.exists(infoPath):
