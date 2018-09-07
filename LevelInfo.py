@@ -546,6 +546,7 @@ def LoadMidi(filename, exInfo = None):
     # print(wordArr)
     midiNotes = np.array(midiNotes)
     midiNotes = midiNotes[:, 0:3]
+    midiNotes = midiNotes.astype(float)
     if exInfo is not None:
         exInfo.append(microsecondsPerQuarterNoteArr)
         exInfo.append(wordArr)

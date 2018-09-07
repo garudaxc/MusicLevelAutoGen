@@ -1549,7 +1549,7 @@ def LoadCsvLabelData(filePath):
 
     return vals    
 
-@run
+# @run
 def GenerateCsvSingingTrainData():
     outputFeatureCount = 0
     csvDataDir = os.path.join(trainDataDir, 'csv_singing')
@@ -1692,7 +1692,7 @@ def AutoTransMidiToLevel():
     print(ouputCount)
 
 
-# @run
+@run
 def GenerateMidiTrainData():
     trainList, validateList = LoadMidiTrainAndValidateFileList()
     fileList = np.concatenate((trainList, validateList))
@@ -1703,9 +1703,14 @@ def GenerateMidiTrainData():
         if not os.path.exists(midiFilePath):
             midiFilePath = midiDir + midiFileName + '.mid'
 
-        midiNotes = LevelInfo.LoadMidi(midiFilePath)
+        exInfo = []
+        midiNotes = LevelInfo.LoadMidi(midiFilePath, exInfo)
         if len(midiNotes) <= 0:
             continue
+
+        if len(exInfo[0]) > 1:
+            print('======================= multi bpm song', song, exInfo[0])
+
         for note in midiNotes:
             note[0] += offset
         
