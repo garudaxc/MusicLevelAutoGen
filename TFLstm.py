@@ -1551,6 +1551,7 @@ def LoadCsvLabelData(filePath):
 
 @run
 def GenerateCsvSingingTrainData():
+    outputFeatureCount = 0
     csvDataDir = os.path.join(trainDataDir, 'csv_singing')
     fileList = os.listdir(csvDataDir)
     for name in fileList:
@@ -1589,7 +1590,9 @@ def GenerateCsvSingingTrainData():
         LevelInfo.SaveInstantValue(bgTimes, songFilePath, '_label_bg')
         features[0:segBeginFrame] = np.zeros_like(features[0])
         features[segEndFrame:] = np.zeros_like(features[0])
-        SaveFeatures(MakeSongDataPathName(song, '_feature'), features)
+        if outputFeatureCount < 5:
+            SaveFeatures(MakeSongDataPathName(song, '_feature'), features)
+            outputFeatureCount += 1
 
         SaveFeaturesAndLabels(MakeSongDataPathName(song, 'feature', '.raw'), segFeatures, segLabels)
 
