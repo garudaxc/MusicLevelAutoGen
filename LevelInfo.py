@@ -363,26 +363,58 @@ def LoadMidi(filename, exInfo = None):
             print(prefix, barNum + 1, beatNum + 1, subVal1 + 1, subVal2, '  time: ', minute, ':', second)
         return barNum, beatNum, subVal1, subVal2
 
+    def ProcessStr(text):
+        emptyText = ''
+        if len(text) <= 0:
+            return emptyText
+
+        text = text.replace(' ', '')
+        text = text.replace('\r', '')
+        text = text.replace('\n', '')
+        text = text.replace('\x00', '')
+        if len(text) <= 0:
+            return emptyText
+
+        def CutPair(text, charA, charB):
+            while True:
+                idxA = text.find(charA)
+                if idxA < 0:
+                    break
+
+                idxB = text.find(charB)
+                if idxB < 0:
+                    break
+
+                text = text[idxB+1:]
+
+            return text
+
+        text = CutPair(text, '<', '>')
+        text = CutPair(text, '[', ']')
+
+        return text
+        
+
     def TryDecodeStr(strData):
-        # 未完成
+        tryArr = ['gbk', 'ascii', 'utf-8']
+        for encoding in tryArr:
+            try:
+                text = strData.decode(encoding)
+                return ProcessStr(text)
+            except:
+                pass
+
+        return '(err0)'
+
+    def DecodeStr(strData):
+        text = TryDecodeStr(strData)
         try:
-            text = strData.decode("gb2312")
-            return text
-        except:
-            pass
-        try:
-            text = strData.decode("ascii")
+            data = text.encode('gbk')
             return text
         except:
             pass
 
-        try:
-            text = strData.decode("utf-8")
-            return text
-        except:
-            pass
-
-        return 'not decode'
+        return '(err1)'
 
     offset = 0
     r, offset = ReadAndOffset('4s', data, offset)
@@ -456,14 +488,12 @@ def LoadMidi(filename, exInfo = None):
                     microsecondsPerQuarterNoteArr.append([curTicks, microsecondsPerQuarterNote])
                 elif metaType == 0x05:
                     wordCount += 1
-                    curWord = ''
-                    # if metaLength > 0:                        
-                    #     strFmt = str(metaLength) + 's'
-                    #     r, suboffset = ReadAndOffset(strFmt, data, offset)
-                    #     text = TryDecodeStr(r[0])
-                    #     if len(text) > 0:
-                    #         if text != '\n' and text != '\r':
-                    #             curWord = text
+                    if metaLength > 0:                        
+                        strFmt = str(metaLength) + 's'
+                        r, suboffset = ReadAndOffset(strFmt, data, offset)
+                        text = DecodeStr(r[0])
+                        if len(text) > 0:
+                            curWord = text
                     # TickToBarInfo(curTicks, 'word', division, microsecondsPerQuarterNoteArr)
 
                 offset += metaLength

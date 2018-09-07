@@ -1634,6 +1634,7 @@ def AutoTransMidiToLevel():
                 print('not found bpm info', name)
                 continue
 
+            print('process', name)
             songInfo = songInfoDic[name]
             bpm = float(songInfo[bpmColIdx])
             if bpm < 90:
@@ -1667,9 +1668,11 @@ def AutoTransMidiToLevel():
             #     levelNotes.append((bar, pos, LevelInfo.shortNote, 0, 0))
             # LevelInfo.GenerateIdolLevelForMidiLabel(outputFilePath, levelNotes, bpm, et, duration, 16)
             
-            with open(outputFilePath, 'w') as outputFile:
-                for singingTime in singingStartTimes:
-                    outputFile.write(str(singingTime) + '\n')
+            wordArr = exInfo[1]
+            # print(wordArr)
+            with open(outputFilePath, 'w', 1, 'gbk') as outputFile:
+                for singingTime, word in zip(singingStartTimes, wordArr):
+                    outputFile.write(str(singingTime) + ',' + word + '\n')
 
             ouputInfoArr.append(songInfo)
             ouputCount += 1
