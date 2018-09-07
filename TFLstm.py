@@ -1246,6 +1246,7 @@ def _Main():
         initialStatesZero = np.array([[0.0] * batch_states.shape[1]] * batch_states.shape[0])
 
         for j in range(epch):
+            epochStartTime = time.time()
             loss = []
             acc = []
             classify = []
@@ -1341,6 +1342,9 @@ def _Main():
             print('epch', j, 'not increase', notIncreaseCount)
             
             data.ShuffleBatch()
+
+            epochEndTime = time.time()
+            print('cost time', epochEndTime - epochStartTime)
 
 # @run
 def SaveShortNoteFile(pathname=r'd:\librosa\RhythmMaster\breakfree\breakfree_4k_nm.imd'):
@@ -1914,6 +1918,23 @@ def LoadTrainAndValidateData(withSongOrder = False):
 
     levelTrainList = LoadLevelFileList()
     for song, offset in levelTrainList:
+        dataFilePath = MakeSongDataPathName(song, 'feature', '.raw')
+        with open(dataFilePath, 'rb') as file:
+            features = pickle.load(file)
+            labels = pickle.load(file)
+            trainX.append(features)
+            trainY.append(labels)
+            trainSong.append(song)
+
+    csvDataDir = os.path.join(trainDataDir, 'csv_singing')
+    csvSingFileList = os.listdir(csvDataDir)
+    for name in csvSingFileList:
+        arr = os.path.splitext(name)
+        song = arr[0]
+        ext = arr[1]
+        if ext != '.csv':
+            continue
+
         dataFilePath = MakeSongDataPathName(song, 'feature', '.raw')
         with open(dataFilePath, 'rb') as file:
             features = pickle.load(file)
