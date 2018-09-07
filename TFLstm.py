@@ -992,7 +992,7 @@ def AutoGenerateLevelTool():
 
     return True
 
-@run
+# @run
 def GenerateLevel():
     print('gen level')
 
@@ -1521,10 +1521,79 @@ def SaveFeaturesAndLabels(dataFilePath, features, labels):
         print('raw file saved', features.shape, labels.shape)
 
 # @run
-def AutoTransMidiToLevel():
-    inputDir = r'E:\ktv_level'
-    subDirList = os.listdir(inputDir)
-    outputDir = 'outputlevel'
+def MakeTrainDataDir():
+    inputSongDir = r'E:\标注原始文件\midi标注csv9.6\midi标注csv9.6'
+    outputSongDir = os.path.join(rootDir, 'rm')
+    fileList = os.listdir(inputSongDir)
+    for name in fileList:
+        if os.path.splitext(name)[1] != '.mp3':
+            continue
+
+        print('process', name)
+        outputDir = os.path.join(outputSongDir, os.path.splitext(name)[0])
+        if not os.path.exists(outputDir):
+            os.mkdir(outputDir)
+
+        inoutFilePath = os.path.join(inputSongDir, name)
+        outputFilePath = os.path.join(outputDir, name)
+        shutil.copy(inoutFilePath, outputFilePath)
+
+def LoadCsvLabelData(filePath):
+    vals = []
+    with open(filePath, 'r') as file:
+        for line in file:
+            line = line.replace('\r', '\n')
+            line = line.replace('\n', '')
+            arr = line.split(',')
+            vals.append(float(arr[0]))
+
+    return vals    
+
+@run
+def GenerateCsvSingingTrainData():
+    csvDataDir = os.path.join(trainDataDir, 'csv_singing')
+    fileList = os.listdir(csvDataDir)
+    for name in fileList:
+        arr = os.path.splitext(name)
+        song = arr[0]
+        ext = arr[1]
+        if ext != '.csv':
+            continue
+
+        print('process', song)
+        csvFilePath = os.path.join(csvDataDir, name)
+        songFilePath = MakeMp3Pathname(song)
+        singingTimes = LoadCsvLabelData(csvFilePath)
+
+        infoPath = os.path.join(os.path.dirname(songFilePath), 'info.txt')
+        if os.path.exists(infoPath):
+            duration, bpm, et = LevelInfo.LoadMusicInfo(songFilePath)
+        else:
+            duration, bpm, et = DownbeatTracking.CalcMusicInfoFromFile(songFilePath)
+            duration = duration * 1000.0
+            et = et * 1000.0
+
+        onsetTimes = PickOnsetForSingingTrain(songFilePath, bpm)
+        singingTimes, bgTimes = MarkOnsetTimeWithMidiTime(onsetTimes, singingTimes, bpm)
+        features, labels = GenerateFeatureAndLabelByTimes(songFilePath, singingTimes, bgTimes)
+
+        segBegin = (singingTimes[0] - 0.500) * 1000
+        segEnd = (singingTimes[-1] + 0.500) * 1000
+        segBeginFrame = max(0, FrameIndex(segBegin, 10))
+        segEndFrame = min(len(features), FrameIndex(segEnd, 10))
+        
+        segFeatures = features[segBeginFrame:segEndFrame]
+        segLabels = labels[segBeginFrame:segEndFrame]
+
+        LevelInfo.SaveInstantValue(singingTimes, songFilePath, '_label_singing')
+        LevelInfo.SaveInstantValue(bgTimes, songFilePath, '_label_bg')
+        features[0:segBeginFrame] = np.zeros_like(features[0])
+        features[segEndFrame:] = np.zeros_like(features[0])
+        SaveFeatures(MakeSongDataPathName(song, '_feature'), features)
+
+        SaveFeaturesAndLabels(MakeSongDataPathName(song, 'feature', '.raw'), segFeatures, segLabels)
+
+def LoadKTVSongInfo():
     songInfoFile = trainDataDir + 'ktv_song_info.csv'
     songInfoDic = {}
     nameColIdx = 11
@@ -1542,6 +1611,16 @@ def AutoTransMidiToLevel():
                 print('line not valid', line)
                 continue
             songInfoDic[info[nameColIdx]] = info
+
+    return songInfoDic, nameColIdx, bpmColIdx, etColIdx, durationColIdx, artistColIdx, songNameColIdx
+
+# @run
+def AutoTransMidiToLevel():
+    inputDir = r'E:\ktv_level'
+    subDirList = os.listdir(inputDir)
+    outputDir = 'outputlevel'
+    songInfoDic, nameColIdx, bpmColIdx, etColIdx, durationColIdx, artistColIdx, songNameColIdx = LoadKTVSongInfo()
+
     ouputCount = 0
     ouputInfoArr = []
     for subDirName in subDirList:
