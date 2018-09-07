@@ -992,7 +992,7 @@ def AutoGenerateLevelTool():
 
     return True
 
-# @run
+@run
 def GenerateLevel():
     print('gen level')
 
@@ -1549,6 +1549,16 @@ def LoadCsvLabelData(filePath):
 
     return vals    
 
+def GetMusicInfo(songFilePath):
+    infoPath = os.path.join(os.path.dirname(songFilePath), 'info.txt')
+    if os.path.exists(infoPath):
+        duration, bpm, et = LevelInfo.LoadMusicInfo(songFilePath)
+    else:
+        duration, bpm, et = DownbeatTracking.CalcMusicInfoFromFile(songFilePath)
+        duration = duration * 1000.0
+        et = et * 1000.0
+    return duration, bpm, et
+
 # @run
 def GenerateCsvSingingTrainData():
     outputFeatureCount = 0
@@ -1572,13 +1582,7 @@ def GenerateCsvSingingTrainData():
             if singingTimes[idx + 1] - singingTimes[idx] > 30.000:
                 print('warning ========================== singing time interval is long, to check the data.', song, singingTimes[idx], singingTimes[idx + 1])
 
-        infoPath = os.path.join(os.path.dirname(songFilePath), 'info.txt')
-        if os.path.exists(infoPath):
-            duration, bpm, et = LevelInfo.LoadMusicInfo(songFilePath)
-        else:
-            duration, bpm, et = DownbeatTracking.CalcMusicInfoFromFile(songFilePath)
-            duration = duration * 1000.0
-            et = et * 1000.0
+        duration, bpm, et = GetMusicInfo(songFilePath)
 
         onsetTimes = PickOnsetForSingingTrain(songFilePath, bpm)
         singingTimes, bgTimes = MarkOnsetTimeWithMidiTime(onsetTimes, singingTimes, bpm)
@@ -1692,7 +1696,7 @@ def AutoTransMidiToLevel():
     print(ouputCount)
 
 
-@run
+# @run
 def GenerateMidiTrainData():
     trainList, validateList = LoadMidiTrainAndValidateFileList()
     fileList = np.concatenate((trainList, validateList))
@@ -1781,7 +1785,7 @@ def MarkMidiLabel():
         print('process song:', song)
         filePath = MakeMp3Pathname(song)
 
-        duration, bpm, et = LevelInfo.LoadMusicInfo(filePath)
+        duration, bpm, et = GetMusicInfo(filePath)
         onsettime = PickOnsetForSingingTrain(filePath, bpm)
         midiNotesData = LoadMidiTranData(MakeSongDataPathName(song, 'midi_train'))
         midiNotes = midiNotesData[:, 0]
