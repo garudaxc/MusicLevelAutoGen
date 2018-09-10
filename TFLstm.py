@@ -992,7 +992,7 @@ def AutoGenerateLevelTool():
 
     return True
 
-@run
+# @run
 def GenerateLevel():
     print('gen level')
 
@@ -1572,7 +1572,7 @@ def LoadCsvSingingFileList():
         if ext != '.csv':
             continue
 
-        fileList.append(song)
+        fileList.append((song, os.path.join(csvDataDir, name)))
 
     csvDataDir = os.path.join(csvDataDir, 'uncheck')
     tempList = os.listdir(csvDataDir)
@@ -1581,18 +1581,17 @@ def LoadCsvSingingFileList():
         if ext != '.csv':
             continue
 
-        fileList.append(song)
+        fileList.append((song, os.path.join(csvDataDir, name)))
 
     return fileList
 
-# @run
+@run
 def GenerateCsvSingingTrainData():
     outputFeatureCount = 0
     fileList = LoadCsvSingingFileList()
-    for song in fileList:
+    for song, csvFilePath in fileList:
         name = song + '.csv'
         print('process', song)
-        csvFilePath = os.path.join(csvDataDir, name)
         songFilePath = MakeMp3Pathname(song)
         singingTimes = LoadCsvLabelData(csvFilePath)
         for idx in range(0, len(singingTimes)-1):
@@ -1943,7 +1942,7 @@ def LoadTrainAndValidateData(withSongOrder = False):
             trainSong.append(song)
 
     csvSingFileList = LoadCsvSingingFileList()
-    for song in csvSingFileList:
+    for song, csvFilePath in csvSingFileList:
         dataFilePath = MakeSongDataPathName(song, 'feature', '.raw')
         with open(dataFilePath, 'rb') as file:
             features = pickle.load(file)
