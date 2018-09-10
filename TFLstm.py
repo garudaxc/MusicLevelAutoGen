@@ -1526,7 +1526,7 @@ def SaveFeaturesAndLabels(dataFilePath, features, labels):
 
 # @run
 def MakeTrainDataDir():
-    inputSongDir = r'E:\标注原始文件\midi标注csv9.6\midi标注csv9.6'
+    inputSongDir = r'E:\标注原始文件\midi标注csv9.7\midi标注csv9.7'
     outputSongDir = os.path.join(rootDir, 'rm')
     fileList = os.listdir(inputSongDir)
     for name in fileList:
@@ -1563,18 +1563,34 @@ def GetMusicInfo(songFilePath):
         et = et * 1000.0
     return duration, bpm, et
 
-# @run
-def GenerateCsvSingingTrainData():
-    outputFeatureCount = 0
+def LoadCsvSingingFileList():
+    fileList = []
     csvDataDir = os.path.join(trainDataDir, 'csv_singing')
-    fileList = os.listdir(csvDataDir)
-    for name in fileList:
-        arr = os.path.splitext(name)
-        song = arr[0]
-        ext = arr[1]
+    tempList = os.listdir(csvDataDir)
+    for name in tempList:
+        song, ext = os.path.splitext(name)
         if ext != '.csv':
             continue
 
+        fileList.append(song)
+
+    csvDataDir = os.path.join(csvDataDir, 'uncheck')
+    tempList = os.listdir(csvDataDir)
+    for name in tempList:
+        song, ext = os.path.splitext(name)
+        if ext != '.csv':
+            continue
+
+        fileList.append(song)
+
+    return fileList
+
+# @run
+def GenerateCsvSingingTrainData():
+    outputFeatureCount = 0
+    fileList = LoadCsvSingingFileList()
+    for song in fileList:
+        name = song + '.csv'
         print('process', song)
         csvFilePath = os.path.join(csvDataDir, name)
         songFilePath = MakeMp3Pathname(song)
@@ -1926,15 +1942,8 @@ def LoadTrainAndValidateData(withSongOrder = False):
             trainY.append(labels)
             trainSong.append(song)
 
-    csvDataDir = os.path.join(trainDataDir, 'csv_singing')
-    csvSingFileList = os.listdir(csvDataDir)
-    for name in csvSingFileList:
-        arr = os.path.splitext(name)
-        song = arr[0]
-        ext = arr[1]
-        if ext != '.csv':
-            continue
-
+    csvSingFileList = LoadCsvSingingFileList()
+    for song in csvSingFileList:
         dataFilePath = MakeSongDataPathName(song, 'feature', '.raw')
         with open(dataFilePath, 'rb') as file:
             features = pickle.load(file)
