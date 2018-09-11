@@ -7,18 +7,18 @@ from tensorflow.python import pywrap_tensorflow
 def TFVariableToShapeMap(ckptPath):
     reader = pywrap_tensorflow.NewCheckpointReader(ckptPath)
     var_to_shape_map = reader.get_variable_to_shape_map()
-    print('=====================================')
+    print('=======')
     for key in var_to_shape_map:
         print(key, var_to_shape_map[key])
-    print('=====================================')
+    print('=======')
     return var_to_shape_map
 
 def TFCurrentVariableList():
     nameList = [v.name for v in tf.trainable_variables()]
-    print('=====================================')
+    print('=======')
     for name in nameList:
         print(name)
-    print('=====================================')
+    print('=======')
     return nameList
 
 def TFVariable(shape, dtype=tf.float32, name=None):
@@ -140,6 +140,33 @@ class NoteDetectionModel():
         sequenceLength = tf.placeholder(tf.int32, [None], name='sequenceLength')
         return X, sequenceLength
 
+    def LSTM(self, X, sequenceLength):
+        numLayers = self.numLayers
+        state_size = tf.nn.rnn_cell.LSTMStateTuple(0, 0)
+        cells = []
+        dropoutCells = []
+        for i in range(numLayers * 2):
+            cell = rnn.LSTMCell(self.numUnits, use_peepholes=True, forget_bias=1.0)
+            cells.append(cell)
+
+            cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=(1.0 - self.dropout))
+            dropoutCells.append(cell)
+
+            state_size = cell.state_size
+
+        if self.timeMajor:
+            X = tf.transpose(X, perm=[1, 0, 2])
+
+        outputs, (states_fw), (states_bw) = rnn.stack_bidirectional_dynamic_rnn(
+            dropoutCells[0:numLayers], dropoutCells[numLayers:], 
+            X, sequence_length=sequenceLength, dtype=tf.float32,
+            initial_states_fw=None)
+
+        if self.timeMajor:
+            outputs = tf.transpose(outputs, perm=[1, 0, 2])
+
+        return outputs
+
     def CudnnLSTM(self, X):
         if not self.timeMajor:
             X = tf.transpose(X, perm=[1, 0, 2])
@@ -179,7 +206,10 @@ class NoteDetectionModel():
         cells = []
         dropoutCell = []
         
-        outputs = self.CudnnLSTM(X)
+        if useCudnn:
+            outputs = self.CudnnLSTM(X)
+        else:
+            outputs = self.LSTM(X, sequenceLength)
 
         statesCount = numLayers * 2 * 2
         initial_states = tf.placeholder(dtype=tf.float32, shape=(batchSize * statesCount, numUnits), name='initial_states')
@@ -231,7 +261,7 @@ class NoteDetectionModel():
         useCudnn = self.useCudnn
         self.RestoreForCudnn(sess, modelFilePath)
 
-    def BuildGraphForPredict(self):
+    def RestoreForCudnn(self, sess, modelFilePath):
         numUnits = self.numUnits
         numLayers = self.numLayers
         singleCell = lambda: cudnn_rnn.CudnnCompatibleLSTMCell(self.numUnits)
@@ -240,7 +270,7 @@ class NoteDetectionModel():
         X, sequenceLength = self.XAndSequenceLength()
         outputs, outputStateFW, outputStateBW = rnn.stack_bidirectional_dynamic_rnn(
             cellsFW, cellsBW, X, 
-            sequence_length=sequenceLength, dtype=tf.float32)
+            sequence_length=sequenceLength, dtype=tf.float32, scope='cudnn_lstm/stack_bidirectional_rnn')
         logits = self.LSTMToLogits(outputs)
         predictOp = tf.nn.softmax(logits, name='predictOp')
         tensorDic = self.tensorDic
@@ -248,7 +278,6 @@ class NoteDetectionModel():
         tensorDic['sequenceLength'] = sequenceLength
         tensorDic['predictOp'] = predictOp
 
-    def RestoreForCudnn(self, sess, modelFilePath):
         TFCurrentVariableList()
         TFVariableToShapeMap(modelFilePath)
 
