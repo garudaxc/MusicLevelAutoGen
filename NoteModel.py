@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import rnn
 from tensorflow.contrib import cudnn_rnn
+from tensorflow.contrib.cudnn_rnn.python.ops import cudnn_rnn_ops
 from tensorflow.python import pywrap_tensorflow
 
 def TFVariableToShapeMap(ckptPath):
@@ -56,7 +57,7 @@ def BuildModel(batchSize, maxTime, xDim, yDim, tensorDic):
     cnnOutputData = BuildCNN(xData, batchSize, maxTime, xDim, 1)
 
 class NoteDetectionModel():
-    def __init__(self, batchSize, maxTime, numLayers, numUnits, xDim, yDim, timeMajor=False, useCudnn=False):
+    def __init__(self, batchSize, maxTime, numLayers, numUnits, xDim, yDim, timeMajor=False, useCudnn=False, useInitialStates=True):
         self.batchSize = batchSize
         self.maxTime = maxTime
         self.numLayers = numLayers
@@ -65,13 +66,14 @@ class NoteDetectionModel():
         self.yDim = yDim
         self.timeMajor = timeMajor
         self.useCudnn = useCudnn
+        self.useInitialStates = useInitialStates
         self.tensorDic = {}
         print('batchSize', batchSize, 'maxTime', maxTime, 'numLayers', numLayers, 'numUnits', numUnits)
-        print('xDim', xDim, 'yDim', yDim, 'timeMajor', timeMajor, 'useCudnn', useCudnn)
+        print('xDim', xDim, 'yDim', yDim, 'timeMajor', timeMajor, 'useCudnn', useCudnn, 'useInitialStates', useInitialStates)
         self.cudnnLSTMName = 'note_cudnn_lstm'
 
     def ModelInfo(self):
-        return self.batchSize, self.maxTime, self.numLayers, self.numUnits, self.xDim, self.yDim, self.timeMajor, self.useCudnn
+        return self.batchSize, self.maxTime, self.numLayers, self.numUnits, self.xDim, self.yDim, self.timeMajor, self.useCudnn, self.useInitialStates
 
     def GetTensorDic(self):
         return self.tensorDic
@@ -147,18 +149,21 @@ class NoteDetectionModel():
         numUnits = self.numUnits
         statesCount = numLayers * 2 * 2
         initialStates = tf.placeholder(dtype=tf.float32, shape=(batchSize * statesCount, numUnits), name='initial_states')
-        initialStatesReshape = tf.reshape(initialStates, [statesCount, batchSize, numUnits])
-        partitions = []
-        for i in range(statesCount):
-            partitions.append(i)
-        allInputStates = tf.dynamic_partition(initialStatesReshape, partitions, statesCount)
-        for i in range(len(allInputStates)):
-            allInputStates[i] = tf.reshape(allInputStates[i], shape=[batchSize, numUnits])
-        initialStatesFW = []
-        initialStatesBW = []
-        for i in range(numLayers):
-            initialStatesFW.append(tf.nn.rnn_cell.LSTMStateTuple(allInputStates[i * 2], allInputStates[i * 2 + 1]))
-            initialStatesBW.append(tf.nn.rnn_cell.LSTMStateTuple(allInputStates[i * 2 + numLayers * 2], allInputStates[i * 2 + 1 + numLayers * 2]))
+        initialStatesFW = None
+        initialStatesBW = None
+        if self.useInitialStates:
+            initialStatesReshape = tf.reshape(initialStates, [statesCount, batchSize, numUnits])
+            partitions = []
+            for i in range(statesCount):
+                partitions.append(i)
+            allInputStates = tf.dynamic_partition(initialStatesReshape, partitions, statesCount)
+            for i in range(len(allInputStates)):
+                allInputStates[i] = tf.reshape(allInputStates[i], shape=[batchSize, numUnits])
+            initialStatesFW = []
+            initialStatesBW = []
+            for i in range(numLayers):
+                initialStatesFW.append(tf.nn.rnn_cell.LSTMStateTuple(allInputStates[i * 2], allInputStates[i * 2 + 1]))
+                initialStatesBW.append(tf.nn.rnn_cell.LSTMStateTuple(allInputStates[i * 2 + numLayers * 2], allInputStates[i * 2 + 1 + numLayers * 2]))
 
         return initialStates, initialStatesFW, initialStatesBW
 
@@ -207,10 +212,12 @@ class NoteDetectionModel():
 
     def CudnnLSTMInputStates(self, cudnnLSTM):
         stateShape = cudnnLSTM.state_shape(self.batchSize)
-        initialStatesShape = stateShape[0]
-        countPerState = initialStatesShape[0]
-        initialStatesShape[0] = initialStatesShape[0] * 2
+        initialStatesShape = [stateShape[0][0] * 2, stateShape[0][1], stateShape[0][2]]
+        countPerState = stateShape[0][0]
         initialStates = tf.placeholder(dtype=tf.float32, shape=initialStatesShape, name='initial_states')
+        if not self.useInitialStates:
+            return initialStates, None
+
         partitions = []
         for i in range(initialStatesShape[0]):
             if i < countPerState:
@@ -218,15 +225,21 @@ class NoteDetectionModel():
             else:
                 partitions.append(1)
         allInputStates = tf.dynamic_partition(initialStates, partitions, 2)
-        return initialStates, allInputStates[0], allInputStates[1]
+        for i in range(len(allInputStates)):
+            allInputStates[i] = tf.reshape(allInputStates[i], shape=stateShape[0])
+
+        return initialStates, (allInputStates[0], allInputStates[1])
 
     def CudnnLSTM(self, X):
         if not self.timeMajor:
             X = tf.transpose(X, perm=[1, 0, 2])
 
-        cudnnLSTM = cudnn_rnn.CudnnLSTM(self.numLayers, self.numUnits, direction="bidirectional", dropout=self.dropout, name=self.cudnnLSTMName)        
-        initialStates, initialStatesH, initialStatesC = self.CudnnLSTMInputStates(cudnnLSTM)
-        outputs, (outputStatesH, outputStatesC) = cudnnLSTM(X, initial_state=(initialStatesH, initialStatesC), training=True)
+        direction = cudnn_rnn_ops.CUDNN_RNN_BIDIRECTION
+        print('CudnnLSTM direction', direction)
+        
+        cudnnLSTM = cudnn_rnn.CudnnLSTM(self.numLayers, self.numUnits, direction=direction, dropout=self.dropout, name=self.cudnnLSTMName)        
+        initialStates, initialStatesTuple = self.CudnnLSTMInputStates(cudnnLSTM)
+        outputs, (outputStatesH, outputStatesC) = cudnnLSTM(X, initial_state=initialStatesTuple, training=True)
         if not self.timeMajor:
             outputs = tf.transpose(outputs, perm=[1, 0, 2])
 
@@ -242,7 +255,7 @@ class NoteDetectionModel():
     def BuildGraph(self, dropout):
         self.dropout = dropout
         print('dropout', dropout)
-        batchSize, maxTime, numLayers, numUnits, xDim, yDim, timeMajor, useCudnn = self.ModelInfo()
+        batchSize, maxTime, numLayers, numUnits, xDim, yDim, timeMajor, useCudnn, useInitialStates = self.ModelInfo()
 
         tensorDic = self.tensorDic
 
@@ -283,6 +296,15 @@ class NoteDetectionModel():
         graphFile = modelFilePath + '.meta'
         saver = tf.train.import_meta_graph(graphFile)
         saver.restore(sess, modelFile)
+
+        tensorDic = self.tensorDic
+        graph = tf.get_default_graph()
+        tensorDic['X'] = graph.get_tensor_by_name('X:0')
+        tensorDic['sequence_length'] = graph.get_tensor_by_name('sequence_length:0')
+        tensorDic['predict_op'] = graph.get_tensor_by_name('predict_op:0')
+        tensorDic['initial_states'] = graph.get_tensor_by_name('initial_states:0')
+        tensorDic['output_states'] = graph.get_tensor_by_name('output_states:0')
+
         print('Restore done')
 
     def RestoreForCudnn(self, sess, modelFilePath):
