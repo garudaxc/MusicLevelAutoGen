@@ -33,7 +33,7 @@ def Conv2dLayer(inputData, filterShape, name=None):
     return reluLayer
 
 def LinearLayer(inputData, dimA, dimB, nameWeight=None, nameBias=None):
-    weight = TFVariable(shape=(dimA, dimB), name=nameWeight)
+    weight = TFVariable(shape=[dimA, dimB], name=nameWeight)
     bias = TFVariable(shape=[dimB], name=nameBias)
     linearLayer = tf.matmul(inputData, weight) + bias
     return linearLayer
@@ -143,12 +143,12 @@ class NoteDetectionModel():
         sequenceLength = tf.placeholder(tf.int32, [None], name='sequence_length')
         return X, sequenceLength
 
-    def LSTMInputStates(self):
+    def LSTMInputStates(self, initialStatesName):
         numLayers = self.numLayers
         batchSize = self.batchSize
         numUnits = self.numUnits
         statesCount = numLayers * 2 * 2
-        initialStates = tf.placeholder(dtype=tf.float32, shape=(batchSize * statesCount, numUnits), name='initial_states')
+        initialStates = tf.placeholder(dtype=tf.float32, shape=(batchSize * statesCount, numUnits), name=initialStatesName)
         initialStatesFW = None
         initialStatesBW = None
         if self.useInitialStates:
@@ -167,7 +167,7 @@ class NoteDetectionModel():
 
         return initialStates, initialStatesFW, initialStatesBW
 
-    def LSTMOuputStates(self, statesFW, statesBW):
+    def LSTMOuputStates(self, statesFW, statesBW, outputStatesName):
         outputStatesArr = []
         for states in statesFW:
             for state in states:
@@ -176,45 +176,50 @@ class NoteDetectionModel():
             for state in states:
                 outputStatesArr.append(state)
 
-        outputStates = tf.concat(outputStatesArr, 0, name="output_states")
+        outputStates = tf.concat(outputStatesArr, 0, name=outputStatesName)
         return outputStates
 
-    def LSTM(self, X, sequenceLength):
+    def LSTM(self, X, sequenceLength, initialStatesName, outputStatesName, cells=None):
         numLayers = self.numLayers
-        state_size = tf.nn.rnn_cell.LSTMStateTuple(0, 0)
-        cells = []
-        dropoutCells = []
-        for i in range(numLayers * 2):
-            cell = rnn.LSTMCell(self.numUnits, use_peepholes=True, forget_bias=1.0)
-            cells.append(cell)
+        if cells is None:
+            print('cells is None. create cells')
+            cells = []
+            dropoutCells = []
+            for i in range(numLayers * 2):
+                cell = rnn.LSTMCell(self.numUnits, use_peepholes=True, forget_bias=1.0)
+                cells.append(cell)
 
-            cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=(1.0 - self.dropout))
-            dropoutCells.append(cell)
+                cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=(1.0 - self.dropout))
+                dropoutCells.append(cell)
 
-            state_size = cell.state_size
+            usedCells = dropoutCells
+        else:
+            print('cells is not None. reuse cells.')
+            dropoutCells = cells
+            usedCells = cells
 
         if self.timeMajor:
             X = tf.transpose(X, perm=[1, 0, 2])
 
-        initialStates, initialStatesFW, initialStatesBW = self.LSTMInputStates()
+        initialStates, initialStatesFW, initialStatesBW = self.LSTMInputStates(initialStatesName)
 
         outputs, statesFW, statesBW = rnn.stack_bidirectional_dynamic_rnn(
-            dropoutCells[0:numLayers], dropoutCells[numLayers:], 
+            usedCells[0:numLayers], usedCells[numLayers:], 
             X, sequence_length=sequenceLength, dtype=tf.float32,
             initial_states_fw=initialStatesFW)
 
         if self.timeMajor:
             outputs = tf.transpose(outputs, perm=[1, 0, 2])
 
-        outputStates = self.LSTMOuputStates(statesFW, statesBW)
+        outputStates = self.LSTMOuputStates(statesFW, statesBW, outputStatesName)
 
-        return outputs, initialStates, outputStates
+        return outputs, initialStates, outputStates, cells, dropoutCells
 
-    def CudnnLSTMInputStates(self, cudnnLSTM):
+    def CudnnLSTMInputStates(self, cudnnLSTM, initialStatesName):
         stateShape = cudnnLSTM.state_shape(self.batchSize)
         initialStatesShape = [stateShape[0][0] * 2, stateShape[0][1], stateShape[0][2]]
         countPerState = stateShape[0][0]
-        initialStates = tf.placeholder(dtype=tf.float32, shape=initialStatesShape, name='initial_states')
+        initialStates = tf.placeholder(dtype=tf.float32, shape=initialStatesShape, name=initialStatesName)
         if not self.useInitialStates:
             return initialStates, None
 
@@ -236,21 +241,28 @@ class NoteDetectionModel():
 
         direction = cudnn_rnn_ops.CUDNN_RNN_BIDIRECTION
         print('CudnnLSTM direction', direction)
-        
+
         cudnnLSTM = cudnn_rnn.CudnnLSTM(self.numLayers, self.numUnits, direction=direction, dropout=self.dropout, name=self.cudnnLSTMName)        
-        initialStates, initialStatesTuple = self.CudnnLSTMInputStates(cudnnLSTM)
+        initialStates, initialStatesTuple = self.CudnnLSTMInputStates(cudnnLSTM, 'initial_states')
         outputs, (outputStatesH, outputStatesC) = cudnnLSTM(X, initial_state=initialStatesTuple, training=True)
         if not self.timeMajor:
             outputs = tf.transpose(outputs, perm=[1, 0, 2])
 
-        outputStates = tf.concat((outputStatesH, outputStatesC), 0, name="output_states")
+        outputStates = tf.concat((outputStatesH, outputStatesC), 0, name='output_states')
         return outputs, initialStates, outputStates
 
-    def LSTMToLogits(self, outputs):
+    def LSTMToLogits(self, outputs, weight=None, bias=None):
         outlayerDim = tf.shape(outputs)[2]
         outputs = tf.reshape(outputs, [self.batchSize * self.maxTime, outlayerDim])
-        logits = LinearLayer(outputs, 2 * self.numUnits, self.yDim, 'output_linear_w', 'output_linear_b')
-        return logits
+
+        if weight is None:
+            weight = TFVariable(shape=[2 * self.numUnits, self.yDim], name='output_linear_w')
+
+        if bias is None:
+            bias = TFVariable(shape=[self.yDim], name='output_linear_b')
+
+        logits = tf.matmul(outputs, weight) + bias
+        return logits, weight, bias
 
     def BuildGraph(self, dropout):
         self.dropout = dropout
@@ -273,11 +285,11 @@ class NoteDetectionModel():
         if useCudnn:
             outputs, initialStates, outputStates = self.CudnnLSTM(X)
         else:
-            outputs, initialStates, outputStates = self.LSTM(X, sequenceLength)
+            outputs, initialStates, outputStates, cells, dropoutCells = self.LSTM(X, sequenceLength, 'initial_states', 'output_states')
         tensorDic['initial_states'] = initialStates
         tensorDic['output_states'] = outputStates
         
-        logits = self.LSTMToLogits(outputs)
+        logits, weight, bias = self.LSTMToLogits(outputs)
         Y = tf.reshape(Y, [batchSize * maxTime, yDim])
         
         loss_op = self.LossOp(logits, Y)
@@ -286,6 +298,12 @@ class NoteDetectionModel():
         tensorDic['accuracy'] = self.AccuracyOp(logits, Y)
         tensorDic['classify_info'] = self.ClassifyInfoTensor(logits, Y)
 
+        if not useCudnn:
+            # not drop out for predict
+            outputsPredict, initialStatesPredict, outputStatesPredict, _, _ = self.LSTM(X, sequenceLength, 'initial_states_predict', 'output_states_predict', cells=cells)
+            logitsPredict, _, _ = self.LSTMToLogits(outputs, weight=weight, bias=bias)
+            predictOp = tf.nn.softmax(logitsPredict, name='predict_op')
+            
         print('build rnn done')
 
     def Restore(self, sess, modelFilePath):
@@ -302,8 +320,8 @@ class NoteDetectionModel():
         tensorDic['X'] = graph.get_tensor_by_name('X:0')
         tensorDic['sequence_length'] = graph.get_tensor_by_name('sequence_length:0')
         tensorDic['predict_op'] = graph.get_tensor_by_name('predict_op:0')
-        tensorDic['initial_states'] = graph.get_tensor_by_name('initial_states:0')
-        tensorDic['output_states'] = graph.get_tensor_by_name('output_states:0')
+        tensorDic['initial_states'] = graph.get_tensor_by_name('initial_states_predict:0')
+        tensorDic['output_states'] = graph.get_tensor_by_name('output_states_predict:0')
 
         print('Restore done')
 
@@ -314,15 +332,15 @@ class NoteDetectionModel():
         cellsFW = [singleCell() for _ in range(numLayers)]
         cellsBW = [singleCell() for _ in range(numLayers)]
         X, sequenceLength = self.XAndSequenceLength()
-        initialStates, initialStatesFW, initialStatesBW = self.LSTMInputStates()
+        initialStates, initialStatesFW, initialStatesBW = self.LSTMInputStates('initial_states')
         with tf.variable_scope(self.cudnnLSTMName):
             outputs, outputStatesFW, outputStatesBW = rnn.stack_bidirectional_dynamic_rnn(
                 cellsFW, cellsBW, X, sequence_length=sequenceLength, dtype=tf.float32, 
                 initial_states_fw=initialStatesFW, initial_states_bw=initialStatesBW)
 
-        outputStates = self.LSTMOuputStates(outputStatesFW, outputStatesBW)
+        outputStates = self.LSTMOuputStates(outputStatesFW, outputStatesBW, 'output_states')
         
-        logits = self.LSTMToLogits(outputs)
+        logits, _, _ = self.LSTMToLogits(outputs)
         predictOp = tf.nn.softmax(logits, name='predict_op')
         tensorDic = self.tensorDic
         tensorDic['X'] = X
