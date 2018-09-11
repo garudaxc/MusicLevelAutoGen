@@ -301,7 +301,7 @@ class NoteDetectionModel():
         if not useCudnn:
             # not drop out for predict
             outputsPredict, initialStatesPredict, outputStatesPredict, _, _ = self.LSTM(X, sequenceLength, 'initial_states_predict', 'output_states_predict', cells=cells)
-            logitsPredict, _, _ = self.LSTMToLogits(outputs, weight=weight, bias=bias)
+            logitsPredict, _, _ = self.LSTMToLogits(outputsPredict, weight=weight, bias=bias)
             predictOp = tf.nn.softmax(logitsPredict, name='predict_op')
             
         print('build rnn done')
@@ -311,9 +311,9 @@ class NoteDetectionModel():
             self.RestoreForCudnn(sess, modelFilePath)
             return
 
-        graphFile = modelFilePath + '.meta'
-        saver = tf.train.import_meta_graph(graphFile)
-        saver.restore(sess, modelFile)
+        graphFilePath = modelFilePath + '.meta'
+        saver = tf.train.import_meta_graph(graphFilePath)
+        saver.restore(sess, modelFilePath)
 
         tensorDic = self.tensorDic
         graph = tf.get_default_graph()
