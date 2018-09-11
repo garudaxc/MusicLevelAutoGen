@@ -68,6 +68,7 @@ class NoteDetectionModel():
         self.tensorDic = {}
         print('batchSize', batchSize, 'maxTime', maxTime, 'numLayers', numLayers, 'numUnits', numUnits)
         print('xDim', xDim, 'yDim', yDim, 'timeMajor', timeMajor, 'useCudnn', useCudnn)
+        self.cudnnLSTMName = 'note_cudnn_lstm'
 
     def ModelInfo(self):
         return self.batchSize, self.maxTime, self.numLayers, self.numUnits, self.xDim, self.yDim, self.timeMajor, self.useCudnn
@@ -171,7 +172,7 @@ class NoteDetectionModel():
         if not self.timeMajor:
             X = tf.transpose(X, perm=[1, 0, 2])
 
-        cudnnLSTM = cudnn_rnn.CudnnLSTM(self.numLayers, self.numUnits, direction="bidirectional", dropout=self.dropout)
+        cudnnLSTM = cudnn_rnn.CudnnLSTM(self.numLayers, self.numUnits, direction="bidirectional", dropout=self.dropout, name=self.cudnnLSTMName)
         outputs, output_states = cudnnLSTM(X, initial_state=None, training=True)
         if not self.timeMajor:
             outputs = tf.transpose(outputs, perm=[1, 0, 2])
@@ -253,8 +254,6 @@ class NoteDetectionModel():
         # predict_op = tf.nn.softmax(logits, name='predict_op')
         # result['predict_op'] = predict_op
 
-        TFCurrentVariableList()
-
         print('build rnn done')
 
     def Restore(self, sess, modelFilePath):
@@ -268,9 +267,10 @@ class NoteDetectionModel():
         cellsFW = [singleCell() for _ in range(numLayers)]
         cellsBW = [singleCell() for _ in range(numLayers)]
         X, sequenceLength = self.XAndSequenceLength()
-        outputs, outputStateFW, outputStateBW = rnn.stack_bidirectional_dynamic_rnn(
-            cellsFW, cellsBW, X, 
-            sequence_length=sequenceLength, dtype=tf.float32, scope='cudnn_lstm/stack_bidirectional_rnn')
+        with tf.variable_scope(self.cudnnLSTMName):
+            outputs, outputStateFW, outputStateBW = rnn.stack_bidirectional_dynamic_rnn(
+                cellsFW, cellsBW, X, 
+                sequence_length=sequenceLength, dtype=tf.float32)
         logits = self.LSTMToLogits(outputs)
         predictOp = tf.nn.softmax(logits, name='predictOp')
         tensorDic = self.tensorDic
@@ -278,13 +278,8 @@ class NoteDetectionModel():
         tensorDic['sequenceLength'] = sequenceLength
         tensorDic['predictOp'] = predictOp
 
-        TFCurrentVariableList()
-        TFVariableToShapeMap(modelFilePath)
-
         saver = tf.train.Saver()
         saver.restore(sess, modelFilePath)
-
-
 
         print('RestoreForCudnn done')
 
