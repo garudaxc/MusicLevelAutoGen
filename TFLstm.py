@@ -13,6 +13,7 @@ import DownbeatTracking
 import madmom
 import shutil
 import sys
+import NoteModel
 
 rootDir = util.getRootDir()
 trainDataDir = rootDir + 'MusicLevelAutoGen/train_data/'
@@ -657,14 +658,20 @@ def SaveModel(sess, filename, saveMeta = False):
 
 def EvaluateWithModel(modelFile, song, rawFile, TrainData, featureFunc=myprocesser.LoadAndProcessAudio):
     # 加载训练好的模型，将结果保存到二进制文件
-    predicts = RunModel(modelFile, MakeMp3Pathname(song), TrainData, featureFunc)
+    start = time.time()
+    if modelFile.find('singing') < 0:
+        predicts = RunModel(modelFile, MakeMp3Pathname(song), TrainData, featureFunc)
+    else:
+        predicts = RunModelEx(modelFile, MakeMp3Pathname(song), TrainData, featureFunc)
+    end = time.time()
+    print('RunModel cost', end - start)
     with open(rawFile, 'wb') as file:
         pickle.dump(predicts, file)
         print('raw file saved', predicts.shape)
 
     return predicts
 
-def RunModel(modelFile, songFile, TrainData, featureFunc=myprocesser.LoadAndProcessAudio):    
+def RunModel(modelFile, songFile, TrainData, featureFunc=myprocesser.LoadAndProcessAudio):
     predictGraph = tf.Graph()
     graphFile = modelFile + '.meta'
 
@@ -704,6 +711,45 @@ def RunModel(modelFile, songFile, TrainData, featureFunc=myprocesser.LoadAndProc
                 t = t[0:numSteps,:]
                 evaluate.append(t)
 
+
+            predicts = np.stack(evaluate).reshape(-1, TrainData.lableDim)
+
+    return predicts
+
+def RunModelEx(modelFile, songFile, TrainData, featureFunc=myprocesser.LoadAndProcessAudio):
+    predictGraph = tf.Graph()
+    graphFile = modelFile + '.meta'
+
+    with predictGraph.as_default():
+        model = NoteModel.NoteDetectionModel(batchSize, numSteps, 3, numHidden, inputDim, TrainData.lableDim, timeMajor=False, useCudnn=True)
+        with tf.Session() as sess:
+            model.Restore(sess, modelFile)
+            print('model loaded')
+
+            tensorDic = model.GetTensorDic()
+            predict_op = tensorDic['predict_op']
+            print('predict_op', predict_op)         
+            X = tensorDic['X']
+            seqLenHolder = tensorDic['sequence_length']
+            
+ 
+            initial_states = tensorDic['initial_states']
+            batch_states = tensorDic['output_states']
+            initialStatesZero = model.InitialStatesZero()
+            currentInitialStates = initialStatesZero
+
+            testx = featureFunc(songFile)
+
+            data = TrainData(batchSize, numSteps, testx)
+            
+            evaluate = []
+            for i in range(data.numBatches):
+                xData, _, seqLen = data.GetBatch(i)
+                t, batchStates = sess.run([predict_op, batch_states], feed_dict={X:xData, seqLenHolder:seqLen, initial_states: currentInitialStates})
+                currentInitialStates = batchStates
+                
+                t = t[0:numSteps,:]
+                evaluate.append(t)
 
             predicts = np.stack(evaluate).reshape(-1, TrainData.lableDim)
 
@@ -992,7 +1038,7 @@ def AutoGenerateLevelTool():
 
     return True
 
-# @run
+@run
 def GenerateLevel():
     print('gen level')
 
@@ -1054,7 +1100,7 @@ def GenerateLevel():
     # debugET = 682
     # song = ['jinjuebianjingxian']
     # debugET = 6694
-    # song = ['ouxiangwanwansui']
+    song = ['ouxiangwanwansui']
     # debugET = 571
     # song = ['blue planet']
     # debugET = 1615
@@ -1209,12 +1255,13 @@ def _Main():
     if trainForSinging:
         validateData = ValidateData(batchSize, numSteps, validateX, validateY)
 
-    seqlenHolder = tf.placeholder(tf.int32, [None], name='seqLen')
-    X = tf.placeholder(dtype=tf.float32, shape=(batchSize, numSteps, inputDim), name='X')
-    Y = tf.placeholder(dtype=tf.float32, shape=(batchSize, numSteps, TrainData.lableDim), name='Y')
-    learningRate = tf.placeholder(dtype=tf.float32, name='learn_rate')
-
-    result = BuildDynamicRnn(X, Y, seqlenHolder, learningRate, TrainData)
+    model = NoteModel.NoteDetectionModel(batchSize, numSteps, 3, numHidden, inputDim, TrainData.lableDim, timeMajor=False, useCudnn=True)
+    model.BuildGraph(dropout=0.4)
+    result = model.GetTensorDic()
+    X = result['X']
+    Y = result['Y']
+    seqlenHolder = result['sequence_length']
+    learningRate = result['learning_rate']
 
     maxAcc = 0.0
     minLoss = 10000.0
@@ -1242,8 +1289,8 @@ def _Main():
         SaveModel(sess, modelPath, saveMeta=True)
 
         initial_states = result['initial_states']
-        batch_states = result['batch_states']
-        initialStatesZero = np.array([[0.0] * batch_states.shape[1]] * batch_states.shape[0])
+        batch_states = result['output_states']
+        initialStatesZero = model.InitialStatesZero()
 
         for j in range(epch):
             epochStartTime = time.time()
@@ -1585,7 +1632,7 @@ def LoadCsvSingingFileList():
 
     return fileList
 
-@run
+# @run
 def GenerateCsvSingingTrainData():
     outputFeatureCount = 0
     fileList = LoadCsvSingingFileList()
