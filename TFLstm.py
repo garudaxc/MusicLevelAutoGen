@@ -1266,6 +1266,8 @@ def _Main():
     maxAcc = 0.0
     minLoss = 10000.0
     minTrainLoss = 10000.0
+    minLossInfo = [0, 0, 0]
+    maxAccInfo = [0, 0, 0]
     notIncreaseCount = 0
     currentLearningRate = learning_rate
     learningRateFined = False
@@ -1341,18 +1343,13 @@ def _Main():
             trainClassifyValue = sum(trainClassify)
 
             notIncreaseCount += 1
-            # if accValue > maxAcc:
-            #     maxAcc = accValue
-            #     notIncreaseCount = 0
-            #     # save checkpoint
-            #     print('save checkpoint')
-            #     SaveModel(sess, modelPath)
+            if accValue > maxAcc:
+                maxAcc = accValue
+                maxAccInfo = [lossValue, accValue, j]
             
-            # if lossValue < minLoss:
-            #     minLoss = lossValue
-            #     notIncreaseCount = 0
-            #     print('save checkpoint')
-            #     SaveModel(sess, modelPath)
+            if lossValue < minLoss:
+                minLoss = lossValue
+                minLossInfo = [lossValue, accValue, j]
 
             if trainLossValue < minTrainLoss:
                 minTrainLoss = trainLossValue
@@ -1386,6 +1383,7 @@ def _Main():
                 print(np.concatenate((trainClassifyValue, classifyValue)))
             else:
                 print(trainClassifyValue)
+            print('current validate minLossInfo', minLossInfo, 'maxAccInfo', maxAccInfo)
             print('epch', j, 'not increase', notIncreaseCount)
             
             data.ShuffleBatch()
@@ -2047,8 +2045,10 @@ def LoadTrainAndValidateData(withSongOrder = False):
         validateX = np.vstack(validateX)
         validateY = np.vstack(validateY)
 
-    print('train song', trainSong)
-    print('validate song', validateSong)
+    print('train song', len(trainSong))
+    print(trainSong)
+    print('validate song', len(validateSong))
+    print(validateSong)
 
     return trainX, trainY, trainSong, validateX, validateY, validateSong
     
