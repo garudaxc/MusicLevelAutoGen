@@ -1656,6 +1656,7 @@ def LoadCsvSingingFileList():
 def GenerateCsvSingingTrainData():
     outputFeatureCount = 0
     fileList, trainList, validateList = LoadCsvSingingFileList()
+    toCheckFileCount = 0
     for song, csvFilePath in fileList:
         name = song + '.csv'
         print('process', song)
@@ -1667,6 +1668,8 @@ def GenerateCsvSingingTrainData():
 
             if singingTimes[idx + 1] - singingTimes[idx] > 30.000:
                 print('warning ========================== singing time interval is long, to check the data.', song, singingTimes[idx], singingTimes[idx + 1])
+                toCheckFileCount += 1
+                break
 
         duration, bpm, et = GetMusicInfo(songFilePath)
 
@@ -1691,6 +1694,8 @@ def GenerateCsvSingingTrainData():
             outputFeatureCount += 1
 
         SaveFeaturesAndLabels(MakeSongDataPathName(song, 'feature', '.raw'), segFeatures, segLabels)
+
+    print('toCheckFileCount', toCheckFileCount)
 
 def LoadKTVSongInfo():
     songInfoFile = trainDataDir + 'ktv_song_info.csv'
