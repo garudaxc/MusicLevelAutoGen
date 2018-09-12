@@ -1611,7 +1611,17 @@ def GetMusicInfo(songFilePath):
     return duration, bpm, et
 
 def LoadCsvSingingFileList():
+    csvValidateListFilePath = os.path.join(trainDataDir, 'csv_validate_list.csv')
+    validateDic = {}
+    with open(csvValidateListFilePath, 'r', 1, 'utf-8') as file:
+        for line in file:
+            line = line.replace('\r', '\n')
+            line = line.replace('\n', '')
+            validateDic[line] = True
+
     fileList = []
+    trainList = []
+    validateList = []
     csvDataDir = os.path.join(trainDataDir, 'csv_singing')
     tempList = os.listdir(csvDataDir)
     for name in tempList:
@@ -1619,7 +1629,12 @@ def LoadCsvSingingFileList():
         if ext != '.csv':
             continue
 
-        fileList.append((song, os.path.join(csvDataDir, name)))
+        data = (song, os.path.join(csvDataDir, name))
+        fileList.append(data)
+        if song in validateDic:
+            validateList.append(data)
+        else:
+            trainList.append(data)
 
     csvDataDir = os.path.join(csvDataDir, 'uncheck')
     tempList = os.listdir(csvDataDir)
@@ -1628,14 +1643,19 @@ def LoadCsvSingingFileList():
         if ext != '.csv':
             continue
 
-        fileList.append((song, os.path.join(csvDataDir, name)))
+        data = (song, os.path.join(csvDataDir, name))
+        fileList.append(data)
+        if song in validateDic:
+            validateList.append(data)
+        else:
+            trainList.append(data)
 
-    return fileList
+    return fileList, trainList, validateList
 
 # @run
 def GenerateCsvSingingTrainData():
     outputFeatureCount = 0
-    fileList = LoadCsvSingingFileList()
+    fileList, trainList, validateList = LoadCsvSingingFileList()
     for song, csvFilePath in fileList:
         name = song + '.csv'
         print('process', song)
@@ -1969,14 +1989,14 @@ def LoadTrainAndValidateData(withSongOrder = False):
             trainY.append(labels)
             trainSong.append(song)
 
-    for midiFileName, offset, song in validateList:
-        dataFilePath = MakeSongDataPathName(song, 'feature', '.raw')
-        with open(dataFilePath, 'rb') as file:
-            features = pickle.load(file)
-            labels = pickle.load(file)
-            validateX.append(features)
-            validateY.append(labels)
-            validateSong.append(song)
+    # for midiFileName, offset, song in validateList:
+    #     dataFilePath = MakeSongDataPathName(song, 'feature', '.raw')
+    #     with open(dataFilePath, 'rb') as file:
+    #         features = pickle.load(file)
+    #         labels = pickle.load(file)
+    #         validateX.append(features)
+    #         validateY.append(labels)
+    #         validateSong.append(song)
 
     levelTrainList = LoadLevelFileList()
     for song, offset in levelTrainList:
@@ -1988,8 +2008,8 @@ def LoadTrainAndValidateData(withSongOrder = False):
             trainY.append(labels)
             trainSong.append(song)
 
-    csvSingFileList = LoadCsvSingingFileList()
-    for song, csvFilePath in csvSingFileList:
+    csvFileList, csvTrainList, csvValidateList = LoadCsvSingingFileList()
+    for song, csvFilePath in csvTrainList:
         dataFilePath = MakeSongDataPathName(song, 'feature', '.raw')
         with open(dataFilePath, 'rb') as file:
             features = pickle.load(file)
@@ -1997,6 +2017,14 @@ def LoadTrainAndValidateData(withSongOrder = False):
             trainX.append(features)
             trainY.append(labels)
             trainSong.append(song)
+    for song, csvFilePath in csvValidateList:
+        dataFilePath = MakeSongDataPathName(song, 'feature', '.raw')
+        with open(dataFilePath, 'rb') as file:
+            features = pickle.load(file)
+            labels = pickle.load(file)
+            validateX.append(features)
+            validateY.append(labels)
+            validateSong.append(song)
 
     # pureBGMfileList, pureBGMDir = LoadPureBGMFileList()
     # for song, ext in pureBGMfileList:
@@ -2013,6 +2041,9 @@ def LoadTrainAndValidateData(withSongOrder = False):
         trainY = np.vstack(trainY)
         validateX = np.vstack(validateX)
         validateY = np.vstack(validateY)
+
+    print('train song', trainSong)
+    print('validate song', validateSong)
 
     return trainX, trainY, trainSong, validateX, validateY, validateSong
     
