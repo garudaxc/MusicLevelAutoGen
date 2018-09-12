@@ -917,7 +917,7 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
         if len(singingPredicts[0]) > 3:
             DownbeatTracking.SaveInstantValue(singingPredicts[:, 3], songFilePath, '_result_dur')
         DownbeatTracking.SaveInstantValue(singingPredicts[:, 0], songFilePath, '_result_no_label')
-        DownbeatTracking.SaveInstantValue(singingTimes, songFilePath, '_result_singing_pick')
+        DownbeatTracking.SaveInstantValue(singingTimes / fps, songFilePath, '_result_singing_pick')
 
     onset = DownbeatTracking.PickOnsetFromFile(songFilePath, bpm, duration, onsetThreshold, onsetActivation, saveDebugFile, songIsPureMusic)
 
