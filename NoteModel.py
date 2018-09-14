@@ -93,7 +93,9 @@ class NoteDetectionModel():
 
     def LossOp(self, logits, Y):
         classWeight = self.ClassWeight(Y)
-        crossEntropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y)
+        # tf 1.5.0 or later, use v2 default
+        # crossEntropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y)
+        crossEntropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=Y)
         loss = tf.reduce_mean(crossEntropy * classWeight)
         return loss
 
