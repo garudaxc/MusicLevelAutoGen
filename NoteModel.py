@@ -3,6 +3,7 @@ import tensorflow as tf
 from tensorflow.contrib import rnn
 from tensorflow.contrib import cudnn_rnn
 from tensorflow.contrib.cudnn_rnn.python.ops import cudnn_rnn_ops
+from tensorflow.contrib import crf
 from tensorflow.python import pywrap_tensorflow
 
 def TFVariableToShapeMap(ckptPath):
@@ -68,6 +69,7 @@ class NoteDetectionModel():
         self.useCudnn = useCudnn
         self.useInitialStatesFW = useInitialStatesFW
         self.useInitialStatesBW = useInitialStatesBW
+        self.useCRF = False
         self.tensorDic = {}
         print('batchSize', batchSize, 'maxTime', maxTime, 'numLayers', numLayers, 'numUnits', numUnits)
         print('xDim', xDim, 'yDim', yDim, 'timeMajor', timeMajor, 'useCudnn', useCudnn)
@@ -98,6 +100,14 @@ class NoteDetectionModel():
         crossEntropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=Y)
         loss = tf.reduce_mean(crossEntropy * classWeight)
         return loss
+
+    def LossOpCRF(self, logits, Y, sequenceLength):
+        logits = tf.reshape(logits, [self.batchSize, self.maxTime, self.yDim])
+        Y = tf.reshape(Y, [self.batchSize, self.maxTime, self.yDim])
+        Y = tf.argmax(Y, axis=2)
+        logLikelihood, transitionParams = crf.crf_log_likelihood(logits, Y, sequenceLength)
+        loss = tf.reduce_mean(-logLikelihood)
+        return loss, transitionParams
 
     def TrainOp(self, loss, learningRate):
         optimizer = tf.train.AdamOptimizer(learning_rate=learningRate)    
@@ -329,13 +339,21 @@ class NoteDetectionModel():
         tensorDic['output_states'] = outputStates
         
         logits, weight, bias = self.LSTMToLogits(outputs)
+        tensorDic['logits'] = logits
         Y = tf.reshape(Y, [batchSize * maxTime, yDim])
         
-        loss_op = self.LossOp(logits, Y)
-        tensorDic['loss_op'] = loss_op
-        tensorDic['train_op'] = self.TrainOp(loss_op, learningRate)
+        lossOp = self.LossOp(logits, Y)
+        tensorDic['loss_op'] = lossOp
+        tensorDic['train_op'] = self.TrainOp(lossOp, learningRate)
         tensorDic['accuracy'] = self.AccuracyOp(logits, Y)
         tensorDic['classify_info'] = self.ClassifyInfoTensor(logits, Y)
+
+        if self.useCRF:
+            logitsCRF = tf.placeholder(tf.float32, shape=[self.batchSize * self.maxTime, self.yDim])
+            lossOpCRF, transitionParams = self.LossOpCRF(logitsCRF, Y, sequenceLength)
+            tensorDic['logits_crf'] = logitsCRF
+            tensorDic['loss_op_crf'] = lossOpCRF
+            tensorDic['transition_params'] = transitionParams
 
         if not useCudnn:
             # not drop out for predict
@@ -388,6 +406,12 @@ class NoteDetectionModel():
         tensorDic['initial_states'] = initialStates
         tensorDic['output_states'] = outputStates
 
+        if self.useCRF:
+            transitionParams = TFVariable([self.yDim, self.yDim], name='transitions')
+            logitsCRF = tf.reshape(logits, [self.batchSize, self.maxTime, self.yDim])
+            decodeTags, bestScore = crf.crf_decode(logitsCRF, transitionParams, sequenceLength)
+            tensorDic['decode_tags'] = decodeTags
+
         saver = tf.train.Saver()
         saver.restore(sess, modelFilePath)
 
@@ -400,5 +424,39 @@ class NoteDetectionModel():
 
         initialStates = self.tensorDic['initial_states']
         return np.zeros(initialStates.shape)
+
+def LongNoteActivationProcess(predicts):
+    threshold = 0.5
+    mergeFrameInterval = 5
+    longDuration = predicts[:, 2]
+    temp = np.zeros_like(longDuration)
+    frameCount = len(longDuration)
+    for idx in range(frameCount):
+        if longDuration[idx] >= threshold:
+            temp[idx] = 1
+
+    findBegin = False
+    curContinueZero = []
+    for idx in range(frameCount):
+        if not findBegin:
+            if temp[idx] == 1:
+                findBegin = True
+            continue
+
+        if temp[idx] == 1:
+            if len(curContinueZero) > 0 and len(curContinueZero) <= mergeFrameInterval:
+                temp[curContinueZero] = 1
+            curContinueZero = []
+            continue
+
+        if len(curContinueZero) > mergeFrameInterval:
+            findBegin = False
+            curContinueZero = []
+            continue
+
+        curContinueZero.append(idx)
+
+    return temp
+    
 
 
