@@ -734,11 +734,11 @@ def ProcessSampleToIdolLevel2(long, short, bpm, et):
 
     short = short[:long.shape[0]]
 
-    long = BilateralFilter(long, ratio=0.9)
+    # long = BilateralFilter(long, ratio=0.9)
     
     beatInterval = int((60 / bpm) * 1000)
-    long = AlignLongNote(long, bpm, et)
-    long = EliminateShortSamples(long, threhold=500)
+    # long = AlignLongNote(long, bpm, et)
+    long = EliminateShortSamples(long, threhold=(beatInterval * 0.9))
 
     # short = EliminateTooCloseSample(short, long)
     
@@ -748,6 +748,129 @@ def ProcessSampleToIdolLevel2(long, short, bpm, et):
 
     return levelNotes
 
+def BeatAndPosInfo(bpm):
+    beatPerBar = 4
+    posPerBeat = 8
+    beatInterval = 60 / bpm
+    posInterval = 60 / bpm / posPerBeat
+    return beatInterval, posInterval, beatPerBar, posPerBeat
+
+def LongNoteActivationProcess(predicts):
+    threshold = 0.7
+    mergeFrameInterval = 5
+    longDuration = predicts[:, 2]
+    temp = np.zeros_like(longDuration)
+    frameCount = len(longDuration)
+    for idx in range(frameCount):
+        if longDuration[idx] >= threshold:
+            temp[idx] = 1
+
+    findBegin = False
+    curContinueZero = []
+    for idx in range(frameCount):
+        if not findBegin:
+            if temp[idx] == 1:
+                findBegin = True
+            continue
+
+        if temp[idx] == 1:
+            if len(curContinueZero) > 0 and len(curContinueZero) <= mergeFrameInterval:
+                temp[curContinueZero] = 1
+            curContinueZero = []
+            continue
+
+        if len(curContinueZero) > mergeFrameInterval:
+            findBegin = False
+            curContinueZero = []
+            continue
+
+        curContinueZero.append(idx)
+
+    return temp
+
+def SplitLongNoteWithDuration(longNote, fps, bpm, beatThreshold):
+    beatInterval, posInterval, beatPerBar, posPerBeat = BeatAndPosInfo(bpm)
+    thresholdFrameCount = int(beatThreshold * beatInterval * fps)
+    longArr = GetLongNoteInfo(longNote)
+    shorter = np.zeros_like(longNote)
+    longer = np.zeros_like(longNote)
+    for note in longArr:
+        begin = note[0]
+        end = note[1]
+        noteFrameCount = end - begin
+        if noteFrameCount > thresholdFrameCount:
+            longer[begin:end] = 1
+        else:
+            shorter[begin:end] = 1
+
+    return shorter, longer
+
+def ShorterLongNote(shortNote, longNote, fps, bpm):
+    if len(shortNote) != len(longNote):
+        print('short len != long len')
+        return [], []
+
+    shortIdx = np.nonzero(shortNote)[0]
+    if len(shortIdx) < 2:
+        return shortNote, np.zeros_like(longNote)
+
+    tempShortNote = np.zeros_like(shortNote)
+    tempLongNote = np.zeros_like(longNote)
+    beatInterval, posInterval, beatPerBar, posPerBeat = BeatAndPosInfo(bpm)
+    thresholdFrameCount = int(1 * beatInterval * fps)
+    minFrameCount = int(1 * beatInterval * fps * 0.9)
+    for i in range(len(shortIdx) - 1):
+        noteIdx = shortIdx[i]
+        nextNoteIdx = shortIdx[i+1]
+        if nextNoteIdx - noteIdx < minFrameCount:
+            tempShortNote[noteIdx] = 1
+            continue
+
+        searchStart = noteIdx
+        searchEnd = min(nextNoteIdx, searchStart + thresholdFrameCount)
+        isLong = False
+        idx = 0
+        for j in range(searchStart, searchEnd):
+            if longNote[j] > 0:
+                isLong = True
+                idx = j
+                break
+        if isLong:
+            start = searchStart
+            end = idx
+            for j in range(idx, nextNoteIdx):
+                if longNote[j] > 0:
+                    end = j
+                else:
+                    break
+
+            end = max(end, start + thresholdFrameCount)
+            end = min(end, nextNoteIdx - 1)
+            if start >= end:
+                continue
+
+            tempLongNote[start:end] = 1
+        else:
+            tempShortNote[noteIdx] = 1
+
+    tempShortNote[shortIdx[-1]] = 1
+
+    return tempShortNote, tempLongNote
+
+def MergeLongNote(longNotesArr):
+    if len(longNotesArr) < 1:
+        return []
+
+    baseArr = longNotesArr[0]
+    if len(longNotesArr) >= 2:
+        for idx in range(1, len(longNotesArr)):
+            arr = longNotesArr[idx]
+            info = GetLongNoteInfo(arr)
+            for note in info:
+                baseArr[note[0]:note[1]] = 1
+
+    return baseArr
+    
 
 def Run():
 

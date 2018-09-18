@@ -424,39 +424,6 @@ class NoteDetectionModel():
 
         initialStates = self.tensorDic['initial_states']
         return np.zeros(initialStates.shape)
-
-def LongNoteActivationProcess(predicts):
-    threshold = 0.5
-    mergeFrameInterval = 5
-    longDuration = predicts[:, 2]
-    temp = np.zeros_like(longDuration)
-    frameCount = len(longDuration)
-    for idx in range(frameCount):
-        if longDuration[idx] >= threshold:
-            temp[idx] = 1
-
-    findBegin = False
-    curContinueZero = []
-    for idx in range(frameCount):
-        if not findBegin:
-            if temp[idx] == 1:
-                findBegin = True
-            continue
-
-        if temp[idx] == 1:
-            if len(curContinueZero) > 0 and len(curContinueZero) <= mergeFrameInterval:
-                temp[curContinueZero] = 1
-            curContinueZero = []
-            continue
-
-        if len(curContinueZero) > mergeFrameInterval:
-            findBegin = False
-            curContinueZero = []
-            continue
-
-        curContinueZero.append(idx)
-
-    return temp
     
 
 
