@@ -30,6 +30,8 @@ numSteps = 512
 numSteps = 128
 inputDim = 314
 featureExtractFunc = myprocesser.LoadAndProcessAudio
+featureExtractFuncLong = myprocesser.LoadAndProcessAudio
+numStepsLong = 500
 # outputDim = 2
 learning_rate = 0.001
 bSaveModel = True
@@ -408,6 +410,8 @@ class TrainDataDynSinging(TrainDataBase):
         self.batchSize = batchSize
         self.numSteps = numSteps
 
+        inputDim = len(x[0])
+
         count = x.shape[0]
 
         if (not y is None):
@@ -447,25 +451,13 @@ class TrainDataDynLongNote(TrainDataBase):
         self.batchSize = batchSize
         self.numSteps = numSteps
 
+        inputDim = len(x[0])
+
         count = x.shape[0]
         if (not y is None):
             
             # beat = np.max(y[:, 3:5], axis=1)
             # y = SamplesToSoftmax(beat)
-            y = np.argmax(y, axis=1)
-            ydata = np.zeros((len(y), self.lableDim))
-            for i in range(len(y)):
-                idx = y[i]
-                if idx == 0:
-                    ydata[i][0] = 1.0
-                elif idx < 3:
-                    ydata[i][1] = 1.0
-                elif i > 0 and (y[i - 1] == y[i]):
-                    ydata[i][3] = 1.0
-                else:
-                    ydata[i][2] = 1.0
-
-            y = np.array(ydata)
             print('y shape', y.shape, 'y sample count', len(y), 'y sum', np.sum(y, axis=0))
 
             self.BuildBatch(x, y)
@@ -659,10 +651,7 @@ def SaveModel(sess, filename, saveMeta = False):
 def EvaluateWithModel(modelFile, song, rawFile, TrainData, featureFunc=myprocesser.LoadAndProcessAudio):
     # 加载训练好的模型，将结果保存到二进制文件
     start = time.time()
-    if modelFile.find('singing') < 0:
-        predicts = RunModel(modelFile, MakeMp3Pathname(song), TrainData, featureFunc)
-    else:
-        predicts = RunModelEx(modelFile, MakeMp3Pathname(song), TrainData, featureFunc)
+    predicts = RunModel(modelFile, MakeMp3Pathname(song), TrainData, featureFunc)
     end = time.time()
     print('RunModel cost', end - start)
     with open(rawFile, 'wb') as file:
@@ -675,53 +664,19 @@ def RunModel(modelFile, songFile, TrainData, featureFunc=myprocesser.LoadAndProc
     predictGraph = tf.Graph()
     graphFile = modelFile + '.meta'
 
-    with predictGraph.as_default():
-        saver = tf.train.import_meta_graph(graphFile)
-        with tf.Session() as sess:
-            
-            saver.restore(sess, modelFile)
-            print('model loaded')
+    # batchSize = 1
+    useCudnn = True
+    maxTime = numSteps
+    if modelFile.find('singing') < 0:
+        featureFunc = featureExtractFuncLong
+        maxTime = numStepsLong
 
-            predict_op = tf.get_default_graph().get_tensor_by_name("predict_op:0")
-            print('predict_op', predict_op)         
-            X = tf.get_default_graph().get_tensor_by_name('X:0')
-            seqLenHolder = tf.get_default_graph().get_tensor_by_name('seqLen:0')
-            
-            reuseState = True
-            if reuseState:
-                initial_states = tf.get_default_graph().get_tensor_by_name('initial_states:0')
-                batch_states = tf.get_default_graph().get_tensor_by_name('batch_states_predict:0')
-                # batch_states = tf.get_default_graph().get_tensor_by_name('batch_states:0')
-                initialStatesZero = np.array([[0.0] * batch_states.shape[1]] * batch_states.shape[0])
-                currentInitialStates = initialStatesZero
-
-            testx = featureFunc(songFile)
-
-            data = TrainData(batchSize, numSteps, testx)
-            
-            evaluate = []
-            for i in range(data.numBatches):
-                xData, _, seqLen = data.GetBatch(i)
-                if not reuseState:
-                    t = sess.run(predict_op, feed_dict={X:xData, seqLenHolder:seqLen})
-                else:
-                    t, batchStates = sess.run([predict_op, batch_states], feed_dict={X:xData, seqLenHolder:seqLen, initial_states: currentInitialStates})
-                    currentInitialStates = batchStates
-                
-                t = t[0:numSteps,:]
-                evaluate.append(t)
-
-
-            predicts = np.stack(evaluate).reshape(-1, TrainData.lableDim)
-
-    return predicts
-
-def RunModelEx(modelFile, songFile, TrainData, featureFunc=myprocesser.LoadAndProcessAudio):
-    predictGraph = tf.Graph()
-    graphFile = modelFile + '.meta'
+    testx = featureFunc(songFile)
+    inputDim = len(testx[0])
+    # maxTime = len(testx)
 
     with predictGraph.as_default():
-        model = NoteModel.NoteDetectionModel(batchSize, numSteps, 3, numHidden, inputDim, TrainData.lableDim, timeMajor=False, useCudnn=True)
+        model = NoteModel.NoteDetectionModel(batchSize, maxTime, 3, numHidden, inputDim, TrainData.lableDim, timeMajor=False, useCudnn=useCudnn)
         with tf.Session() as sess:
             model.Restore(sess, modelFile)
             print('model loaded')
@@ -738,9 +693,7 @@ def RunModelEx(modelFile, songFile, TrainData, featureFunc=myprocesser.LoadAndPr
             initialStatesZero = model.InitialStatesZero()
             currentInitialStates = initialStatesZero
 
-            testx = featureFunc(songFile)
-
-            data = TrainData(batchSize, numSteps, testx)
+            data = TrainData(batchSize, maxTime, testx)
             
             evaluate = []
             for i in range(data.numBatches):
@@ -748,7 +701,7 @@ def RunModelEx(modelFile, songFile, TrainData, featureFunc=myprocesser.LoadAndPr
                 t, batchStates = sess.run([predict_op, batch_states], feed_dict={X:xData, seqLenHolder:seqLen, initial_states: currentInitialStates})
                 currentInitialStates = batchStates
                 
-                t = t[0:numSteps,:]
+                t = t[0:maxTime,:]
                 evaluate.append(t)
 
             predicts = np.stack(evaluate).reshape(-1, TrainData.lableDim)
@@ -882,12 +835,10 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
 
     onsetProcessor = madmom.features.onsets.CNNOnsetProcessor()
     onsetActivation = onsetProcessor(songFilePath)
-    onsetActivation = DownbeatTracking.AppendEmptyDataWithDecodeOffset(songFilePath, onsetActivation, fps)
     frameCount = len(onsetActivation)
 
     singingPredicts = shortPredicts
     singingActivation = singingPredicts[:, 1]
-    singingActivation = DownbeatTracking.AppendEmptyDataWithDecodeOffset(songFilePath, singingActivation, fps)
     dis_time = 60 / bpm / 8
     singingPicker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=shortThreshold, smooth=0.0, pre_max=dis_time, post_max=dis_time, fps=fps)
     singingTimes = singingPicker(singingActivation)
@@ -949,10 +900,23 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
     mergeShort = AlignNoteWithBPMAndET(mergeShort, frameInterval, bpm, et)
     print('count before', countBefore, 'count after', np.sum(mergeShort))
 
-    longActivation = longPredicts[:, 3]
-    longActivation = DownbeatTracking.AppendEmptyDataWithDecodeOffset(songFilePath, longActivation, fps)
-    levelNotes = postprocess.ProcessSampleToIdolLevel2(longActivation, mergeShort, bpm, et)
+    longNoteSrc = postprocess.LongNoteActivationProcess(longPredicts)
+    longNoteSrc.resize(frameCount)
+    beatThreshold = 1.5
+    shorter, longer = postprocess.SplitLongNoteWithDuration(longNoteSrc, fps, bpm, beatThreshold)
+    tempShort, tempLong = postprocess.ShorterLongNote(mergeShort, shorter, fps, bpm)
+    mergeShort = tempShort
+    longNote = postprocess.MergeLongNote([longer, tempLong])
+    if saveDebugFile:
+        DownbeatTracking.SaveInstantValue(longNoteSrc, songFilePath, '_long_processed')
+        DownbeatTracking.SaveInstantValue(shorter, songFilePath, '_long_shorter')
+        DownbeatTracking.SaveInstantValue(longer, songFilePath, '_long_longer')
+        DownbeatTracking.SaveInstantValue(tempShort, songFilePath, '_long_temp_short')
+        DownbeatTracking.SaveInstantValue(tempLong, songFilePath, '_long_temp_long')
 
+    mergeShort = DownbeatTracking.AppendEmptyDataWithDecodeOffset(songFilePath, mergeShort, fps)
+    longNote = DownbeatTracking.AppendEmptyDataWithDecodeOffset(songFilePath, longNote, fps)
+    levelNotes = postprocess.ProcessSampleToIdolLevel2(longNote, mergeShort, bpm, et)
     LevelInfo.GenerateIdolLevel(levelFilePath, levelNotes, bpm, et, duration, templateFilePath)
 
 def AutoGenerateLevel(songFilePath, shortModelPath, longModelPath, levelFilePath, onsetThreshold = 0.7, shortThreshold = 0.7):
@@ -1145,9 +1109,9 @@ def GenerateLevel():
         rawFile = TrainData.RawDataFileName(song[0])
         modelFile = TrainData.GetModelPathName()
         predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)
-        DownbeatTracking.SaveInstantValue(predicts[:, 1], pathname, '_long_short')   
-        DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_long_start')   
-        DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_long_dur')   
+        DownbeatTracking.SaveInstantValue(predicts[:, 1], pathname, '_long_start')   
+        DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_long_dur')   
+        DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_long_end')   
         print('predicts shape', predicts.shape)
 
         # TrainData.GenerateLevel(predicts, pathname)
@@ -1231,31 +1195,35 @@ def LoadRawData(useSoftmax = True):
 def _Main():
     trainForSinging = True
     # testx, testy = PrepareTrainData(songList, batchSize)
+    maxTime = numSteps
     if trainForSinging:
         TrainData = TrainDataDynSinging
         trainx, trainy, trainSong, validateX, validateY, validateSong = LoadTrainAndValidateData()
         ValidateData = TrainDataDynSinging
-        # offsetX = [[0.0] * inputDim] * int(numSteps / 2)
+        # offsetX = [[0.0] * inputDim] * int(maxTime / 2)
         # tempLabel = [0.0] * TrainData.lableDim
         # tempLabel[0] = 1.0
-        # offsetY = [tempLabel] * int(numSteps / 2)
+        # offsetY = [tempLabel] * int(maxTime / 2)
         # trainxOffset = np.concatenate((offsetX, trainx))
         # trainyOffset = np.concatenate((offsetY, trainy))
         # TrainDataOffset = TrainDataDynSinging
-        # offsetData = TrainDataOffset(batchSize, numSteps, trainxOffset, trainyOffset)
+        # offsetData = TrainDataOffset(batchSize, maxTime, trainxOffset, trainyOffset)
     else:
         TrainData = TrainDataDynLongNote
         trainx, trainy = PrepareTrainDataFromPack(featureFile)
+        # trainx, trainy, trainSong = LoadTrainAndValidateDataForLong()
+        maxTime = numStepsLong
     
+    inputDim = len(trainx[0])
     modelPath = TrainData.GetModelPathName()    
     print('trainx frame count: ', len(trainx))
-    data = TrainData(batchSize, numSteps, trainx, trainy)
+    data = TrainData(batchSize, maxTime, trainx, trainy)
     numBatches = data.numBatches
     validateData = None
     if trainForSinging:
-        validateData = ValidateData(batchSize, numSteps, validateX, validateY)
+        validateData = ValidateData(batchSize, maxTime, validateX, validateY)
 
-    model = NoteModel.NoteDetectionModel(batchSize, numSteps, 3, numHidden, inputDim, TrainData.lableDim, timeMajor=False, useCudnn=True)
+    model = NoteModel.NoteDetectionModel(batchSize, maxTime, 3, numHidden, inputDim, TrainData.lableDim, timeMajor=False, useCudnn=True)
     model.BuildGraph(dropout=0.4)
     result = model.GetTensorDic()
     X = result['X']
@@ -1322,7 +1290,7 @@ def _Main():
                 trainLoss.append(l)
                 trainAcc.append(a)
                 trainClassify.append(classifyInfo)
-                currentInitialStates = batchStates            
+                currentInitialStates = batchStates
             
             currentInitialStates = initialStatesZero
             if validateData is not None:
@@ -1343,11 +1311,11 @@ def _Main():
             trainClassifyValue = sum(trainClassify)
 
             notIncreaseCount += 1
-            if accValue > maxAcc:
+            if validateData is not None and accValue > maxAcc:
                 maxAcc = accValue
                 maxAccInfo = [lossValue, accValue, j]
             
-            if lossValue < minLoss:
+            if validateData is not None and lossValue < minLoss:
                 minLoss = lossValue
                 minLossInfo = [lossValue, accValue, j]
 
@@ -1499,23 +1467,87 @@ def LoadAllTrainningLable():
     featureData = []
     lableData = []
     index = 0
+    processDic = {}
+    useWholeSong = True
     for song, _, regions in metaData:
         print('load', index, song)
         index += 1
+        if useWholeSong and song in processDic:
+            print('have processed', song)
+            continue
+
+        processDic[song] =  True
+
         pathname = MakeMp3Pathname(song)
-        features = myprocesser.LoadAndProcessAudio(pathname)
+        features = featureExtractFuncLong(pathname)
         numSample = len(features)
-        
+        if index == 1:
+            SaveFeatures(MakeSongDataPathName(song, 'melfeature'), features)
+
         pathname = MakeLevelPathname(song, difficulty=1)
         print(pathname)
         level = LevelInfo.LoadRhythmMasterLevel(pathname)
         lable = ConvertLevelToLables(level, numSample)
 
-        for start, length in regions:
-            start = int(start // 10)
-            length = int(length // 10)
-            featureData.append(features[start:start+length])
-            lableData.append(lable[start:start+length])
+        tempLabels = np.zeros((numSample))
+
+        startArr = []
+        endArr = []
+        msPerFrame = 10
+        longNoteArr = []
+        for note in level:
+            time, type, val = note
+            if type == LevelInfo.combineNode:             
+                for subTime, subType, subVal in val:
+                    if subType == LevelInfo.longNote:
+                        longNoteArr.append((subTime, subVal))
+            elif type == LevelInfo.longNote:
+                longNoteArr.append((time, val))
+
+        for start, duration in longNoteArr:
+            startIdx = FrameIndex(start, msPerFrame)
+            endIdx = FrameIndex(start + duration, msPerFrame)
+            tempLabels[startIdx:endIdx] = 2
+
+        longStart = []
+        longEnd = []
+        for start, duration in longNoteArr:
+            startIdx = FrameIndex(start, msPerFrame)
+            tempLabels[startIdx] = 1
+            longStart.append(startIdx / 100)
+
+        for idx in range(numSample):
+            if tempLabels[idx] != 2:
+                continue
+
+            if (idx == numSample - 1) or (tempLabels[idx + 1] != 2):
+                tempLabels[idx] = 3
+                longEnd.append(idx / 100)
+
+        labelDim = 4
+        labels = np.zeros((numSample, labelDim))
+        for idx in range(numSample):
+            val = [0.0] * labelDim
+            val[int(tempLabels[idx])] = 1.0
+            labels[idx] = val
+
+        longDuration = labels[:, 2]
+        longStart = labels[:, 1]
+        longEnd = labels[:, 3]
+        posFix = '_longlabel'
+        DownbeatTracking.SaveInstantValue(longDuration, pathname, posFix)
+        DownbeatTracking.SaveInstantValue(longStart, pathname, '_longstart')
+        DownbeatTracking.SaveInstantValue(longEnd, pathname, '_longend')
+
+        if useWholeSong:
+            featureData.append(features)
+            lableData.append(labels)
+        else:
+            for start, length in regions:
+                start = int(start // 10)
+                length = int(length // 10)
+                featureData.append(features[start:start+length])
+                lableData.append(labels[start:start+length])
         
     featureData = np.vstack(featureData)
     lableData = np.vstack(lableData)
@@ -1655,9 +1687,12 @@ def GenerateCsvSingingTrainData():
     outputFeatureCount = 0
     fileList, trainList, validateList = LoadCsvSingingFileList()
     toCheckFileCount = 0
+    allCount = len(fileList)
+    curIdx = 0
     for song, csvFilePath in fileList:
         name = song + '.csv'
-        print('process', song)
+        curIdx = curIdx + 1
+        print('process', song, curIdx, '/', allCount)
         songFilePath = MakeMp3Pathname(song)
         singingTimes = LoadCsvLabelData(csvFilePath)
         for idx in range(0, len(singingTimes)-1):
@@ -1670,6 +1705,10 @@ def GenerateCsvSingingTrainData():
                 break
 
         duration, bpm, et = GetMusicInfo(songFilePath)
+        featureFilePath = MakeSongDataPathName(song, 'feature', '.raw')
+        if os.path.exists(featureFilePath):
+            print('feature exists')
+            continue
 
         onsetTimes = PickOnsetForSingingTrain(songFilePath, bpm)
         singingTimes, bgTimes = MarkOnsetTimeWithMidiTime(onsetTimes, singingTimes, bpm)
@@ -1691,7 +1730,7 @@ def GenerateCsvSingingTrainData():
             SaveFeatures(MakeSongDataPathName(song, '_feature'), features)
             outputFeatureCount += 1
 
-        SaveFeaturesAndLabels(MakeSongDataPathName(song, 'feature', '.raw'), segFeatures, segLabels)
+        SaveFeaturesAndLabels(featureFilePath, segFeatures, segLabels)
 
     print('toCheckFileCount', toCheckFileCount)
 
