@@ -575,8 +575,8 @@ def CalcPreferenceBeatCount(bpm, duration):
     rate = (bpm - minBpm) / (maxBpm - minBpm)
     rate = min(max(rate, 0.0), 1.0)
     beatPerBar = 4
-    minNotePerBeat = 4 / beatPerBar
-    maxNotePerBeat = 8 / beatPerBar
+    minNotePerBeat = 3 / beatPerBar
+    maxNotePerBeat = 6 / beatPerBar
     beat = duration / 60000 * bpm
     count = round((minNotePerBeat + rate * (maxNotePerBeat - minNotePerBeat)) * beat)
     return count
@@ -596,7 +596,7 @@ def PickOnsetFromFile(filename, bpm, duration, threhold = 0.7, onsets = None, sa
         SaveInstantValue(samples, filename, '_onset_activation')
     count = CalcPreferenceBeatCount(bpm, duration)
     if isPureMusic:
-        count = count * 2
+        count = count + 1
 
     # print(type(samples), samples.shape, len(samples))
 
