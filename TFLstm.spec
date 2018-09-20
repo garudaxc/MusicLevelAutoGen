@@ -2,13 +2,16 @@
 
 block_cipher = None
 
+site_packages_dir = 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python36\\Lib\\site-packages\\'
 
 a = Analysis(['TFLstm.py'],
-             pathex=['C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python36\\Lib\\site-packages\\scipy\\extra-dll', 'D:\\audio\\proj\\MusicLevelAutoGen'],
+             pathex=[site_packages_dir + 'scipy\\extra-dll', '.\\'],
              binaries=[],
              datas= [
-                 ('C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python36\\Lib\\site-packages\\resampy\\data\\kaiser_best.npz', 'resampy\\data'),
-                 ('C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python36\\Lib\\site-packages\\resampy\\data\\kaiser_fast.npz', 'resampy\\data')
+                 (site_packages_dir + 'resampy\\data\\kaiser_best.npz', 'resampy\\data'),
+                 (site_packages_dir + 'resampy\\data\\kaiser_fast.npz', 'resampy\\data'),
+                 (site_packages_dir + 'tensorflow\\contrib\\rnn\\python\\ops\\_gru_ops.dll', 'tensorflow\\contrib\\rnn\\python\\ops'), 
+                 (site_packages_dir + 'tensorflow\\contrib\\rnn\\python\\ops\\_lstm_ops.dll', 'tensorflow\\contrib\\rnn\\python\\ops')
              ],
              hiddenimports=[
                  'scipy._lib.messagestream',
