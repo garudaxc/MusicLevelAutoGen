@@ -569,14 +569,19 @@ def ChromaFeature(filename):
     short[onsettime] = 1
     return short
 
-def CalcPreferenceBeatCount(bpm, duration):
+def CalcPreferenceBeatCount(bpm, duration, isPureMusic):
     minBpm = 90
     maxBpm = 220
     rate = (bpm - minBpm) / (maxBpm - minBpm)
     rate = min(max(rate, 0.0), 1.0)
     beatPerBar = 4
-    minNotePerBeat = 3 / beatPerBar
-    maxNotePerBeat = 6 / beatPerBar
+    start = 4
+    end = 6
+    if isPureMusic:
+        start = 6
+        end = 8
+    minNotePerBeat = start / beatPerBar
+    maxNotePerBeat = end / beatPerBar
     beat = duration / 60000 * bpm
     count = round((minNotePerBeat + rate * (maxNotePerBeat - minNotePerBeat)) * beat)
     return count
@@ -594,9 +599,7 @@ def PickOnsetFromFile(filename, bpm, duration, threhold = 0.7, onsets = None, sa
 
     if saveDebugFile:
         SaveInstantValue(samples, filename, '_onset_activation')
-    count = CalcPreferenceBeatCount(bpm, duration)
-    if isPureMusic:
-        count = count + 1
+    count = CalcPreferenceBeatCount(bpm, duration, isPureMusic)
 
     # print(type(samples), samples.shape, len(samples))
 
