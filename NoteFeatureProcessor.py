@@ -20,6 +20,7 @@ class BasicNoteFeatureProcessor():
 
     def save(self, filePath, features, labels):
         targetFilePath = self.makeFeatureFilePath(filePath)
+        print('NoteFeatureProcessor save', targetFilePath)
         with open(targetFilePath, 'wb') as file:
             pickle.dump(features, file)
             pickle.dump(labels, file)
@@ -31,6 +32,7 @@ class BasicNoteFeatureProcessor():
             print('filePath not exist', targetFilePath)
             return [], []
 
+        print('NoteFeatureProcessor load', targetFilePath)
         with open(targetFilePath, 'rb') as file:
             features = pickle.load(file)
             labels = pickle.load(file)
