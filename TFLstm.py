@@ -1101,55 +1101,38 @@ def GenerateLevel():
     pathname = MakeMp3Pathname(song[0])
     print(pathname)
 
-    useOnsetForShort = True
-    if True:
-        # gen raw data
+    TrainData = TrainDataDynLongNote
+    rawFile = TrainData.RawDataFileName(song[0])
+    modelFile = TrainData.GetModelPathName()
+    predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)
+    DownbeatTracking.SaveInstantValue(predicts[:, 1], pathname, '_long_start')   
+    DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_long_dur')   
+    DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_long_end')   
+    print('predicts shape', predicts.shape)
 
-        TrainData = TrainDataDynLongNote
-        rawFile = TrainData.RawDataFileName(song[0])
-        modelFile = TrainData.GetModelPathName()
-        predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)
-        DownbeatTracking.SaveInstantValue(predicts[:, 1], pathname, '_long_start')   
-        DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_long_dur')   
-        DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_long_end')   
-        print('predicts shape', predicts.shape)
+    TrainData = TrainDataDynSinging
+    rawFile = TrainData.RawDataFileName(song[0])
+    modelFile = TrainData.GetModelPathName()
+    predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData, featureExtractFunc)  
+    print('predicts shape', predicts.shape) 
 
-        # TrainData.GenerateLevel(predicts, pathname)
+    print('calc bpm')
+    DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM)
 
-        if not useOnsetForShort:
-            TrainData = TrainDataDynShortNoteBeat
-            rawFile = TrainData.RawDataFileName(song[0])
-            modelFile = TrainData.GetModelPathName()
-            predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData)  
-            print('predicts shape', predicts.shape) 
 
-        # TrainData.GenerateLevel(predicts, pathname)
+    levelEditorRoot = rootDir + 'LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'
+    levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, song[0])
+    duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
+    
+    rawFileLong = TrainDataDynLongNote.RawDataFileName(song[0])
+    rawFileSinging = TrainDataDynSinging.RawDataFileName(song[0])
+    with open(rawFileSinging, 'rb') as file:
+        predicts = pickle.load(file)
 
-        if useOnsetForShort:
-            TrainData = TrainDataDynSinging
-            rawFile = TrainData.RawDataFileName(song[0])
-            modelFile = TrainData.GetModelPathName()
-            predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData, featureExtractFunc)  
-            print('predicts shape', predicts.shape) 
+    with open(rawFileLong, 'rb') as file:
+        longPredicts = pickle.load(file)
 
-        print('calc bpm')
-        DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM)
-
-    if useOnsetForShort:
-        # levelFile = 'd:/LevelEditor_ForPlayer_8.0/client/Assets/LevelDesign/%s.xml' % (song[0])
-        levelEditorRoot = rootDir + 'LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'
-        levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, song[0])
-        duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
-        
-        rawFileLong = TrainDataDynLongNote.RawDataFileName(song[0])
-        rawFileSinging = TrainDataDynSinging.RawDataFileName(song[0])
-        with open(rawFileSinging, 'rb') as file:
-            predicts = pickle.load(file)
-
-        with open(rawFileLong, 'rb') as file:
-            longPredicts = pickle.load(file)
-
-        GenerateLevelImp(pathname, duration, bpm, et, predicts, longPredicts, levelFile, rootDir + 'data/idol_template.xml', 0.7, 0.7, True)
+    GenerateLevelImp(pathname, duration, bpm, et, predicts, longPredicts, levelFile, rootDir + 'data/idol_template.xml', 0.7, 0.7, True)
     
 
 def LoadRawData(useSoftmax = True):
@@ -1334,16 +1317,6 @@ def _Main():
                     currentLearningRate = learningRateList[currentLearningRateIdx][0]
                     print('change learning rate', currentLearningRate)
                     notIncreaseCount = 0
-
-            # if notIncreaseCount > 10 and not learningRateFined:
-            #     currentLearningRate = currentLearningRate / 2
-            #     print('change learning rate', currentLearningRate)
-            #     notIncreaseCount = 0
-            #     learningRateFined = True
-
-            # if notIncreaseCount > 15 and learningRateFined:
-            #     print('stop learning')
-            #     break
 
             print('epch', j, 'train', 'loss', trainLossValue, 'accuracy', trainAccValue)
             if validateData is not None:
@@ -1982,27 +1955,6 @@ def GenerateMarkedMidiFeature():
             outputCsvCount = outputCsvCount + 1
         SaveFeaturesAndLabels(MakeSongDataPathName(song, 'feature', '.raw'), features, labels)
 
-        # sing = np.array(labels)
-        # sing = sing[:, 1]
-        # DownbeatTracking.SaveInstantValue(sing, pathname, '_s_label')
-        # bg = np.array(labels)
-        # bg = bg[:, 2]
-        # DownbeatTracking.SaveInstantValue(bg, pathname, '_bg_label')
-        # durs = np.array(labels)
-        # durs = durs[:, 3]
-        # DownbeatTracking.SaveInstantValue(durs, pathname, '_dur_label')
-
-    # pureBgSongs = ['bgm_palace_memories', 'bgm_canon', 'bgm_mobile_suit', 'bgm_wuyueyu']
-    # for song in pureBgSongs:
-    #     pathname = MakeMp3Pathname(song)
-    #     # DownbeatTracking.CalcMusicInfoFromFile(pathname)
-    #     duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
-    #     bgTimes = PickOnsetForSingingTrain(pathname, bpm)
-    #     DownbeatTracking.SaveInstantValue(bgTimes, pathname, '_midi_bg')    
-    #     features, labels = GenerateFeatureAndLabelByTimes(pathname, [], bgTimes)
-    #     xDatas.append(features)
-    #     yDatas.append(labels)
-
 def LoadPureBGMFileList(loadOrigin=True):
     pureBGMDir = rootDir + 'purebgm/'
     names = os.listdir(pureBGMDir)
@@ -2104,90 +2056,6 @@ def LoadTrainAndValidateData(withSongOrder = False):
     print(validateSong)
 
     return trainX, trainY, trainSong, validateX, validateY, validateSong
-    
-rmListPath = rootDir + 'MusicLevelAutoGen/midi/rm_train_list.csv'
-# @run
-def GenerateRhythmMasterTrainData():
-    startTimeDic = {}
-    songRegionDic = {}
-    with open(rmListPath, 'r') as f:
-        for line in f:
-            singingStartTime = []
-            line = line.replace('\r', '\n')
-            line = line.replace('\n', '')
-            song, start, noteType, duration = line.split(',')
-            print('process song rm:', song)
-            start = float(start)
-            duration = float(duration)
-            levelPath = MakeLevelPathname(song, difficulty=1)
-            level = LevelInfo.LoadRhythmMasterLevel(levelPath)
-            for note in level:
-                time, type, val = note
-                if type == LevelInfo.combineNode:             
-                    for n in val:
-                        subTime, subType, subVal = n
-                        timeval = subTime / 1000.0
-                        if timeval < start or timeval > start + duration:
-                            continue
-                        singingStartTime.append(timeval)
-                else:
-                    timeval = time / 1000.0
-                    if timeval < start or timeval > start + duration:
-                        continue
-                    singingStartTime.append(timeval)
-
-            if song in startTimeDic:
-                arr = startTimeDic[song]
-                arr = arr + singingStartTime
-                startTimeDic[song] = arr
-                songRegionDic[song].append((start, duration))
-            else:
-                startTimeDic[song] = singingStartTime
-                songRegionDic[song] = [(start, duration)]
-
-    xDatas = []
-    yDatas = []
-    for song in startTimeDic:
-        print('process song feature:', song)
-        songFilePath = MakeMp3Pathname(song)
-        singingStartTime = startTimeDic[song]
-        singingStartTime = np.array(singingStartTime)
-        singingStartTime = np.unique(singingStartTime)
-        DownbeatTracking.CalcMusicInfoFromFile(songFilePath)
-        duration, bpm, et = LevelInfo.LoadMusicInfo(songFilePath)
-        onsetTimes = PickOnsetForSingingTrain(songFilePath, bpm)
-        singingTimes, bgTimes = MarkOnsetTimeWithMidiTime(onsetTimes, singingStartTime, bpm)
-        
-        features, labels = GenerateFeatureAndLabelByTimes(songFilePath, singingTimes, bgTimes)
-
-        regions = songRegionDic[song]
-        tempBgTimes = []
-        trainFeatures = np.array([[0.0] * inputDim] * len(features))
-        for start, length in regions:
-            for bgTime in bgTimes:
-                if bgTime >= start and bgTime < start + length:
-                    tempBgTimes.append(bgTime)
-
-            start = int(start * 100)
-            length = int(length * 100)
-            xDatas.append(features[start:start+length])
-            yDatas.append(labels[start:start+length])
-
-            trainFeatures[start:start+length] = features[start:start+length]
-
-        bgTimes = tempBgTimes
-        LevelInfo.SaveInstantValue(singingTimes, songFilePath, '_rm_singing')
-        LevelInfo.SaveInstantValue(bgTimes, songFilePath, '_rm_bg')
-        SaveFeatures(MakeSongDataPathName(song, '_feature'), trainFeatures)
-
-    xDatas = np.vstack(xDatas)
-    yDatas = np.vstack(yDatas)
-
-    dataFilePath = rootDir + 'data/rm_singing_bg.raw'
-    with open(dataFilePath, 'wb') as file:
-        pickle.dump(xDatas, file)
-        pickle.dump(yDatas, file)
-        print('raw file saved', xDatas.shape, yDatas.shape)
 
 def LoadLevelFileList():
     filePath = trainDataDir + 'level_train_list.csv'
