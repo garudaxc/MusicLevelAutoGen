@@ -1764,6 +1764,9 @@ def AutoTransMidiToLevel():
 
     ouputCount = 0
     ouputInfoArr = []
+    nameDic = {}
+    repeatCount = 0
+    repeatDic = {}
     for subDirName in subDirList:
         dirPath = os.path.join(inputDir, subDirName)
         fileNameList = os.listdir(dirPath)
@@ -1791,6 +1794,15 @@ def AutoTransMidiToLevel():
             midiNotes = LevelInfo.LoadMidi(midiFilePath, exInfo)
             if len(exInfo[0]) > 1:
                 continue
+
+            songName = songInfo[songNameColIdx]
+            if songName in nameDic:
+                print('repeat ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~', songName)
+                repeatCount = repeatCount + 1
+                repeatDic[songName] = True
+                continue
+
+            nameDic[songName] = True
 
             songFileName = os.path.splitext(name)[0] + '_' + songInfo[artistColIdx] + '_' + songInfo[songNameColIdx] + '.csv'
             songFileName = songFileName.replace('/', '-')
@@ -1822,6 +1834,8 @@ def AutoTransMidiToLevel():
     SaveFeatures(os.path.join(outputDir, 'song_info.csv'), ouputInfoArr)
 
     print(ouputCount)
+    print('repeatCount', repeatCount)
+    print('repeatDic', repeatDic)
 
 
 # @run
