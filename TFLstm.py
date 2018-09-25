@@ -713,8 +713,10 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
 
     def IsPureMusic(singingTimes, bpm, duration):
         minInterval = 60 / bpm * 2
-        minCount = int(duration / minInterval)
-        print('singingTimes', len(singingTimes), 'minCount', minCount)
+        originMinCount = int(duration / minInterval)
+        limitCount = 150
+        minCount = min(originMinCount, limitCount)
+        print('singingTimes', len(singingTimes), 'minCount', minCount, [originMinCount, limitCount])
         return len(singingTimes) < minCount
 
     songIsPureMusic = IsPureMusic(singingTimes, bpm, duration / 1000)
