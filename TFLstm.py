@@ -869,6 +869,32 @@ def AutoGenerateLevelTool():
 
     return True
 
+def OutputSongDuration():
+    songRootDir = GetSamplePath()
+    subList = os.listdir(songRootDir)
+    import librosa
+    dic = {}
+    for name in subList:
+        songFilePath = MakeMp3Pathname(name)
+        if not os.path.exists(songFilePath):
+            continue
+
+        y, sr = librosa.load(songFilePath, mono=True, sr=44100)
+        duration = librosa.get_duration(y=y, sr=sr)
+        tempMinutes = int(duration // 60)
+        dis = abs(duration - tempMinutes * 60)
+        if dis > 5.0:
+            continue
+
+        print(name, tempMinutes, duration)
+        if tempMinutes in dic:
+            dic[tempMinutes].append((name, duration))
+        else:
+            dic[tempMinutes] = [(name, duration)]
+
+    print('result:')
+    print(dic)      
+
 @run
 def GenerateLevel():
     print('gen level')
@@ -965,6 +991,8 @@ def GenerateLevel():
     # postprocess.ProcessSampleToIdolLevel(song[0])
     # return
 
+    startTime = time.time()
+
     pathname = MakeMp3Pathname(song[0])
     print(pathname)
 
@@ -1000,6 +1028,9 @@ def GenerateLevel():
         longPredicts = pickle.load(file)
 
     GenerateLevelImp(pathname, duration, bpm, et, predicts, longPredicts, levelFile, rootDir + 'data/idol_template.xml', 0.7, 0.7, True)
+
+    endTime = time.time()
+    print('cost time', endTime - startTime)
     
 
 def LoadRawData(useSoftmax = True):
