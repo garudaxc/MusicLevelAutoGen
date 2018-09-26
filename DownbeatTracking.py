@@ -280,10 +280,13 @@ def AppendEmptyDataWithDecodeOffset(filename, arr, fps):
     print('append decode offset frame count', count)
     return np.concatenate(([0] * count, arr))
 
-def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1, saveToFile=True):
-    y, sr = librosa.load(filename, mono=True, sr=44100)
-    logger.info('loaded')
-    duration = librosa.get_duration(y=y, sr=sr)
+def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1, saveToFile=True, preCalcData = None, audioData = None):
+    if audioData is None:
+        y, sr = librosa.load(filename, mono=True, sr=44100)
+        logger.info('loaded')
+        duration = librosa.get_duration(y=y, sr=sr)
+    else:
+        y, sr, duration = audioData
     print('duration', duration)
 
     calcRealInfo = debugET < 0 or debugBPM < 0
@@ -301,7 +304,7 @@ def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1, saveToFile=True
         #     return
 
         # bpm, etAuto = CalcBPM(beat, firstBeat, lastBeat)
-        bpm, etAuto = NotePreprocess.CalcBpmET(y, sr, duration)
+        bpm, etAuto = NotePreprocess.CalcBpmET(y, sr, duration, preCalcData)
 
         print('bpm', bpm, 'et', etAuto)
         etAuto = etAuto + DecodeOffset(filename)
