@@ -7,7 +7,6 @@ import postprocess
 import tensorflow as tf
 from tensorflow.contrib import rnn
 import time
-import matplotlib.pyplot as plt
 import util
 import DownbeatTracking
 import madmom
@@ -159,9 +158,7 @@ def SamplesToSoftmax(samples):
 
 
 def GetSamplePath():
-    path = '/Users/xuchao/Documents/rhythmMaster/'
-    if os.name == 'nt':
-        path = rootDir + 'rm/'
+    path = rootDir + 'rm/'
     return path
 
 def MakeMp3Pathname(song):
@@ -1007,9 +1004,12 @@ def GenerateLevel():
     # song = ['xiangrikuideyueding']
     # debugBPM = 158
     # debugET = 115
-    song = ['dur_test_ktv_15159_张靓颖_滚动']
-    # song = ['dur_test_ktv_10055_S.H.E._金钟罩铁布衫']
-    # song = ['dur_test_ktv_10032_F.I.R._把爱放开']
+    song = ['gundong']
+    # song = ['jinzhongzhao']
+    # song = ['baaifangkai']
+    print(sys.argv, len(sys.argv))
+    if len(sys.argv) == 2:
+        song = [sys.argv[1]]
 
     # postprocess.ProcessSampleToIdolLevel(song[0])
     # return

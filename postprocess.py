@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.stats
 import pickle
 import scipy.signal
@@ -571,50 +570,50 @@ def TransferCombineNote(begin, end, shortPos, side):
     return notes
 
 
-def SampleDistribute(samples):
-    '''
-    compute distribute in unit time
-    '''
-    if samples is None:
-        with open('d:/raw_sample.raw', 'rb') as file:
-            samples = pickle.load(file)
+# def SampleDistribute(samples):
+#     '''
+#     compute distribute in unit time
+#     '''
+#     if samples is None:
+#         with open('d:/raw_sample.raw', 'rb') as file:
+#             samples = pickle.load(file)
 
-    assert samples.ndim == 1
-    stride = 800
-    numUnit = len(samples) // stride
-    print('units count', numUnit)
+#     assert samples.ndim == 1
+#     stride = 800
+#     numUnit = len(samples) // stride
+#     print('units count', numUnit)
 
-    distri = np.zeros((stride + 1))
-    gammaSample = np.zeros((numUnit))
-    for i in range(numUnit):
-        unit = samples[i*stride:(i+1)*stride]
-        count = (unit > 0.9).nonzero()[0].shape[0]
-        distri[count] += 1
-        gammaSample[i] = float(count)
+#     distri = np.zeros((stride + 1))
+#     gammaSample = np.zeros((numUnit))
+#     for i in range(numUnit):
+#         unit = samples[i*stride:(i+1)*stride]
+#         count = (unit > 0.9).nonzero()[0].shape[0]
+#         distri[count] += 1
+#         gammaSample[i] = float(count)
 
-    rang = 60
-    totalCount = np.sum(distri)
-    distri = distri / float(numUnit)
-    distri = distri[0:rang]
-    plt.plot(distri)
-    # plt.show()
+#     rang = 60
+#     totalCount = np.sum(distri)
+#     distri = distri / float(numUnit)
+#     distri = distri[0:rang]
+#     plt.plot(distri)
+#     # plt.show()
 
-    args = scipy.stats.gamma.fit(gammaSample)
-    print(args)
-    maxgamma = np.max(gammaSample)
-    y = scipy.stats.gamma.pdf(range(rang), args[0], loc=args[1], scale=args[2])
-    plt.plot(y)
+#     args = scipy.stats.gamma.fit(gammaSample)
+#     print(args)
+#     maxgamma = np.max(gammaSample)
+#     y = scipy.stats.gamma.pdf(range(rang), args[0], loc=args[1], scale=args[2])
+#     plt.plot(y)
 
     
-    fig, ax = plt.subplots(1, 1)
-    mu = totalCount / float(numUnit)
-    print('mu', mu)
-    x = np.arange(poisson.ppf(0.01, mu),
-                  poisson.ppf(0.99, mu))
-    ax.plot(x, poisson.pmf(x, mu), 'bo', ms=8, label='poisson pmf')
-    ax.vlines(x, 0, poisson.pmf(x, mu), colors='b', lw=5, alpha=0.5)
+#     fig, ax = plt.subplots(1, 1)
+#     mu = totalCount / float(numUnit)
+#     print('mu', mu)
+#     x = np.arange(poisson.ppf(0.01, mu),
+#                   poisson.ppf(0.99, mu))
+#     ax.plot(x, poisson.pmf(x, mu), 'bo', ms=8, label='poisson pmf')
+#     ax.vlines(x, 0, poisson.pmf(x, mu), colors='b', lw=5, alpha=0.5)
 
-    plt.show()
+#     plt.show()
 
 
 def SaveInstantValue(beats, filename, postfix=''):
