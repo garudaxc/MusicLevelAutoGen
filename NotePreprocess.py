@@ -6,6 +6,19 @@ import time
 import scipy
 import os.path
 
+from madmom.processors import ParallelProcessor, Processor, SequentialProcessor
+from madmom.audio.signal import SignalProcessor, FramedSignalProcessor
+from madmom.audio.stft import ShortTimeFourierTransformProcessor
+from madmom.audio.spectrogram import (
+    FilteredSpectrogramProcessor, LogarithmicSpectrogramProcessor,
+    SpectrogramDifferenceProcessor)
+from madmom.ml.nn import NeuralNetworkEnsemble
+from madmom.models import DOWNBEATS_BLSTM
+from functools import partial
+from madmom.models import ONSETS_CNN
+from madmom.ml.nn import NeuralNetwork
+
+
 def MSL(beats):
     # 最小二乘直线拟合
     numBeats = len(beats)
@@ -136,7 +149,7 @@ def madmom_features_downbeats_filter_downbeats(beats):
     # return only downbeats (timestamps)
     return beats[beats[:, 1] == 1][:, 0]
     
-def CalcBpmET(y, sr, duration, **args):
+def CalcBpmET(y, sr, duration, preCalcData = None):
     # calc downbeat entertime
     analysisLength = 60
     minimumMusicLength = 110
@@ -155,10 +168,18 @@ def CalcBpmET(y, sr, duration, **args):
     clip = librosa.time_to_samples(clipTime, sr=sr)
     yy = y[clip[0]:clip[1]]
 
-    processer = RNNDownBeatProcessor(num_threads=numThread)
-    downbeatTracking = DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda=1000, fps=100)
-    beatProba = processer(yy)
-
+    fps = 100
+    if preCalcData is None:
+        processor = RNNDownBeatProcessor(num_threads=numThread)
+        beatProba = processor(yy)
+    else:
+        processor = CustomRNNDownBeatProcessor(num_threads=numThread)
+        startIdx = int(start * fps)
+        endIdx = startIdx + int(analysisLength * fps)
+        clipPreCalcData = preCalcData[startIdx:endIdx]
+        beatProba = processor(clipPreCalcData)
+    print('beatProb shape', len(beatProba))
+    downbeatTracking = DBNDownBeatTrackingProcessor(beats_per_bar=4, transition_lambda=1000, fps=fps)
     beatIndex = downbeatTracking(beatProba)
     
     firstBeat, lastBeat = NormalizeInterval(beatIndex, threhold=threhold, abThrehold=abThrehold)
@@ -177,3 +198,69 @@ def CalcBpmET(y, sr, duration, **args):
     bpm = 240.0 / barInter
 
     return bpm, etAuto
+
+class DataInputProcessor(Processor):
+    def __init__(self, data, **kwargs):
+        self.data = data
+
+    def process(self, data, **kwargs):
+        return self.data
+
+def LoadAudioFile(audioFilePath, sampleRate):
+    signalProcessor = SignalProcessor(num_channels=1, sample_rate=sampleRate)
+    return signalProcessor(audioFilePath)
+
+def STFT(audioData, frameSizeArr, fps):
+    multi = ParallelProcessor([])
+    for frameSize in frameSizeArr:
+        frames = FramedSignalProcessor(frame_size=frameSize, fps=fps)
+        stft = ShortTimeFourierTransformProcessor()
+        multi.append(SequentialProcessor((frames, stft)))
+        
+    return multi(audioData)
+
+def SpectrogramDifference(stftDataArr, numBandArr):
+    multi = ParallelProcessor([])
+    for stftData, numBand in zip(stftDataArr, numBandArr):
+        filt = FilteredSpectrogramProcessor(num_bands=numBand, fmin=30, fmax=17000, norm_filters=True)
+        spec = LogarithmicSpectrogramProcessor(mul=1, add=1)
+        diff = SpectrogramDifferenceProcessor(diff_ratio=0.5, positive_diffs=True, stack_diffs=np.hstack)
+        multi.append(SequentialProcessor((DataInputProcessor(stftData), filt, spec, diff)))
+
+    proc = SequentialProcessor((multi, np.hstack))
+    return proc(0)
+
+class CustomRNNDownBeatProcessor(SequentialProcessor):
+    def __init__(self, **kwargs):
+        # pylint: disable=unused-argument
+        # process the pre-processed signal with a NN ensemble
+        nn = NeuralNetworkEnsemble.load(DOWNBEATS_BLSTM, **kwargs)
+        # use only the beat & downbeat (i.e. remove non-beat) activations
+        act = partial(np.delete, obj=0, axis=1)
+        # instantiate a SequentialProcessor
+        super(CustomRNNDownBeatProcessor, self).__init__((nn, act))
+
+class CustomCNNOnsetProcessor(SequentialProcessor):
+    def __init__(self, stftDataArr, **kwargs):
+        # pylint: disable=unused-argument
+        # define pre-processing chain
+        # process the multi-resolution spec in parallel
+        multi = ParallelProcessor([])
+        for stftData in stftDataArr:
+            filt = FilteredSpectrogramProcessor(
+                filterbank=madmom.audio.filters.MelFilterbank, num_bands=80, fmin=27.5, fmax=16000,
+                norm_filters=True, unique_filters=False)
+            spec = LogarithmicSpectrogramProcessor(log=np.log, add=madmom.features.onsets.EPSILON)
+            # process each frame size with spec and diff sequentially
+            multi.append(SequentialProcessor((DataInputProcessor(stftData), filt, spec)))
+        # stack the features (in depth) and pad at beginning and end
+        stack = np.dstack
+        pad = madmom.features.onsets._cnn_onset_processor_pad
+        # pre-processes everything sequentially
+        pre_processor = SequentialProcessor((multi, stack, pad))
+
+        # process the pre-processed signal with a NN ensemble
+        nn = NeuralNetwork.load(ONSETS_CNN[0])
+
+        # instantiate a SequentialProcessor
+        super(CustomCNNOnsetProcessor, self).__init__((pre_processor, nn))
