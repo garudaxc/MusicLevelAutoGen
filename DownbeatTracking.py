@@ -8,7 +8,6 @@ import multiprocessing as mp
 import time
 import logger
 import calc_bpm
-import matplotlib.pyplot as plt
 import librosa
 import pickle
 import NotePreprocess
