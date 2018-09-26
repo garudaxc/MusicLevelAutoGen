@@ -13,7 +13,6 @@ def MSL(beats):
     AT = np.matrix([np.ones(numBeats), range(numBeats)])
     b = np.matrix(beats)
     x = (AT * AT.T).I * AT * b.T
-    #logger.info(x)
 
     a = x[1, 0]
     b = x[0, 0]
@@ -59,7 +58,6 @@ def diff(beats, a):
     cnt = int(numBeat / 3)
     
     m, i1 = min_measure(mean[:cnt], dist[:cnt])
-    #logger.info(m, ' ', i1)    
     m, i2 = min_measure(mean[-cnt:], dist[-cnt:])
     
     i2 = numBeat - cnt + i2
@@ -83,7 +81,6 @@ def calc_beat_interval(beats, i1, i2):
 def CalcBarInterval(beat_times):
     numBeats = len(beat_times)
     itvals = beat_intervals(beat_times)
-    #logger.info('mean ' + str(mean))
 
     #最小二乘计算固定间隔拍子·
     a, b = MSL(beat_times)  
@@ -100,7 +97,6 @@ def NormalizeInterval(beat, threhold = 0.02, abThrehold=0.333):
     diff = np.abs(interval - aver)
 
     abnormal = np.nonzero(diff > threhold)[0]
-    logger.info('abnormal count', abnormal.size, abnormal)
 
     if abnormal.size > beat.shape[0] * abThrehold:
         # 拍子均匀程度太低，自动生成失败
@@ -118,7 +114,6 @@ def NormalizeInterval(beat, threhold = 0.02, abThrehold=0.333):
     # for i in range(-1, -1-len(abnormal), -1):
     #     if len(interval) + i == abnormal[i]:
     #         count1 = count1 + 1
-    # logger.info('del %d items form begining %d items form end' % (count0, count1))
 
     return 0, len(beat)
 
@@ -157,9 +152,7 @@ def CalcBpmET(y, sr, duration, **args):
         analysisLength = min(analysisLength, duration)
         
     clipTime = np.array([start, start+analysisLength])      
-    # logger.info('duration', duration, 'start', start)
     clip = librosa.time_to_samples(clipTime, sr=sr)
-    # logger.info('total', y.shape, 'clip', clip)
     yy = y[clip[0]:clip[1]]
 
     processer = RNNDownBeatProcessor(num_threads=numThread)
@@ -170,7 +163,6 @@ def CalcBpmET(y, sr, duration, **args):
     
     firstBeat, lastBeat = NormalizeInterval(beatIndex, threhold=threhold, abThrehold=abThrehold)
     if firstBeat == -1:        
-        logger.error(PROBABLY_NOT_MUSIC, 'generate error,numbeat %d, abnormal rate %f' % (len(beatIndex), lastBeat))
         return 0, 0
 
     newBeat = beatIndex[firstBeat:lastBeat]
