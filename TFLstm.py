@@ -536,8 +536,11 @@ def RunModel(modelFile, songFile, TrainData, modelParam):
     graphFile = modelFile + '.meta'
 
     batchSize = modelParam.batchSize
-    # batchSize = 1
+    batchSize = 1
+    startTime = time.time()
     testx = modelParam.featureProcessor.extract(songFile)
+    endTime = time.time()
+    print('featureProcessor extract', endTime - startTime)
     inputDim = len(testx[0])
     maxTime = modelParam.maxTime
     # maxTime = len(testx)
@@ -561,7 +564,7 @@ def RunModel(modelFile, songFile, TrainData, modelParam):
             currentInitialStates = initialStatesZero
 
             data = TrainData(batchSize, maxTime, testx)
-            
+            startTime = time.time()
             evaluate = []
             for i in range(data.numBatches):
                 xData, _, seqLen = data.GetBatch(i)
@@ -572,6 +575,8 @@ def RunModel(modelFile, songFile, TrainData, modelParam):
                 evaluate.append(t)
 
             predicts = np.stack(evaluate).reshape(-1, TrainData.lableDim)
+            endTime = time.time()
+            print('real cost', endTime - startTime)
 
     return predicts
 
@@ -700,9 +705,11 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
     fps = 100
     frameInterval = int(1000 / fps)
 
+    time1 = time.time()
     onsetProcessor = madmom.features.onsets.CNNOnsetProcessor()
     onsetActivation = onsetProcessor(songFilePath)
     frameCount = len(onsetActivation)
+    print('pick cost', time.time() - time1)
 
     singingPredicts = shortPredicts
     singingActivation = singingPredicts[:, 1]
@@ -1012,8 +1019,9 @@ def GenerateLevel():
     print('predicts shape', predicts.shape) 
 
     print('calc bpm')
+    tempStart = time.time()
     DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM)
-
+    print('CalcMusicInfoFromFile', time.time() - tempStart)
 
     levelEditorRoot = rootDir + 'LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'
     levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, song[0])
