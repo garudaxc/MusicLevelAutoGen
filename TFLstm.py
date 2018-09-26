@@ -531,16 +531,19 @@ def EvaluateWithModel(modelFile, song, rawFile, TrainData, modelParam):
 
     return predicts
 
-def RunModel(modelFile, songFile, TrainData, modelParam):
+def RunNoteModel(songFile, shortModelFile, longModelFile):
+    xData = shortModelParam.featureProcessor.extract(songFile)
+    shortPredict = RunModel(songFile, shortModelFile, TrainDataDynSinging, shortModelParam, xData)
+    longPredict = RunModel(songFile, longModelFile, TrainDataDynLongNote, longModelParam, xData)
+    return shortPredict, longPredict
+
+def RunModel(songFile, modelFile, TrainData, modelParam, xData):
+    testx = np.copy(xData)
     predictGraph = tf.Graph()
     graphFile = modelFile + '.meta'
 
     batchSize = modelParam.batchSize
     batchSize = 1
-    startTime = time.time()
-    testx = modelParam.featureProcessor.extract(songFile)
-    endTime = time.time()
-    print('featureProcessor extract', endTime - startTime)
     inputDim = len(testx[0])
     maxTime = modelParam.maxTime
     # maxTime = len(testx)
@@ -579,6 +582,7 @@ def RunModel(modelFile, songFile, TrainData, modelParam):
             print('real cost', endTime - startTime)
 
     return predicts
+
 
 def AlignNoteWithBPMAndET(notes, frameInterval, bpm, et):
     '''
@@ -794,8 +798,7 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
     LevelInfo.GenerateIdolLevel(levelFilePath, levelNotes, bpm, et, duration, templateFilePath)
 
 def AutoGenerateLevel(songFilePath, shortModelPath, longModelPath, levelFilePath, onsetThreshold = 0.7, shortThreshold = 0.7):
-    longPredicts = RunModel(longModelPath, songFilePath, TrainDataDynLongNote, longModelParam)
-    shortPredicts = RunModel(shortModelPath, songFilePath, TrainDataDynSinging, shortModelParam)
+    shortPredicts, longPredicts = RunNoteModel(songFile, shortModelFile, longModelPath)
     duration, bpm, et = DownbeatTracking.CalcMusicInfoFromFile(songFilePath, -1, -1, False)
     duration = int(duration * 1000)
     et = int(et * 1000)
@@ -964,7 +967,7 @@ def GenerateLevel():
     # debugET = 682
     # song = ['jinjuebianjingxian']
     # debugET = 6694
-    song = ['ouxiangwanwansui']
+    # song = ['ouxiangwanwansui']
     # debugET = 571
     # song = ['blue planet']
     # debugET = 1615
@@ -994,6 +997,8 @@ def GenerateLevel():
     # song = ['xiangrikuideyueding']
     # debugBPM = 158
     # debugET = 115
+    song = ['dur_test_ktv_15159_张靓颖_滚动']
+    # song = ['dur_test_ktv_10032_F.I.R._把爱放开']
 
     # postprocess.ProcessSampleToIdolLevel(song[0])
     # return
@@ -1003,20 +1008,12 @@ def GenerateLevel():
     pathname = MakeMp3Pathname(song[0])
     print(pathname)
 
-    TrainData = TrainDataDynLongNote
-    rawFile = TrainData.RawDataFileName(song[0])
-    modelFile = TrainData.GetModelPathName()
-    predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData, longModelParam)
-    DownbeatTracking.SaveInstantValue(predicts[:, 1], pathname, '_long_start')   
-    DownbeatTracking.SaveInstantValue(predicts[:, 2], pathname, '_long_dur')   
-    DownbeatTracking.SaveInstantValue(predicts[:, 3], pathname, '_long_end')   
-    print('predicts shape', predicts.shape)
-
-    TrainData = TrainDataDynSinging
-    rawFile = TrainData.RawDataFileName(song[0])
-    modelFile = TrainData.GetModelPathName()
-    predicts = EvaluateWithModel(modelFile, song[0], rawFile, TrainData, shortModelParam)  
-    print('predicts shape', predicts.shape) 
+    shortPredicts, longPredicts = RunNoteModel(pathname, TrainDataDynSinging.GetModelPathName(), TrainDataDynLongNote.GetModelPathName())
+    DownbeatTracking.SaveInstantValue(longPredicts[:, 1], pathname, '_long_start')   
+    DownbeatTracking.SaveInstantValue(longPredicts[:, 2], pathname, '_long_dur')   
+    DownbeatTracking.SaveInstantValue(longPredicts[:, 3], pathname, '_long_end')   
+    print('predicts shape', longPredicts.shape)
+    print('predicts shape', shortPredicts.shape) 
 
     print('calc bpm')
     tempStart = time.time()
@@ -1026,16 +1023,8 @@ def GenerateLevel():
     levelEditorRoot = rootDir + 'LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'
     levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, song[0])
     duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
-    
-    rawFileLong = TrainDataDynLongNote.RawDataFileName(song[0])
-    rawFileSinging = TrainDataDynSinging.RawDataFileName(song[0])
-    with open(rawFileSinging, 'rb') as file:
-        predicts = pickle.load(file)
 
-    with open(rawFileLong, 'rb') as file:
-        longPredicts = pickle.load(file)
-
-    GenerateLevelImp(pathname, duration, bpm, et, predicts, longPredicts, levelFile, rootDir + 'data/idol_template.xml', 0.7, 0.7, True)
+    GenerateLevelImp(pathname, duration, bpm, et, shortPredicts, longPredicts, levelFile, rootDir + 'data/idol_template.xml', 0.7, 0.7, True)
 
     endTime = time.time()
     print('cost time', endTime - startTime)
