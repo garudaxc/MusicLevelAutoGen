@@ -23,6 +23,25 @@ def TFCurrentVariableList():
     print('=======')
     return nameList
 
+def RenameVarName(checkpointDir, replaceFrom = None, replaceTo = None, prefix = None):
+    checkpoint = tf.train.get_checkpoint_state(checkpointDir)
+    with tf.Session() as sess:
+        varList = tf.contrib.framework.list_variables(checkpointDir)
+        for varName, _ in varList:
+            variable = tf.contrib.framework.load_variable(checkpointDir, varName)
+            newName = varName
+            if replaceFrom is not None and replaceTo is not None:
+                newName = newName.replace(replaceFrom, replaceTo)
+            if prefix is not None:
+                newName = prefix + newName
+
+            print('Renaming %s to %s.' % (varName, newName))
+            newVariable = tf.Variable(variable, name=newName)
+            
+        saver = tf.train.Saver()
+        sess.run(tf.global_variables_initializer())
+        saver.save(sess, checkpoint.model_checkpoint_path)
+
 def TFVariable(shape, dtype=tf.float32, name=None):
     # return tf.get_variable(name=name, initializer=tf.random_normal(shape, dtype=dtype))
     return tf.Variable(tf.random_normal(shape, dtype=dtype), name=name)

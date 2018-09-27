@@ -43,8 +43,8 @@ class ModelParam():
         self.dropout = dropout
         self.featureProcessor = featureProcessorClass()
 
-shortModelParam = ModelParam('', useCudnn=True, featureProcessorClass=NoteFeatureProcessor.ShortNoteFeatureProcessor)
-longModelParam = ModelParam('', maxTime=500, useCudnn=True, featureProcessorClass=NoteFeatureProcessor.LongNoteFeatureProcessor)
+shortModelParam = ModelParam('short_note', useCudnn=True, featureProcessorClass=NoteFeatureProcessor.ShortNoteFeatureProcessor)
+longModelParam = ModelParam('long_note', maxTime=500, useCudnn=True, featureProcessorClass=NoteFeatureProcessor.LongNoteFeatureProcessor)
 
 # for long note
 songList = ['aiqingmaimai','ai', 'hellobaby', 'hongri', 'houhuiwuqi', 'huashuo', 'huozaicike', 'haodan']
