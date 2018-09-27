@@ -37,7 +37,7 @@ def RenameVarName(checkpointDir, replaceFrom = None, replaceTo = None, prefix = 
 
             print('Renaming %s to %s.' % (varName, newName))
             newVariable = tf.Variable(variable, name=newName)
-            
+
         saver = tf.train.Saver()
         sess.run(tf.global_variables_initializer())
         saver.save(sess, checkpoint.model_checkpoint_path)
@@ -334,7 +334,7 @@ class NoteDetectionModel():
         return logits, weight, bias
 
     def BuildGraph(self, dropout):
-        if self.variableScopeName is None or len(self.variableScopeName) <= 0:
+        if not self.HasVariableScopeName():
             self.BuildGraphImp(dropout)
             return
 
@@ -411,7 +411,7 @@ class NoteDetectionModel():
         print('Restore done')
 
     def RestoreForCudnn(self, sess, modelFilePath):
-        if self.variableScopeName is None or len(self.variableScopeName) <= 0:
+        if not self.HasVariableScopeName():
             self.RestoreForCudnnImp(sess, modelFilePath)
             return
     
@@ -447,14 +447,20 @@ class NoteDetectionModel():
             logitsCRF = tf.reshape(logits, [self.batchSize, self.maxTime, self.yDim])
             decodeTags, bestScore = crf.crf_decode(logitsCRF, transitionParams, sequenceLength)
             tensorDic['decode_tags'] = decodeTags
-
-        saver = tf.train.Saver()
+        
+        varList = None
+        if self.HasVariableScopeName():
+            varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.variableScopeName)
+        saver = tf.train.Saver(var_list=varList)
         saver.restore(sess, modelFilePath)
 
         print('RestoreForCudnn done')
 
-    def GetTensorByName(graph, name):
+    def GetTensorByName(self, graph, name):
         return graph.get_tensor_by_name(self.variableScopeName + '/' + name)
+
+    def HasVariableScopeName(self):
+        return (self.variableScopeName is not None) and (len(self.variableScopeName) > 0)
 
     def InitialStatesZero(self):
         if 'initial_states' not in self.tensorDic:
