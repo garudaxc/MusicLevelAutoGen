@@ -532,12 +532,17 @@ def EvaluateWithModel(modelFile, song, rawFile, TrainData, modelParam):
 
 def RunNoteModel(songFile, shortModelFile, longModelFile, xData = None):
     if xData is None:
-        xData = shortModelParam.featureProcessor.extract(songFile)
+        shortData = shortModelParam.featureProcessor.extract(songFile)
+        longData = longModelParam.featureProcessor.extract(songFile)
+    else:
+        shortData = xData
+        longData = xData
+        
     startTime = time.time()
-    shortPredict = RunModel(songFile, shortModelFile, TrainDataDynSinging, shortModelParam, xData)
+    shortPredict = RunModel(songFile, shortModelFile, TrainDataDynSinging, shortModelParam, shortData)
     print('run model cost', time.time() - startTime)
     startTime = time.time()
-    longPredict = RunModel(songFile, longModelFile, TrainDataDynLongNote, longModelParam, xData)
+    longPredict = RunModel(songFile, longModelFile, TrainDataDynLongNote, longModelParam, longData)
     print('run model cost', time.time() - startTime)
     return shortPredict, longPredict
 
