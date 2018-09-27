@@ -31,8 +31,9 @@ bSaveModel = True
 epch = 10000
     
 class ModelParam():
-    def __init__(self, batchSize=16, maxTime=128, numLayers=3, numUnits=26, dropout=0.4, 
+    def __init__(self, variableScopeName, batchSize=16, maxTime=128, numLayers=3, numUnits=26, dropout=0.4, 
         timeMajor=False, useCudnn=False, featureProcessorClass=NoteFeatureProcessor.ShortNoteFeatureProcessor):
+        self.variableScopeName = variableScopeName
         self.batchSize = batchSize
         self.maxTime = maxTime
         self.numLayers = numLayers
@@ -42,8 +43,8 @@ class ModelParam():
         self.dropout = dropout
         self.featureProcessor = featureProcessorClass()
 
-shortModelParam = ModelParam(useCudnn=True, featureProcessorClass=NoteFeatureProcessor.ShortNoteFeatureProcessor)
-longModelParam = ModelParam(maxTime=500, useCudnn=True, featureProcessorClass=NoteFeatureProcessor.LongNoteFeatureProcessor)
+shortModelParam = ModelParam('', useCudnn=True, featureProcessorClass=NoteFeatureProcessor.ShortNoteFeatureProcessor)
+longModelParam = ModelParam('', maxTime=500, useCudnn=True, featureProcessorClass=NoteFeatureProcessor.LongNoteFeatureProcessor)
 
 # for long note
 songList = ['aiqingmaimai','ai', 'hellobaby', 'hongri', 'houhuiwuqi', 'huashuo', 'huozaicike', 'haodan']
@@ -552,7 +553,7 @@ def RunModel(songFile, modelFile, TrainData, modelParam, xData):
     # maxTime = len(testx)
 
     with predictGraph.as_default():
-        model = NoteModel.NoteDetectionModel(batchSize, maxTime, modelParam.numLayers, modelParam.numUnits, inputDim, TrainData.lableDim, timeMajor=modelParam.timeMajor, useCudnn=modelParam.useCudnn)
+        model = NoteModel.NoteDetectionModel(modelParam.variableScopeName, batchSize, maxTime, modelParam.numLayers, modelParam.numUnits, inputDim, TrainData.lableDim, timeMajor=modelParam.timeMajor, useCudnn=modelParam.useCudnn)
         with tf.Session() as sess:
             model.Restore(sess, modelFile)
             print('model loaded')
@@ -1113,7 +1114,7 @@ def _Main():
     if trainForSinging:
         validateData = ValidateData(batchSize, maxTime, validateX, validateY)
 
-    model = NoteModel.NoteDetectionModel(batchSize, maxTime, modelParam.numLayers, modelParam.numUnits, inputDim, TrainData.lableDim, 
+    model = NoteModel.NoteDetectionModel(modelParam.variableScopeName, batchSize, maxTime, modelParam.numLayers, modelParam.numUnits, inputDim, TrainData.lableDim, 
         timeMajor=modelParam.timeMajor, useCudnn=modelParam.useCudnn)
     model.BuildGraph(dropout=modelParam.dropout)
     result = model.GetTensorDic()

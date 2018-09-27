@@ -58,7 +58,8 @@ def BuildModel(batchSize, maxTime, xDim, yDim, tensorDic):
     cnnOutputData = BuildCNN(xData, batchSize, maxTime, xDim, 1)
 
 class NoteDetectionModel():
-    def __init__(self, batchSize, maxTime, numLayers, numUnits, xDim, yDim, timeMajor=False, useCudnn=False, useInitialStatesFW=True, useInitialStatesBW=False):
+    def __init__(self, variableScopeName, batchSize, maxTime, numLayers, numUnits, xDim, yDim, timeMajor=False, useCudnn=False, useInitialStatesFW=True, useInitialStatesBW=False):
+        self.variableScopeName = variableScopeName
         self.batchSize = batchSize
         self.maxTime = maxTime
         self.numLayers = numLayers
@@ -314,6 +315,14 @@ class NoteDetectionModel():
         return logits, weight, bias
 
     def BuildGraph(self, dropout):
+        if self.variableScopeName is None or len(self.variableScopeName) <= 0:
+            self.BuildGraphImp(dropout)
+            return
+
+        with tf.variable_scope(self.variableScopeName):
+            self.BuildGraphImp(dropout)
+
+    def BuildGraphImp(self, dropout):
         self.dropout = dropout
         print('dropout', dropout)
         batchSize, maxTime, numLayers, numUnits, xDim, yDim, timeMajor, useCudnn = self.ModelInfo()
@@ -374,15 +383,23 @@ class NoteDetectionModel():
 
         tensorDic = self.tensorDic
         graph = tf.get_default_graph()
-        tensorDic['X'] = graph.get_tensor_by_name('X:0')
-        tensorDic['sequence_length'] = graph.get_tensor_by_name('sequence_length:0')
-        tensorDic['predict_op'] = graph.get_tensor_by_name('predict_op:0')
-        tensorDic['initial_states'] = graph.get_tensor_by_name('initial_states_predict:0')
-        tensorDic['output_states'] = graph.get_tensor_by_name('output_states_predict:0')
+        tensorDic['X'] = self.GetTensorByName(graph, 'X:0')
+        tensorDic['sequence_length'] = self.GetTensorByName(graph, 'sequence_length:0')
+        tensorDic['predict_op'] = self.GetTensorByName(graph, 'predict_op:0')
+        tensorDic['initial_states'] = self.GetTensorByName(graph, 'initial_states_predict:0')
+        tensorDic['output_states'] = self.GetTensorByName(graph, 'output_states_predict:0')
 
         print('Restore done')
 
     def RestoreForCudnn(self, sess, modelFilePath):
+        if self.variableScopeName is None or len(self.variableScopeName) <= 0:
+            self.RestoreForCudnnImp(sess, modelFilePath)
+            return
+    
+        with tf.variable_scope(self.variableScopeName):
+            self.RestoreForCudnnImp(sess, modelFilePath)
+
+    def RestoreForCudnnImp(self, sess, modelFilePath):
         numUnits = self.numUnits
         numLayers = self.numLayers
         singleCell = lambda: cudnn_rnn.CudnnCompatibleLSTMCell(self.numUnits)
@@ -416,6 +433,9 @@ class NoteDetectionModel():
         saver.restore(sess, modelFilePath)
 
         print('RestoreForCudnn done')
+
+    def GetTensorByName(graph, name):
+        return graph.get_tensor_by_name(self.variableScopeName + '/' + name)
 
     def InitialStatesZero(self):
         if 'initial_states' not in self.tensorDic:
