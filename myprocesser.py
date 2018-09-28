@@ -5,7 +5,6 @@ import os
 import madmom
 # import librosa
 # import librosa.display
-import matplotlib.pyplot as plt
 import pickle
 
 #madmom.audio.signal
