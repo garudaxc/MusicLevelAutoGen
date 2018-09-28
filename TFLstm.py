@@ -713,18 +713,16 @@ def AlignNoteWithBPMAndET(notes, frameInterval, bpm, et):
 
     return np.array(newNotes)
 
-def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, templateFilePath, onsetThreshold, shortThreshold, saveDebugFile = False, songSTFTData = None):    
+def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, templateFilePath, onsetThreshold, shortThreshold, saveDebugFile = False, onsetActivation = None):    
     print('bpm', bpm, 'et', et, 'dur', duration)
     fps = 100
     frameInterval = int(1000 / fps)
 
     time1 = time.time()
-    if songSTFTData is not None:
-        onsetProcessor = NotePreprocess.CustomCNNOnsetProcessor(songSTFTData)
-        onsetActivation = onsetProcessor(0)
-    else:
+    if onsetActivation is None:
         onsetProcessor = madmom.features.onsets.CNNOnsetProcessor()
         onsetActivation = onsetProcessor(songFilePath)
+
     frameCount = len(onsetActivation)
     print('pick cost', time.time() - time1)
 
@@ -1027,29 +1025,36 @@ def GenerateLevel():
 
     sampleRate = 44100
     audioData = NotePreprocess.LoadAudioFile(pathname, sampleRate)
-    stftData = NotePreprocess.STFT(audioData, [1024, 2048, 4096], 100)
-    onsetSTFTData = (stftData[1], stftData[0], stftData[2])
-    specDiff = NotePreprocess.SpectrogramDifference(stftData, [3, 6, 12])
+    audioData = np.array(audioData)
+    specDiff, melLogSpec = NotePreprocess.SpecDiffAndMelLogSpec(audioData, [1024, 2048, 4096], [3, 6, 12], 100)
     xData = myprocesser.FeatureStandardize(specDiff)
     print('preprocess cost time', time.time() - startTime)
-    
-    shortPredicts, longPredicts = RunNoteModel(pathname, TrainDataDynSinging.GetModelPathName(), TrainDataDynLongNote.GetModelPathName(), xData)
-    DownbeatTracking.SaveInstantValue(longPredicts[:, 1], pathname, '_long_start')   
-    DownbeatTracking.SaveInstantValue(longPredicts[:, 2], pathname, '_long_dur')   
-    DownbeatTracking.SaveInstantValue(longPredicts[:, 3], pathname, '_long_end')   
-    print('predicts shape', longPredicts.shape)
-    print('predicts shape', shortPredicts.shape) 
 
-    print('calc bpm')
-    tempStart = time.time()
-    DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM, True, specDiff, (audioData, sampleRate, float(len(audioData)) / sampleRate))
-    print('CalcMusicInfoFromFile', time.time() - tempStart)
+    allProc = NotePreprocess.AllTaskProcessor(
+        [RunModel, pathname, TrainDataDynSinging.GetModelPathName(), TrainDataDynSinging, shortModelParam, xData], 
+        [RunModel, pathname, TrainDataDynLongNote.GetModelPathName(), TrainDataDynLongNote, longModelParam, xData], 
+        [specDiff, audioData, sampleRate, float(len(audioData)) / sampleRate, pathname], 
+        [melLogSpec]
+        )
+    shortPredicts, longPredicts, onsetActivation, duration, bpm, et = allProc(0)
+    
+    # shortPredicts, longPredicts = RunNoteModel(pathname, TrainDataDynSinging.GetModelPathName(), TrainDataDynLongNote.GetModelPathName(), xData)
+    # DownbeatTracking.SaveInstantValue(longPredicts[:, 1], pathname, '_long_start')   
+    # DownbeatTracking.SaveInstantValue(longPredicts[:, 2], pathname, '_long_dur')   
+    # DownbeatTracking.SaveInstantValue(longPredicts[:, 3], pathname, '_long_end')   
+    # print('predicts shape', longPredicts.shape)
+    # print('predicts shape', shortPredicts.shape) 
+
+    # print('calc bpm')
+    # tempStart = time.time()
+    # DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM, True, specDiff, (audioData, sampleRate, float(len(audioData)) / sampleRate))
+    # print('CalcMusicInfoFromFile', time.time() - tempStart)
 
     levelEditorRoot = rootDir + 'LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'
     levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, song[0])
-    duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
+    # duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
 
-    GenerateLevelImp(pathname, duration, bpm, et, shortPredicts, longPredicts, levelFile, rootDir + 'data/idol_template.xml', 0.7, 0.7, True, onsetSTFTData)
+    GenerateLevelImp(pathname, duration, bpm, et, shortPredicts, longPredicts, levelFile, rootDir + 'data/idol_template.xml', 0.7, 0.7, True, onsetActivation)
 
     endTime = time.time()
     print('cost time', endTime - startTime)
