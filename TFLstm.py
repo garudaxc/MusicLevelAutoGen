@@ -1039,11 +1039,11 @@ def GenerateLevel():
     shortPredicts, longPredicts, onsetActivation, duration, bpm, et = allProc(0)
     
     # shortPredicts, longPredicts = RunNoteModel(pathname, TrainDataDynSinging.GetModelPathName(), TrainDataDynLongNote.GetModelPathName(), xData)
-    # DownbeatTracking.SaveInstantValue(longPredicts[:, 1], pathname, '_long_start')   
-    # DownbeatTracking.SaveInstantValue(longPredicts[:, 2], pathname, '_long_dur')   
-    # DownbeatTracking.SaveInstantValue(longPredicts[:, 3], pathname, '_long_end')   
-    # print('predicts shape', longPredicts.shape)
-    # print('predicts shape', shortPredicts.shape) 
+    DownbeatTracking.SaveInstantValue(longPredicts[:, 1], pathname, '_long_start')   
+    DownbeatTracking.SaveInstantValue(longPredicts[:, 2], pathname, '_long_dur')   
+    DownbeatTracking.SaveInstantValue(longPredicts[:, 3], pathname, '_long_end')   
+    print('predicts shape', longPredicts.shape)
+    print('predicts shape', shortPredicts.shape) 
 
     # print('calc bpm')
     # tempStart = time.time()
