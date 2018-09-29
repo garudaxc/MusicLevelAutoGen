@@ -19,7 +19,7 @@ from madmom.models import ONSETS_CNN
 from madmom.ml.nn import NeuralNetwork
 
 import DownbeatTracking
-
+import multiprocessing as mp
 
 def MSL(beats):
     # 最小二乘直线拟合
@@ -356,31 +356,42 @@ class CustomCNNOnsetProcessorEx(SequentialProcessor):
         print('onset dectection proc cost', time.time() - startTime)
         return res
 
+def ProcessFunc(func):
+    return func(0)
+
 class AllTaskProcessor(Processor):
     def __init__(self, shortParam, longParam, bpmParam, onsetParam, **kwargs):
-        procArr = []
-        procArr.append(NoteModelProcessor(shortParam[0], shortParam[1], shortParam[2], shortParam[3], shortParam[4], shortParam[5]))
-        procArr.append(NoteModelProcessor(longParam[0], longParam[1], longParam[2], longParam[3], longParam[4], longParam[5]))
-        procArr.append(CustomCNNOnsetProcessorEx(onsetParam[0]))
+        self.shortParam = shortParam
+        self.longParam = longParam
+        self.bpmParam = bpmParam
+        self.onsetParam = onsetParam        
+
+    def process(self, data, **kwargs):
+        startTime = time.time()
+        shortParam = self.shortParam
+        longParam = self.longParam
+        bpmParam = self.bpmParam
+        onsetParam = self.onsetParam
+        bpmModelCount = 8
+        processCount = 3 + bpmModelCount
+        pool = mp.Pool(processCount)
+        resOnset = pool.apply_async(CustomCNNOnsetProcessorEx(onsetParam[0]), [0])
+        resShort = pool.apply_async(NoteModelProcessor(shortParam[0], shortParam[1], shortParam[2], shortParam[3], shortParam[4], shortParam[5]), [0])
+        resLong = pool.apply_async(NoteModelProcessor(longParam[0], longParam[1], longParam[2], longParam[3], longParam[4], longParam[5]), [0])
+        
+        bpmProcArr = []
         preCalcData = bpmParam[0]
         start, analysisLength = AnalysisInfo(bpmParam[3])
         fps = 100
         startIdx = int(start * fps)
         endIdx = startIdx + int(analysisLength * fps)
         clipPreCalcData = preCalcData[startIdx:endIdx]
-        for i in range(8):
-            procArr.append(CustomRNNDownBeatProcessorEx(i, clipPreCalcData))
+        for i in range(bpmModelCount):
+            bpmProcArr.append(CustomRNNDownBeatProcessorEx(i, clipPreCalcData))
 
-        self.bpmParam = bpmParam
-        self.multi = ParallelProcessor(procArr, num_threads=len(procArr))
+        subRes = pool.map(ProcessFunc, bpmProcArr)
+        pool.close()
 
-    def process(self, data, **kwargs):
-        startTime = time.time()
-        res = self.multi(0)
-        shortPredicts = res[0]
-        longPredicts = res[1]
-        onsetActivation = res[2]
-        subRes = res[3:]
         predict = madmom.ml.nn.average_predictions(subRes)
         act = partial(np.delete, obj=0, axis=1)
         downBeatOutput = act(predict)
@@ -390,5 +401,12 @@ class AllTaskProcessor(Processor):
         et = et + DownbeatTracking.DecodeOffset(self.bpmParam[4])
         print('decode offset et', et)
         et = int(et * 1000)
-        print('all task cost', time.time() - startTime)
+
+        pool.join()
+        shortPredicts = resShort.get()
+        longPredicts = resLong.get()
+        onsetActivation = resOnset.get()
+
+        endTime = time.time()
+        print('all task cost', endTime - startTime)
         return shortPredicts, longPredicts, onsetActivation, duration, bpm, et
