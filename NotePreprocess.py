@@ -297,7 +297,10 @@ class NoteModelProcessor(Processor):
         self.xData = xData
 
     def process(self, data, **kwargs):
-        return self.runFunc(self.songFile, self.modelFile, self.TrainData, self.modelParam, self.xData)
+        startTime = time.time()
+        res = self.runFunc(self.songFile, self.modelFile, self.TrainData, self.modelParam, self.xData)
+        print('model proc cost', time.time() - startTime)
+        return res
 
 def MelLogarithmicSpectrogram(stftDataArr):
     multi = ParallelProcessor([], num_threads=len(stftDataArr))
