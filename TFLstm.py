@@ -1030,29 +1030,32 @@ def GenerateLevel():
     xData = myprocesser.FeatureStandardize(specDiff)
     print('preprocess cost time', time.time() - startTime)
 
-    allProc = NotePreprocess.AllTaskProcessor(
-        [RunModel, pathname, TrainDataDynSinging.GetModelPathName(), TrainDataDynSinging, shortModelParam, xData], 
-        [RunModel, pathname, TrainDataDynLongNote.GetModelPathName(), TrainDataDynLongNote, longModelParam, xData], 
-        [specDiff, audioData, sampleRate, float(len(audioData)) / sampleRate, pathname], 
-        [melLogSpec]
-        )
-    shortPredicts, longPredicts, onsetActivation, duration, bpm, et = allProc(0)
-    
-    # shortPredicts, longPredicts = RunNoteModel(pathname, TrainDataDynSinging.GetModelPathName(), TrainDataDynLongNote.GetModelPathName(), xData)
+    multiProcessAllTask = True
+    if multiProcessAllTask:
+        allProc = NotePreprocess.AllTaskProcessor(
+            [RunModel, pathname, TrainDataDynSinging.GetModelPathName(), TrainDataDynSinging, shortModelParam, xData], 
+            [RunModel, pathname, TrainDataDynLongNote.GetModelPathName(), TrainDataDynLongNote, longModelParam, xData], 
+            [specDiff, audioData, sampleRate, float(len(audioData)) / sampleRate, pathname], 
+            [melLogSpec]
+            )
+        shortPredicts, longPredicts, onsetActivation, duration, bpm, et = allProc(0)
+    else:
+        onsetActivation = None
+        shortPredicts, longPredicts = RunNoteModel(pathname, TrainDataDynSinging.GetModelPathName(), TrainDataDynLongNote.GetModelPathName(), xData)
+        print('calc bpm')
+        tempStart = time.time()
+        DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM, True, specDiff, (audioData, sampleRate, float(len(audioData)) / sampleRate))
+        print('CalcMusicInfoFromFile', time.time() - tempStart)
+        duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
+        
     DownbeatTracking.SaveInstantValue(longPredicts[:, 1], pathname, '_long_start')   
     DownbeatTracking.SaveInstantValue(longPredicts[:, 2], pathname, '_long_dur')   
     DownbeatTracking.SaveInstantValue(longPredicts[:, 3], pathname, '_long_end')   
     print('predicts shape', longPredicts.shape)
     print('predicts shape', shortPredicts.shape) 
 
-    # print('calc bpm')
-    # tempStart = time.time()
-    # DownbeatTracking.CalcMusicInfoFromFile(pathname, debugET, debugBPM, True, specDiff, (audioData, sampleRate, float(len(audioData)) / sampleRate))
-    # print('CalcMusicInfoFromFile', time.time() - tempStart)
-
     levelEditorRoot = rootDir + 'LevelEditorForPlayer_8.0/LevelEditor_ForPlayer_8.0/'
     levelFile = '%sclient/Assets/LevelDesign/%s.xml' % (levelEditorRoot, song[0])
-    # duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
 
     GenerateLevelImp(pathname, duration, bpm, et, shortPredicts, longPredicts, levelFile, rootDir + 'data/idol_template.xml', 0.7, 0.7, True, onsetActivation)
 
