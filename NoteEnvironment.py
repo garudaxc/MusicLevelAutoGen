@@ -32,7 +32,7 @@ def GenerateDefaultSessionConfig():
         config = tf.ConfigProto()
         config.intra_op_parallelism_threads = 4
         config.inter_op_parallelism_threads = 2
-        print('tensorflow config', config.intra_op_parallelism_threads, config.inter_op_parallelism_threads)
+        print('[NoteEnvironment] tensorflow config', 'intra', config.intra_op_parallelism_threads, 'inter', config.inter_op_parallelism_threads)
     else:
         print('[NoteEnvironment] windows system not set tensorflow config now.')
     return config
