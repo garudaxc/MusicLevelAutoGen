@@ -15,6 +15,7 @@ import sys
 import NoteFeatureProcessor
 import NoteModel
 import NotePreprocess
+import NoteEnvironment
 
 rootDir = util.getRootDir()
 trainDataDir = rootDir + 'MusicLevelAutoGen/train_data/'
@@ -559,7 +560,7 @@ def RunModel(songFile, modelFile, TrainData, modelParam, xData):
 
     with predictGraph.as_default():
         model = NoteModel.NoteDetectionModel(modelParam.variableScopeName, batchSize, maxTime, modelParam.numLayers, modelParam.numUnits, inputDim, TrainData.lableDim, timeMajor=modelParam.timeMajor, useCudnn=modelParam.useCudnn)
-        with tf.Session() as sess:
+        with tf.Session(config=NoteEnvironment.GenerateDefaultSessionConfig()) as sess:
             model.Restore(sess, modelFile)
             print('model loaded')
 
@@ -1022,6 +1023,8 @@ def GenerateLevel():
 
     pathname = MakeMp3Pathname(song[0])
     print(pathname)
+
+    NoteEnvironment.SetPrefrenceEnvironmentVariable()
 
     sampleRate = 44100
     audioData = NotePreprocess.LoadAudioFile(pathname, sampleRate)
