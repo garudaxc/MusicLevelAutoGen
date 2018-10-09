@@ -20,6 +20,7 @@ from madmom.ml.nn import NeuralNetwork
 
 import DownbeatTracking
 import multiprocessing as mp
+import math
 
 def MSL(beats):
     # 最小二乘直线拟合
@@ -209,6 +210,33 @@ def CalcBpmET(y, sr, duration, preCalcData = None, downBeatData = None):
     bpm = 240.0 / barInter
 
     return bpm, etAuto
+
+def SplitData(srcArr, splitCount, overlap):
+    arrLength = len(srcArr)
+    if splitCount > arrLength or arrLength == 0 or overlap < 0:
+        return None
+
+    arr = srcArr
+    subArrDataLength = int(math.ceil(arrLength / splitCount))
+    allLength = subArrDataLength * splitCount
+    if allLength > splitCount:
+        appendShape = np.concatenate(([allLength - splitCount], np.shape(arr[0])))
+        appendArr = np.zeros(appendShape)
+        arr = np.concatenate((arr, appendArr))
+
+    if overlap > 0:
+        overlapShape = np.concatenate(([overlap], np.shape(arr[0])))
+        overlapArr = np.zeros(overlapShape)
+        arr = np.concatenate((overlapArr, arr, overlapArr))
+
+    res = []
+    for i in range(splitCount):
+        start = overlap + i * subArrDataLength
+        end = start + subArrDataLength
+        subArr = arr[(start - overlap) : (end + overlap)]
+        res.append(subArr)
+
+    return np.array(res)
 
 class DataInputProcessor(Processor):
     def __init__(self, data, **kwargs):

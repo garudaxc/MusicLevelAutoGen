@@ -265,9 +265,6 @@ def RhythmMasterLevelPorcess():
     notes = notes[:,0]
     LevelInfo.SaveInstantValue(notes, pathname, '_slide')
 
-
-
-
 class TrainDataBase():
 
     def GetBatch(self, n):
@@ -300,119 +297,6 @@ class TrainDataBase():
         x = x.reshape(self.batchSize, -1, self.numSteps, xDim)
         self._x = x.transpose(1, 0, 2, 3)
         print('numbatches', self.numBatches, 'x shape', self._x.shape, 'y shape', self._y.shape)
-
-###
-# TrainDataDynShortNoteSinging
-###
-class TrainDataDynShortNoteSinging(TrainDataBase):
-    lableDim = 2
-    def __init__(self, batchSize, numSteps, x, y=None):
-        assert x.ndim == 2
-        self.batchSize = batchSize
-        self.numSteps = numSteps
-
-        inputDim = len(x[0])
-
-        count = x.shape[0]
-
-        if (not y is None): 
-            beat = np.max(y[:, 1:4], axis=1)
-            
-            long = np.max(y[:, 4:5], axis=1)
-            for i in range(1, len(long)):
-                if long[i-1] == 0 and long[i] > 0:
-                    beat[i] = 1
-
-            y = SamplesToSoftmax(beat)
-            print('y shape', y.shape, 'y sample count', len(y), 'y sum', np.sum(y, axis=0))
-
-            self.BuildBatch(x, y)
-        else:
-            self._y = [None] * count
-
-            x = x[0:(count - count%numSteps)]
-            x = x.reshape(-1, 1, numSteps, inputDim)
-            self._x = np.repeat(x, batchSize, axis=1)
-            print('x shape', self._x.shape)
-
-            self.numBatches = len(x)
-            print('numbatch', self.numBatches) 
-
-    def GetModelPathName():
-        return 'd:/work/model_shortnote_singing.ckpt'
-
-    def RawDataFileName(song):
-        path = MakeMp3Dir(song)
-        return path + 'evaluate_data_short_singing.raw'
-    
-    def GenerateLevel(predicts, pathname):      
-                       
-        pre = predicts[:, 1]
-        # pre = postprocess.PurifyInstanceSample(pre)
-        # picked = postprocess.PickInstanceSample(pre)
-
-        # sam = np.zeros_like(pre)
-        # sam[picked] = 1
-        
-        notes = postprocess.TrainDataToLevelData(pre, 10, 0.90, 0)
-        notes = np.asarray(notes)
-        notes[0]
-
-        notes = notes[:,0]
-        LevelInfo.SaveInstantValue(notes, pathname, '_inst_singing')
-
-
-
-class TrainDataDynShortNoteBeat(TrainDataBase):
-    lableDim = 2
-    def __init__(self, batchSize, numSteps, x, y=None):
-        assert x.ndim == 2
-        self.batchSize = batchSize
-        self.numSteps = numSteps
-
-        inputDim = len(x[0])
-
-        count = x.shape[0]
-
-        if (not y is None): 
-            beat = np.max(y[:, 1:4], axis=1)
-            
-            long = np.max(y[:, 4:5], axis=1)
-            for i in range(1, len(long)):
-                if long[i-1] == 0 and long[i] > 0:
-                    beat[i] = 1
-
-            y = SamplesToSoftmax(beat)
-            print('y shape', y.shape, 'y sample count', len(y), 'y sum', np.sum(y, axis=0))
-
-            self.BuildBatch(x, y)
-        else:
-            self._y = [None] * count
-
-            x = x[0:(count - count%numSteps)]
-            x = x.reshape(-1, 1, numSteps, inputDim)
-            self._x = np.repeat(x, batchSize, axis=1)
-            print('x shape', self._x.shape)
-
-            self.numBatches = len(x)
-            print('numbatch', self.numBatches) 
-
-    def GetModelPathName():
-        return rootDir + 'model_shortnote_beat/model_shortnote_beat.ckpt'
-
-    def RawDataFileName(song):
-        path = MakeMp3Dir(song)
-        return path + 'evaluate_data_short_beat.raw'
-    
-    def GenerateLevel(predicts, pathname):     
-                       
-        short = predicts[:, 1]
-        short = postprocess.PickInstanceSample(short, count=400)
-        notes = postprocess.TrainDataToLevelData(short, 10, 0.1, 0)
-
-        notes = notes[:,0]
-        LevelInfo.SaveInstantValue(notes, pathname, '_inst_beat')
-
 
 class TrainDataDynSinging(TrainDataBase):
     lableDim = 3
@@ -553,10 +437,35 @@ def RunModel(songFile, modelFile, TrainData, modelParam, xData):
     graphFile = modelFile + '.meta'
 
     batchSize = modelParam.batchSize
-    batchSize = 1
+    batchSize = 8
     inputDim = len(testx[0])
+
+    preProcessStart= time.time()
+    overlap = 128
+    if batchSize < 2:
+        overlap = 0
+    testx = NotePreprocess.SplitData(xData, batchSize, overlap)
+    testx = testx.reshape(batchSize, -1, inputDim)
+
     maxTime = modelParam.maxTime
-    # maxTime = len(testx)
+    maxTime = len(testx[0])
+
+    appendCount = maxTime - len(testx[0]) % maxTime
+    if appendCount < maxTime:
+        tempX = []
+        for arr in testx:
+            tempX.append(np.concatenate((arr, np.zeros([appendCount, inputDim]))))
+        testx = np.array(tempX)
+    else:
+        appendCount = 0
+
+    batchNum = len(testx[0]) // maxTime
+    print('batchNum', batchNum)
+    testx = testx.reshape(batchSize, batchNum, maxTime, inputDim)
+    testx = testx.transpose(1, 0, 2, 3)
+
+    preProcessEnd= time.time()
+    print('model pre cost', preProcessEnd - preProcessStart)
 
     with predictGraph.as_default():
         model = NoteModel.NoteDetectionModel(modelParam.variableScopeName, batchSize, maxTime, modelParam.numLayers, modelParam.numUnits, inputDim, TrainData.lableDim, timeMajor=modelParam.timeMajor, useCudnn=modelParam.useCudnn)
@@ -576,18 +485,26 @@ def RunModel(songFile, modelFile, TrainData, modelParam, xData):
             initialStatesZero = model.InitialStatesZero()
             currentInitialStates = initialStatesZero
 
-            data = TrainData(batchSize, maxTime, testx)
             startTime = time.time()
-            evaluate = []
-            for i in range(data.numBatches):
-                xData, _, seqLen = data.GetBatch(i)
-                t, batchStates = sess.run([predict_op, batch_states], feed_dict={X:xData, seqLenHolder:seqLen, initial_states: currentInitialStates})
+
+            seqLen = [maxTime] * batchSize
+            batchPredictArr = []
+            for i in range(batchNum):
+                batchX = testx[i]
+                batchPredict, batchStates = sess.run([predict_op, batch_states], feed_dict={X:batchX, seqLenHolder:seqLen, initial_states: currentInitialStates})
                 currentInitialStates = batchStates
                 
-                t = t[0:maxTime,:]
-                evaluate.append(t)
+                batchPredictArr.append(batchPredict)
 
-            predicts = np.stack(evaluate).reshape(-1, TrainData.lableDim)
+            outputDim = np.shape(batchPredictArr[0])[1]
+            predicts = np.array(batchPredictArr)
+            predicts = predicts.reshape(batchNum, batchSize, maxTime, outputDim)
+            predicts = predicts.transpose(1, 0, 2, 3)
+            predicts = predicts.reshape(batchSize, -1, outputDim)
+            predicts = predicts[:, overlap : (len(predicts[0]) - appendCount - overlap), :]
+            predicts = predicts.reshape(-1, outputDim)
+            predicts = predicts[0:len(xData)]
+
             endTime = time.time()
             print('real cost', endTime - startTime)
 
