@@ -434,6 +434,7 @@ class AllTaskProcessor(Processor):
         for i in range(bpmModelCount):
             bpmProcArr.append(CustomRNNDownBeatProcessorEx(i, clipPreCalcData))
 
+        bpmStartTime = time.time()
         subRes = pool.map(ProcessFunc, bpmProcArr)
         pool.close()
 
@@ -446,6 +447,8 @@ class AllTaskProcessor(Processor):
         et = et + DownbeatTracking.DecodeOffset(self.bpmParam[4])
         print('decode offset et', et)
         et = int(et * 1000)
+        bpmEndTime = time.time()
+        print('bpm task cost', bpmEndTime - bpmStartTime)
 
         pool.join()
         shortPredicts = resShort.get()
