@@ -404,9 +404,23 @@ class AllTaskProcessor(Processor):
         bpmParam = self.bpmParam
         onsetParam = self.onsetParam
         bpmModelCount = 8
-        processCount = 3 + bpmModelCount
+        onsetSplitCount = 1
+        processCount = 2 + onsetSplitCount + bpmModelCount
         pool = mp.Pool(processCount)
-        resOnset = pool.apply_async(CustomCNNOnsetProcessorEx(onsetParam[0]), [0])
+
+        onsetOverlap = 0
+        onsetProcessorCutFrame = 0
+        if onsetSplitCount <= 1:
+            resOnsetArr = [pool.apply_async(CustomCNNOnsetProcessorEx(onsetParam[0]), [0])]
+        else:
+            onsetOverlap = 128
+            onsetProcessorCutFrame = 14
+            onsetInputArr = SplitData(onsetParam[0], onsetSplitCount, onsetOverlap)
+            resOnsetArr = []
+            for subInput in onsetInputArr:
+                resOnset = pool.apply_async(CustomCNNOnsetProcessorEx(subInput), [0])
+                resOnsetArr.append(resOnset)
+
         resShort = pool.apply_async(NoteModelProcessor(shortParam[0], shortParam[1], shortParam[2], shortParam[3], shortParam[4], shortParam[5]), [0])
         resLong = pool.apply_async(NoteModelProcessor(longParam[0], longParam[1], longParam[2], longParam[3], longParam[4], longParam[5]), [0])
         
@@ -436,7 +450,15 @@ class AllTaskProcessor(Processor):
         pool.join()
         shortPredicts = resShort.get()
         longPredicts = resLong.get()
-        onsetActivation = resOnset.get()
+
+        onsetActivation = np.array([], dtype='float32')
+        for idx, resOnset in zip(range(onsetSplitCount), resOnsetArr):
+            subActivation = resOnset.get()
+            cutFrame = onsetProcessorCutFrame
+            if idx == onsetSplitCount - 1:
+                cutFrame = 0
+            subActivation = subActivation[onsetOverlap : len(subActivation) - onsetOverlap + cutFrame]
+            onsetActivation = np.concatenate((onsetActivation, subActivation))
 
         endTime = time.time()
         print('all task cost', endTime - startTime)
