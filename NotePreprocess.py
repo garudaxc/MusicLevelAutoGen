@@ -362,8 +362,7 @@ def SpecDiffAndMelLogSpec(audioData, sampleRate, frameSizeArr, numBandArr, fps):
     melLogSpec = madmom.features.onsets._cnn_onset_processor_pad(np.dstack(resB))
     return specDiff, melLogSpec
 
-def SpecDiffAndMelLogSpecEx(audioData, sampleRate, frameSizeArr, numBandArr, fps):
-    splitCount = 4
+def SpecDiffAndMelLogSpecEx(audioData, sampleRate, frameSizeArr, numBandArr, fps, splitCount = 4):
     maxFrameSize = np.max(frameSizeArr)
     hopSize = int(sampleRate / fps)
     minOverlapFrameCount = math.ceil(maxFrameSize / hopSize)
@@ -461,11 +460,12 @@ def ProcessFunc(func):
     return func(0)
 
 class AllTaskProcessor(Processor):
-    def __init__(self, shortParam, longParam, bpmParam, onsetParam, **kwargs):
+    def __init__(self, shortParam, longParam, bpmParam, onsetParam, onsetSplitCount, **kwargs):
         self.shortParam = shortParam
         self.longParam = longParam
         self.bpmParam = bpmParam
-        self.onsetParam = onsetParam        
+        self.onsetParam = onsetParam
+        self.onsetSplitCount = onsetSplitCount     
 
     def process(self, data, **kwargs):
         startTime = time.time()
@@ -474,7 +474,7 @@ class AllTaskProcessor(Processor):
         bpmParam = self.bpmParam
         onsetParam = self.onsetParam
         bpmModelCount = 8
-        onsetSplitCount = 1
+        onsetSplitCount = self.onsetSplitCount
         processCount = 2 + onsetSplitCount + bpmModelCount
         pool = mp.Pool(processCount)
 

@@ -946,17 +946,19 @@ def GenerateLevel():
     sampleRate = 44100
     audioData = NotePreprocess.LoadAudioFile(pathname, sampleRate)
     audioData = np.array(audioData)
-    specDiff, melLogSpec = NotePreprocess.SpecDiffAndMelLogSpec(audioData, sampleRate, [1024, 2048, 4096], [3, 6, 12], 100)
+    specDiff, melLogSpec = NotePreprocess.SpecDiffAndMelLogSpecEx(audioData, sampleRate, [1024, 2048, 4096], [3, 6, 12], 100)
     xData = myprocesser.FeatureStandardize(specDiff)
     print('preprocess cost time', time.time() - startTime)
 
     multiProcessAllTask = True
     if multiProcessAllTask:
+        onsetSplitCount = 2
         allProc = NotePreprocess.AllTaskProcessor(
             [RunModel, pathname, TrainDataDynSinging.GetModelPathName(), TrainDataDynSinging, shortModelParam, xData], 
             [RunModel, pathname, TrainDataDynLongNote.GetModelPathName(), TrainDataDynLongNote, longModelParam, xData], 
             [specDiff, audioData, sampleRate, float(len(audioData)) / sampleRate, pathname], 
-            [melLogSpec]
+            [melLogSpec], 
+            onsetSplitCount
             )
         shortPredicts, longPredicts, onsetActivation, duration, bpm, et = allProc(0)
     else:
