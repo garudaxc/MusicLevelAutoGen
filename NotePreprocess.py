@@ -417,7 +417,7 @@ def SpecDiffAndMelLogSpecEx(audioData, sampleRate, frameSizeArr, numBandArr, fps
             idx = i + j * len(frameSizeArr)
             removeA = RemoveOverlap(res[idx][0], left, right)
             removeB = RemoveOverlap(res[idx][1], left, right)
-            print('res', np.shape(removeA), np.shape(removeB))
+            # print('res', np.shape(removeA), np.shape(removeB))
             tempA.append(removeA)
             tempB.append(removeB)
 
@@ -430,6 +430,44 @@ def SpecDiffAndMelLogSpecEx(audioData, sampleRate, frameSizeArr, numBandArr, fps
     specDiff = np.hstack(resA)
     melLogSpec = madmom.features.onsets._cnn_onset_processor_pad(np.dstack(resB))
     return specDiff, melLogSpec
+
+def CompareData(arrA, arrB):
+    idA = id(arrA)
+    idB = id(arrB)
+    print('compare object id', idA, idB)
+    if idA == idB:
+        print('compare object id equal. may be error!')
+        return False
+
+    arrA = np.array(arrA)
+    arrB = np.array(arrB)
+    shapeA = np.shape(arrA)
+    shapeB = np.shape(arrB)
+    print('compare shape', shapeA, shapeB)
+    if len(shapeA) != len(shapeB):
+        print('compare shape failed')
+        return False
+
+    for valA, valB in zip(shapeA, shapeB):
+        if valA != valB:
+            print('compare shape val failed')
+            return False
+
+    reshapeA = np.reshape(arrA, [-1])
+    reshapeB = np.reshape(arrB, [-1])
+    print('compare length', len(arrA), len(arrB))
+    if len(arrA) != len(arrB):
+        print('compare length failed')
+        return False
+
+    for vA, vB in zip(reshapeA, reshapeB):
+        if vA != vB:
+            print('compare arr val failed')
+            return False
+
+    print('compare res true')
+    return True
+
 
 class CustomRNNDownBeatProcessorEx(SequentialProcessor):
     def __init__(self, idx, specDiff, **kwargs):
