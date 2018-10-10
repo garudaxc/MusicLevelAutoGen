@@ -49,6 +49,8 @@ def CheckSplitFuncValid():
         audioData = np.array(audioData)
         specDiff, melLogSpec = NotePreprocess.SpecDiffAndMelLogSpecEx(audioData, sampleRate, [1024, 2048, 4096], [3, 6, 12], 100)
         specDiffSrc, melLogSpecSrc = NotePreprocess.SpecDiffAndMelLogSpec(audioData, sampleRate, [1024, 2048, 4096], [3, 6, 12], 100)
+        # TFLstm.SaveFeatures(TFLstm.MakeSongDataPathName(song, 'specdiff_split'), specDiff)
+        # TFLstm.SaveFeatures(TFLstm.MakeSongDataPathName(song, 'specdiff_src'), specDiffSrc)
         if not CompareData(specDiffSrc, specDiff):
             print(song, 'check failed')
             return False
