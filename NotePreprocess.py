@@ -343,10 +343,10 @@ def MelLogarithmicSpectrogram(stftDataArr):
     proc = SequentialProcessor((multi, stack, pad))
     return proc(0)
 
-def SpecDiffAndMelLogSpec(audioData, frameSizeArr, numBandArr, fps):
+def SpecDiffAndMelLogSpec(audioData, sampleRate, frameSizeArr, numBandArr, fps):
     arr = []
     for frameSize, numBand in zip(frameSizeArr, numBandArr):
-        signalProcessor = SignalProcessor(num_channels=1, sample_rate=44100)
+        signalProcessor = SignalProcessor(num_channels=1, sample_rate=sampleRate)
         frames = FramedSignalProcessor(frame_size=frameSize, fps=fps)
         stft = ShortTimeFourierTransformProcessor()
         subProc = ParallelProcessor([SequentialProcessor(SpectrogramDifferenceProcArr(numBand)), SequentialProcessor(MelLogSpecProcArr())])
@@ -358,6 +358,76 @@ def SpecDiffAndMelLogSpec(audioData, frameSizeArr, numBandArr, fps):
     resA = [res[0][0], res[1][0], res[2][0]]
     # onset 的顺序和specdiff的不一样
     resB = [res[1][1], res[0][1], res[2][1]]
+    specDiff = np.hstack(resA)
+    melLogSpec = madmom.features.onsets._cnn_onset_processor_pad(np.dstack(resB))
+    return specDiff, melLogSpec
+
+def SpecDiffAndMelLogSpecEx(audioData, sampleRate, frameSizeArr, numBandArr, fps):
+    splitCount = 4
+    maxFrameSize = np.max(frameSizeArr)
+    hopSize = int(sampleRate / fps)
+    minOverlapFrameCount = math.ceil(maxFrameSize / hopSize)
+    overlap = int(minOverlapFrameCount * hopSize)
+
+    splitAudioDataArr = []
+    frameCount = math.ceil(len(audioData) / float(hopSize))
+    frameCountPerSlice = math.ceil(frameCount / float(splitCount))
+    for idx in range(splitCount):
+        start = idx * frameCountPerSlice * hopSize
+        end = start + frameCountPerSlice * hopSize + hopSize * minOverlapFrameCount
+        if idx > 0:
+            start = start - hopSize * minOverlapFrameCount
+        if idx == splitCount - 1:
+            end = len(audioData)
+
+        splitAudioDataArr.append(audioData[start:end])
+
+    # splitAudioDataArr = SplitData(audioData, splitCount, overlap)
+    splitFrameSizeArr = np.concatenate([frameSizeArr] * splitCount)
+    splitNumBandArr = np.concatenate([numBandArr] * splitCount)
+
+    arr = []
+    for idx, frameSize, numBand in zip(range(len(splitFrameSizeArr)), splitFrameSizeArr, splitNumBandArr):
+        inputProc = DataInputProcessor(splitAudioDataArr[idx // len(frameSizeArr)])
+        signalProcessor = SignalProcessor(num_channels=1, sample_rate=sampleRate)
+        frames = FramedSignalProcessor(frame_size=frameSize, fps=fps)
+        stft = ShortTimeFourierTransformProcessor()
+        subProc = ParallelProcessor([SequentialProcessor(SpectrogramDifferenceProcArr(numBand)), SequentialProcessor(MelLogSpecProcArr())])
+        arr.append([inputProc, signalProcessor, frames, stft, subProc])
+
+    processorNum = len(arr)
+    multi = ParallelProcessor(arr, num_threads=processorNum)
+    res = multi(0)
+
+    def RemoveOverlap(arr, left, right):
+        return arr[left:len(arr)-right]
+
+    resA = []
+    resB = []
+    for i in range(len(frameSizeArr)):
+        tempA = []
+        tempB = []
+        for j in range(splitCount):
+            left = minOverlapFrameCount
+            right = minOverlapFrameCount
+            if j == 0:
+                left = 0
+            if j == splitCount - 1:
+                right = 0
+
+            idx = i + j * len(frameSizeArr)
+            removeA = RemoveOverlap(res[idx][0], left, right)
+            removeB = RemoveOverlap(res[idx][1], left, right)
+            print('res', np.shape(removeA), np.shape(removeB))
+            tempA.append(removeA)
+            tempB.append(removeB)
+
+        t = np.concatenate(tempA)
+        resA.append(np.concatenate(tempA))
+        resB.append(np.concatenate(tempB))
+    
+    # onset 的顺序和specdiff的不一样
+    resB = [resB[1], resB[0], resB[2]]
     specDiff = np.hstack(resA)
     melLogSpec = madmom.features.onsets._cnn_onset_processor_pad(np.dstack(resB))
     return specDiff, melLogSpec

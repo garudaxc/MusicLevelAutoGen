@@ -946,7 +946,7 @@ def GenerateLevel():
     sampleRate = 44100
     audioData = NotePreprocess.LoadAudioFile(pathname, sampleRate)
     audioData = np.array(audioData)
-    specDiff, melLogSpec = NotePreprocess.SpecDiffAndMelLogSpec(audioData, [1024, 2048, 4096], [3, 6, 12], 100)
+    specDiff, melLogSpec = NotePreprocess.SpecDiffAndMelLogSpec(audioData, sampleRate, [1024, 2048, 4096], [3, 6, 12], 100)
     xData = myprocesser.FeatureStandardize(specDiff)
     print('preprocess cost time', time.time() - startTime)
 
