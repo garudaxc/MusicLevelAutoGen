@@ -632,6 +632,7 @@ def AlignNoteWithBPMAndET(notes, frameInterval, bpm, et):
     return np.array(newNotes)
 
 def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, templateFilePath, onsetThreshold, shortThreshold, saveDebugFile = False, onsetActivation = None):    
+    startTime = time.time()
     print('bpm', bpm, 'et', et, 'dur', duration)
     fps = 100
     frameInterval = int(1000 / fps)
@@ -725,6 +726,7 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
     longNote = DownbeatTracking.AppendEmptyDataWithDecodeOffset(songFilePath, longNote, fps)
     levelNotes = postprocess.ProcessSampleToIdolLevel2(longNote, mergeShort, bpm, et)
     LevelInfo.GenerateIdolLevel(levelFilePath, levelNotes, bpm, et, duration, templateFilePath)
+    print('GenerateLevelImp cost', time.time() - startTime)
 
 def AutoGenerateLevel(songFilePath, shortModelPath, longModelPath, levelFilePath, onsetThreshold = 0.7, shortThreshold = 0.7):
     shortPredicts, longPredicts = RunNoteModel(songFile, shortModelFile, longModelPath)
