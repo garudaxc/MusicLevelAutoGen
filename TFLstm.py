@@ -30,10 +30,11 @@ learning_rate = 0.001
 bSaveModel = True
 
 epch = 10000
-    
+
+useCudnnGPUModeForInference = True    
 class ModelParam():
     def __init__(self, variableScopeName, batchSize=16, maxTime=128, numLayers=3, numUnits=26, dropout=0.4, 
-        timeMajor=False, useCudnn=False, featureProcessorClass=NoteFeatureProcessor.ShortNoteFeatureProcessor):
+        timeMajor=False, useCudnn=False, restoreCudnnWithGPUMode=False, featureProcessorClass=NoteFeatureProcessor.ShortNoteFeatureProcessor):
         self.variableScopeName = variableScopeName
         self.batchSize = batchSize
         self.maxTime = maxTime
@@ -41,11 +42,12 @@ class ModelParam():
         self.numUnits = numUnits
         self.timeMajor = timeMajor
         self.useCudnn = useCudnn
+        self.restoreCudnnWithGPUMode = restoreCudnnWithGPUMode
         self.dropout = dropout
         self.featureProcessor = featureProcessorClass()
 
-shortModelParam = ModelParam('short_note', useCudnn=True, featureProcessorClass=NoteFeatureProcessor.ShortNoteFeatureProcessor)
-longModelParam = ModelParam('long_note', maxTime=500, useCudnn=True, featureProcessorClass=NoteFeatureProcessor.LongNoteFeatureProcessor)
+shortModelParam = ModelParam('short_note', useCudnn=True, restoreCudnnWithGPUMode=useCudnnGPUModeForInference, featureProcessorClass=NoteFeatureProcessor.ShortNoteFeatureProcessor)
+longModelParam = ModelParam('long_note', maxTime=500, useCudnn=True, restoreCudnnWithGPUMode=useCudnnGPUModeForInference, featureProcessorClass=NoteFeatureProcessor.LongNoteFeatureProcessor)
 
 # for long note
 songList = ['aiqingmaimai','ai', 'hellobaby', 'hongri', 'houhuiwuqi', 'huashuo', 'huozaicike', 'haodan']
@@ -468,7 +470,9 @@ def RunModel(songFile, modelFile, TrainData, modelParam, xData):
     print('model pre cost', preProcessEnd - preProcessStart)
 
     with predictGraph.as_default():
-        model = NoteModel.NoteDetectionModel(modelParam.variableScopeName, batchSize, maxTime, modelParam.numLayers, modelParam.numUnits, inputDim, TrainData.lableDim, timeMajor=modelParam.timeMajor, useCudnn=modelParam.useCudnn)
+        model = NoteModel.NoteDetectionModel(modelParam.variableScopeName, batchSize, maxTime, modelParam.numLayers, modelParam.numUnits, 
+            inputDim, TrainData.lableDim, timeMajor=modelParam.timeMajor, 
+            useCudnn=modelParam.useCudnn, restoreCudnnWithGPUMode=modelParam.restoreCudnnWithGPUMode)
         with tf.Session(config=NoteEnvironment.GenerateDefaultSessionConfig()) as sess:
             model.Restore(sess, modelFile)
             print('model loaded')
@@ -955,6 +959,10 @@ def GenerateLevel():
 
     multiProcessAllTask = True
     if multiProcessAllTask:
+        # todo 内存不够，待调整
+        shortModelParam.restoreCudnnWithGPUMode = False
+        longModelParam.restoreCudnnWithGPUMode = False
+
         onsetSplitCount = 2
         allProc = NotePreprocess.AllTaskProcessor(
             [RunModel, pathname, TrainDataDynSinging.GetModelPathName(), TrainDataDynSinging, shortModelParam, xData], 
