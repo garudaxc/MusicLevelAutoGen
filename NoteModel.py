@@ -77,7 +77,7 @@ def BuildModel(batchSize, maxTime, xDim, yDim, tensorDic):
     cnnOutputData = BuildCNN(xData, batchSize, maxTime, xDim, 1)
 
 class NoteDetectionModel():
-    def __init__(self, variableScopeName, batchSize, maxTime, numLayers, numUnits, xDim, yDim, timeMajor=False, useCudnn=False, useInitialStatesFW=True, useInitialStatesBW=False):
+    def __init__(self, variableScopeName, batchSize, maxTime, numLayers, numUnits, xDim, yDim, timeMajor=False, useCudnn=False, restoreCudnnWithGPUMode=False, useInitialStatesFW=True, useInitialStatesBW=False):
         self.variableScopeName = variableScopeName
         self.batchSize = batchSize
         self.maxTime = maxTime
@@ -90,6 +90,7 @@ class NoteDetectionModel():
         self.useInitialStatesFW = useInitialStatesFW
         self.useInitialStatesBW = useInitialStatesBW
         self.useCRF = False
+        self.restoreCudnnWithGPUMode = restoreCudnnWithGPUMode
         self.tensorDic = {}
         print('batchSize', batchSize, 'maxTime', maxTime, 'numLayers', numLayers, 'numUnits', numUnits)
         print('xDim', xDim, 'yDim', yDim, 'timeMajor', timeMajor, 'useCudnn', useCudnn)
@@ -304,16 +305,19 @@ class NoteDetectionModel():
         print('initialStatesC', initialStatesC)
         return initialStates, (initialStatesH, initialStatesC)
 
-    def CudnnLSTM(self, X):
+    def CudnnLSTM(self, X, training=True):
         if not self.timeMajor:
             X = tf.transpose(X, perm=[1, 0, 2])
 
         direction = cudnn_rnn_ops.CUDNN_RNN_BIDIRECTION
         print('CudnnLSTM direction', direction)
 
-        cudnnLSTM = cudnn_rnn.CudnnLSTM(self.numLayers, self.numUnits, direction=direction, dropout=self.dropout, name=self.cudnnLSTMName)        
+        dropout = 0
+        if training:
+            dropout = self.dropout
+        cudnnLSTM = cudnn_rnn.CudnnLSTM(self.numLayers, self.numUnits, direction=direction, dropout=dropout, name=self.cudnnLSTMName)        
         initialStates, initialStatesTuple = self.CudnnLSTMInputStates(cudnnLSTM, 'initial_states')
-        outputs, (outputStatesH, outputStatesC) = cudnnLSTM(X, initial_state=initialStatesTuple, training=True)
+        outputs, (outputStatesH, outputStatesC) = cudnnLSTM(X, initial_state=initialStatesTuple, training=training)
         if not self.timeMajor:
             outputs = tf.transpose(outputs, perm=[1, 0, 2])
 
@@ -419,19 +423,23 @@ class NoteDetectionModel():
             self.RestoreForCudnnImp(sess, modelFilePath)
 
     def RestoreForCudnnImp(self, sess, modelFilePath):
-        numUnits = self.numUnits
-        numLayers = self.numLayers
-        singleCell = lambda: cudnn_rnn.CudnnCompatibleLSTMCell(self.numUnits)
-        cellsFW = [singleCell() for _ in range(numLayers)]
-        cellsBW = [singleCell() for _ in range(numLayers)]
         X, sequenceLength = self.XAndSequenceLength()
-        initialStates, initialStatesFW, initialStatesBW = self.LSTMInputStates('initial_states')
-        with tf.variable_scope(self.cudnnLSTMName):
-            outputs, outputStatesFW, outputStatesBW = rnn.stack_bidirectional_dynamic_rnn(
-                cellsFW, cellsBW, X, sequence_length=sequenceLength, dtype=tf.float32, 
-                initial_states_fw=initialStatesFW, initial_states_bw=initialStatesBW)
+        if self.restoreCudnnWithGPUMode:
+            outputs, initialStates, outputStates = self.CudnnLSTM(X, training=False)
+        else:
+            numUnits = self.numUnits
+            numLayers = self.numLayers
+            singleCell = lambda: cudnn_rnn.CudnnCompatibleLSTMCell(self.numUnits)
+            cellsFW = [singleCell() for _ in range(numLayers)]
+            cellsBW = [singleCell() for _ in range(numLayers)]
 
-        outputStates = self.LSTMOuputStates(outputStatesFW, outputStatesBW, 'output_states')
+            initialStates, initialStatesFW, initialStatesBW = self.LSTMInputStates('initial_states')
+            with tf.variable_scope(self.cudnnLSTMName):
+                outputs, outputStatesFW, outputStatesBW = rnn.stack_bidirectional_dynamic_rnn(
+                    cellsFW, cellsBW, X, sequence_length=sequenceLength, dtype=tf.float32, 
+                    initial_states_fw=initialStatesFW, initial_states_bw=initialStatesBW)
+
+            outputStates = self.LSTMOuputStates(outputStatesFW, outputStatesBW, 'output_states')
         
         logits, _, _ = self.LSTMToLogits(outputs)
         predictOp = tf.nn.softmax(logits, name='predict_op')
