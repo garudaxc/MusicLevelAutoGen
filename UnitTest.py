@@ -7,6 +7,7 @@ import util
 import tensorflow as tf
 import NotePreprocess
 import madmom
+import NoteModel
 
 def CompareData(arrA, arrB):
     idA = id(arrA)
@@ -70,20 +71,26 @@ def CheckSplitFuncValid():
     return True
 
 def RunDownbeatsTFModel(xData, modelFilePath):
+    print('run model', modelFilePath)
     batchSize = 1
     maxTime = len(xData[0])
     inputDim = len(xData[0][0])
 
     seqLen = [maxTime] * batchSize
 
+    usePeepholes = True
+
     graph = tf.Graph()
     variableScopeName = os.path.splitext(os.path.basename(modelFilePath))[0]
     with graph.as_default():
-        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, batchSize, maxTime, 25, inputDim, True, [50, 3], [3], tf.nn.softmax)
+        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, batchSize, maxTime, 25, inputDim, usePeepholes, [50, 3], [3], tf.nn.softmax)
         with tf.Session() as sess:
             varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=variableScopeName)
             saver = tf.train.Saver(var_list=varList)
             saver.restore(sess, modelFilePath)
+
+            # NoteModel.TFCurrentVariableList()
+            
             X = tensorDic['X']
             sequenceLength = tensorDic['sequence_length']
             output = tensorDic['output']
@@ -137,5 +144,5 @@ def RunAllDownbeatsTFModel(audioFilePath):
     return bpm, et
 
 if __name__ == '__main__':
-    # RunAllDownbeatsTFModel(TFLstm.MakeMp3Pathname('ouxiangwanwansui'))
+    RunAllDownbeatsTFModel(TFLstm.MakeMp3Pathname('ouxiangwanwansui'))
     print('TestCase end')
