@@ -1,6 +1,12 @@
 import numpy as np
 import NotePreprocess
 import TFLstm
+import ModelTool
+import os
+import util
+import tensorflow as tf
+import NotePreprocess
+import madmom
 
 def CompareData(arrA, arrB):
     idA = id(arrA)
@@ -63,6 +69,73 @@ def CheckSplitFuncValid():
 
     return True
 
-if __name__ == '__main__':
+def RunDownbeatsTFModel(xData, modelFilePath):
+    batchSize = 1
+    maxTime = len(xData[0])
+    inputDim = len(xData[0][0])
 
+    seqLen = [maxTime] * batchSize
+
+    graph = tf.Graph()
+    variableScopeName = os.path.splitext(os.path.basename(modelFilePath))[0]
+    with graph.as_default():
+        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, batchSize, maxTime, 25, inputDim, True, [50, 3], [3], tf.nn.softmax)
+        with tf.Session() as sess:
+            varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=variableScopeName)
+            saver = tf.train.Saver(var_list=varList)
+            saver.restore(sess, modelFilePath)
+            X = tensorDic['X']
+            sequenceLength = tensorDic['sequence_length']
+            output = tensorDic['output']
+
+            res = sess.run([output], feed_dict={X:xData, sequenceLength:seqLen})
+            print('sub res shape', np.shape(res))
+
+    res = np.reshape(res, (maxTime, -1))
+    return res
+
+def RunAllDownbeatsTFModel(audioFilePath):
+    sampleRate = 44100
+    audioData = NotePreprocess.LoadAudioFile(audioFilePath, sampleRate)
+    audioData = np.array(audioData)
+    specDiff, melLogSpec = NotePreprocess.SpecDiffAndMelLogSpec(audioData, sampleRate, [1024, 2048, 4096], [3, 6, 12], 100)
+    
+    preCalcData = specDiff
+    start, analysisLength = NotePreprocess.AnalysisInfo(len(audioData) / sampleRate)
+    fps = 100
+    startIdx = int(start * fps)
+    endIdx = startIdx + int(analysisLength * fps)
+    clipPreCalcData = preCalcData[startIdx:endIdx]
+
+    specDiff = clipPreCalcData
+    
+    batchSize = 1
+    maxTime = len(specDiff)
+    inputDim = len(specDiff[0])
+    xData = np.reshape(specDiff, (batchSize, maxTime, inputDim))
+
+    res = []
+    for i in range(8):
+        print('model', i)
+        varScopeName = 'downbeats_' + str(i)
+        rootDir = util.getRootDir()
+        outputFileDir = os.path.join(rootDir, 'madmom_to_tf')
+        outputFileDir = os.path.join(outputFileDir, varScopeName)
+        outputFilePath = os.path.join(outputFileDir, varScopeName + '.ckpt')
+        res.append(RunDownbeatsTFModel(xData, outputFilePath))
+        
+    predict = madmom.ml.nn.average_predictions(res)
+    print('DownbeatsTFModel predict shape', np.shape(predict))
+
+    from functools import partial
+    act = partial(np.delete, obj=0, axis=1)
+    downBeatOutput = act(predict)
+    sampleRate = 44100
+    audioData = NotePreprocess.LoadAudioFile(audioFilePath, sampleRate)
+    bpm, et = NotePreprocess.CalcBpmET(audioData, sampleRate, len(audioData) / sampleRate, downBeatOutput, downBeatOutput)
+    print('bpm', bpm, 'et', et)
+    return bpm, et
+
+if __name__ == '__main__':
+    # RunAllDownbeatsTFModel(TFLstm.MakeMp3Pathname('ouxiangwanwansui'))
     print('TestCase end')
