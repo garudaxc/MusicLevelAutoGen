@@ -8,6 +8,7 @@ import tensorflow as tf
 import NotePreprocess
 import madmom
 import NoteModel
+import time
 
 def CompareData(arrA, arrB):
     idA = id(arrA)
@@ -103,7 +104,9 @@ def RunDownbeatsTFModel(xData, modelFilePath, useLSTMBlockFusedCell):
             sequenceLength = tensorDic['sequence_length']
             output = tensorDic['output']
 
+            startTime = time.time()
             res = sess.run([output], feed_dict={X:xData, sequenceLength:seqLen})
+            print('model real cost', time.time() - startTime)
             print('sub res shape', np.shape(res))
 
     res = np.reshape(res, (maxTime, -1))
@@ -141,6 +144,7 @@ def RunAllDownbeatsTFModel(audioFilePath):
     else:
         xData = np.reshape(specDiff, (batchSize, maxTime, inputDim))
 
+    startTime = time.time()
     res = []
     for i in range(8):
         print('model', i)
@@ -151,6 +155,8 @@ def RunAllDownbeatsTFModel(audioFilePath):
         outputFilePath = os.path.join(outputFileDir, varScopeName + '.ckpt')
         res.append(RunDownbeatsTFModel(xData, outputFilePath, useLSTMBlockFusedCell))
         
+    print('all model cost', time.time() - startTime)
+
     predict = madmom.ml.nn.average_predictions(res)
     print('DownbeatsTFModel predict shape', np.shape(predict))
 
