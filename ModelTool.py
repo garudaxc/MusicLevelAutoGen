@@ -61,7 +61,18 @@ def FindVarByName(varList, name, appendZero = True):
     print('search', searchName, '   failed')
     return None
 
-def BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc):
+def BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc, useLSTMBlockFusedCell):
+    print('variableScopeName', variableScopeName, 'numLayers', numLayers, 'batchSize', batchSize, 'maxTime', maxTime, 'numUnits', numUnits)
+    print('usePeepholes', usePeepholes, 'weightsShape', weightsShape, 'biasShape', biasShape)
+    
+    buildFunc = BuildDownbeatsModelGraphWithLSTMCell
+    if useLSTMBlockFusedCell:
+        buildFunc = BuildDownbeatsModelGraphWithLSTMBlockFusedCell
+    
+    return buildFunc(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc)
+
+def BuildDownbeatsModelGraphWithLSTMCell(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc):
+    print('BuildDownbeatsModelGraph With LSTMCell')
     with tf.variable_scope(variableScopeName):
         cells = []
         # madmom的源码里计算gate activation时，没有用forget_bias，转过来需要设置成0
@@ -76,6 +87,68 @@ def BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, maxTime, n
         outputs, statesFW, statesBW = rnn.stack_bidirectional_dynamic_rnn(
             cells[0:numLayers], cells[numLayers:], 
             X, sequence_length=sequenceLength, dtype=tf.float32)
+        
+        outlayerDim = tf.shape(outputs)[2]
+        outputs = tf.reshape(outputs, [batchSize * maxTime, outlayerDim])
+
+        weights = tf.Variable(tf.random_normal(weightsShape, dtype=tf.float32), name='output_linear_w')
+        bias = tf.Variable(tf.random_normal(biasShape, dtype=tf.float32), name='output_linear_b')
+        logits = tf.matmul(outputs, weights) + bias
+        logits = tfActivationFunc(logits)
+
+    tensorDic = {}
+    tensorDic['X'] = X
+    tensorDic['sequence_length'] = sequenceLength
+    tensorDic['output'] = logits
+    return tensorDic
+
+def CreateLSTMBlockFusedCell(layerIdx, isForward, numUnits, usePeepholes, forgetBias):
+    cellName = TFLSTMVariableName(layerIdx, isForward, "")
+    cellName = cellName[0 : len(cellName)-1]
+    cell = rnn.LSTMBlockFusedCell(numUnits, use_peephole=usePeepholes, forget_bias=forgetBias, name=cellName)
+    return cell
+
+def BuildDownbeatsModelGraphWithLSTMBlockFusedCell(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc):    
+    print('BuildDownbeatsModelGraph With LSTMBlockFusedCell')
+    with tf.variable_scope(variableScopeName):
+        cells = []
+        tempInputFirst = tf.zeros([maxTime, batchSize, inputDim])
+        inputShapeFirst = tempInputFirst.get_shape().with_rank(3)
+        tempInputOther = tf.zeros([maxTime, batchSize, numUnits * 2])
+        inputShapeOther = tempInputOther.get_shape().with_rank(3)
+        # madmom的源码里计算gate activation时，没有用forget_bias，转过来需要设置成0
+        forgetBias = 0.0
+        for i in range(numLayers):
+            fwCell = CreateLSTMBlockFusedCell(i, True, numUnits, usePeepholes, forgetBias)
+            bwCell = CreateLSTMBlockFusedCell(i, False, numUnits, usePeepholes, forgetBias)
+            if i == 0:
+                fwCell.build(inputShapeFirst)
+                bwCell.build(inputShapeFirst)
+            else:
+                fwCell.build(inputShapeOther)
+                bwCell.build(inputShapeOther)
+            cells.append((fwCell, bwCell))
+
+        XShape = (maxTime, batchSize, inputDim)
+        X = tf.placeholder(dtype=tf.float32, shape=XShape, name='X')
+        sequenceLength = tf.placeholder(tf.int32, [None], name='sequence_length')
+
+        def reverseOp(inputOp):
+            return tf.reverse(inputOp, [0])
+
+        reverseDim = [0]
+        currentFWInput = X
+        currentBWInput = reverseOp(currentFWInput)
+        fwOutputs = None
+        bwOutputs = None
+        for fwCell, bwCell in cells:
+            fwOutputs, _ = fwCell(currentFWInput, dtype=tf.float32, sequence_length=sequenceLength)
+            bwOutputs, _ = bwCell(currentBWInput, dtype=tf.float32, sequence_length=sequenceLength)
+            bwOutputs = reverseOp(bwOutputs)
+            currentFWInput = tf.concat((fwOutputs, bwOutputs), 2)
+            currentBWInput = reverseOp(currentFWInput)
+
+        outputs = currentFWInput
         
         outlayerDim = tf.shape(outputs)[2]
         outputs = tf.reshape(outputs, [batchSize * maxTime, outlayerDim])

@@ -77,10 +77,13 @@ def CheckSplitFuncValid():
 
     return True
 
-def RunDownbeatsTFModel(xData, modelFilePath):
+def RunDownbeatsTFModel(xData, modelFilePath, useLSTMBlockFusedCell):
     print('run model', modelFilePath)
     batchSize = 1
-    maxTime = len(xData[0])
+    if useLSTMBlockFusedCell:
+        maxTime = len(xData)
+    else:
+        maxTime = len(xData[0])
     inputDim = len(xData[0][0])
 
     seqLen = [maxTime] * batchSize
@@ -90,13 +93,11 @@ def RunDownbeatsTFModel(xData, modelFilePath):
     graph = tf.Graph()
     variableScopeName = os.path.splitext(os.path.basename(modelFilePath))[0]
     with graph.as_default():
-        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, batchSize, maxTime, 25, inputDim, usePeepholes, [50, 3], [3], tf.nn.softmax)
+        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, batchSize, maxTime, 25, inputDim, usePeepholes, [50, 3], [3], tf.nn.softmax, useLSTMBlockFusedCell)
         with tf.Session() as sess:
             varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=variableScopeName)
             saver = tf.train.Saver(var_list=varList)
             saver.restore(sess, modelFilePath)
-
-            # NoteModel.TFCurrentVariableList()
             
             X = tensorDic['X']
             sequenceLength = tensorDic['sequence_length']
@@ -133,7 +134,12 @@ def RunAllDownbeatsTFModel(audioFilePath):
     batchSize = 1
     maxTime = len(specDiff)
     inputDim = len(specDiff[0])
-    xData = np.reshape(specDiff, (batchSize, maxTime, inputDim))
+
+    useLSTMBlockFusedCell = True
+    if useLSTMBlockFusedCell:
+        xData = np.reshape(specDiff, (maxTime, batchSize, inputDim))
+    else:
+        xData = np.reshape(specDiff, (batchSize, maxTime, inputDim))
 
     res = []
     for i in range(8):
@@ -143,7 +149,7 @@ def RunAllDownbeatsTFModel(audioFilePath):
         outputFileDir = os.path.join(rootDir, 'madmom_to_tf')
         outputFileDir = os.path.join(outputFileDir, varScopeName)
         outputFilePath = os.path.join(outputFileDir, varScopeName + '.ckpt')
-        res.append(RunDownbeatsTFModel(xData, outputFilePath))
+        res.append(RunDownbeatsTFModel(xData, outputFilePath, useLSTMBlockFusedCell))
         
     predict = madmom.ml.nn.average_predictions(res)
     print('DownbeatsTFModel predict shape', np.shape(predict))
