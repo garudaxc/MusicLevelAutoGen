@@ -79,6 +79,7 @@ def CheckSplitFuncValid():
     return True
 
 def RunDownbeatsTFModel(xData, modelFilePath, useLSTMBlockFusedCell):
+    startFuncTime = time.time()
     print('run model', modelFilePath)
     if useLSTMBlockFusedCell:
         batchSize = len(xData[0])
@@ -121,6 +122,7 @@ def RunDownbeatsTFModel(xData, modelFilePath, useLSTMBlockFusedCell):
         res = np.reshape(res, (batchSize, maxTime, -1))
         res = res[0]
 
+    print('model func cost', time.time() - startFuncTime)
     return res
 
 def RunAllDownbeatsTFModel(audioFilePath):
