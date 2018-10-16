@@ -37,6 +37,13 @@ def CompareData(arrA, arrB):
     if len(arrA) != len(arrB):
         print('compare length failed')
         return False
+        
+    subVal = np.abs(reshapeA - reshapeB)
+    maxDis = np.max(subVal)
+    minDis = np.min(subVal)
+    aveDis = np.average(subVal)
+    dis = np.sqrt(np.sum(np.square(subVal)))
+    print('arrA to arrB dis %f, aveDis %f, maxDis %f, minDis %f' % (dis, aveDis, maxDis, minDis))
 
     for vA, vB in zip(reshapeA, reshapeB):
         if vA != vB:
@@ -146,6 +153,9 @@ def RunAllDownbeatsTFModel(audioFilePath):
     downBeatOutput = act(predict)
     DownbeatTracking.SaveInstantValue(downBeatOutput[:, 0], audioFilePath, '_rnn_dst_0')
     DownbeatTracking.SaveInstantValue(downBeatOutput[:, 1], audioFilePath, '_rnn_dst_1')
+
+    CompareData(downBeatOutput, srcRes)
+
     sampleRate = 44100
     audioData = NotePreprocess.LoadAudioFile(audioFilePath, sampleRate)
     bpm, et = NotePreprocess.CalcBpmET(audioData, sampleRate, len(audioData) / sampleRate, downBeatOutput, downBeatOutput)
