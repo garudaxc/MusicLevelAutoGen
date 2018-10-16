@@ -112,8 +112,15 @@ def RunDownbeatsTFModel(xData, modelFilePath, useLSTMBlockFusedCell):
             res = sess.run([output], feed_dict={X:xData, sequenceLength:seqLen})
             print('model real cost', time.time() - startTime)
             print('sub res shape', np.shape(res))
+    
+    if useLSTMBlockFusedCell:
+        res = np.reshape(res, (maxTime, batchSize, -1))
+        res = res.transpose((1, 0, 2))
+        res = res[0]
+    else:
+        res = np.reshape(res, (batchSize, maxTime, -1))
+        res = res[0]
 
-    res = np.reshape(res, (maxTime, -1))
     return res
 
 def RunAllDownbeatsTFModel(audioFilePath):
@@ -142,11 +149,14 @@ def RunAllDownbeatsTFModel(audioFilePath):
     maxTime = len(specDiff)
     inputDim = len(specDiff[0])
 
+    xData = [specDiff] * batchSize
+    xData = np.reshape(xData, (batchSize, maxTime, inputDim))
+
     useLSTMBlockFusedCell = True
     if useLSTMBlockFusedCell:
-        xData = np.reshape(specDiff, (maxTime, batchSize, inputDim))
+        xData = xData.transpose((1, 0, 2))
     else:
-        xData = np.reshape(specDiff, (batchSize, maxTime, inputDim))
+        pass
 
     startTime = time.time()
     res = []
