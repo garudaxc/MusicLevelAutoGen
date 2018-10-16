@@ -28,7 +28,99 @@ def MadmomLSTMLayerParam(layer):
     w_o_diag = output_gate.peephole_weights
 
     return kernel, bias, w_i_diag, w_f_diag, w_o_diag, input_dim, num_units
-    
+
+def MadmomLSTMLayersParam(layerArr):
+
+    # not completed
+
+    layer = layerArr[0]
+    input_gate = layer.input_gate
+    cell = layer.cell
+    forget_gate = layer.forget_gate
+    output_gate = layer.output_gate
+
+    input_gate_weights = input_gate.weights
+    cell_weights = cell.weights
+    forget_gate_weights = forget_gate.weights
+    output_gate_weights = output_gate.weights
+
+    # input_gate_recurrent_weights = input_gate.recurrent_weights
+    # cell_recurrent_weights = cell.recurrent_weights
+    # forget_gate_recurrent_weights = forget_gate.recurrent_weights
+    # output_gate_recurrent_weights = output_gate.recurrent_weights
+    input_gate_recurrent_weights = [input_gate.recurrent_weights]
+    cell_recurrent_weights = [cell.recurrent_weights]
+    forget_gate_recurrent_weights = [forget_gate.recurrent_weights]
+    output_gate_recurrent_weights = [output_gate.recurrent_weights]
+
+    input_gate_bias = input_gate.bias
+    cell_bias = cell.bias
+    forget_bias = forget_gate.bias
+    output_gate_bias = output_gate.bias
+
+    w_i_diag = input_gate.peephole_weights
+    w_f_diag = forget_gate.peephole_weights
+    w_o_diag = output_gate.peephole_weights
+
+    for i in range(len(layerArr)):
+        layer = layerArr[i]
+        input_gate = layer.input_gate
+        cell = layer.cell
+        forget_gate = layer.forget_gate
+        output_gate = layer.output_gate
+
+        input_dim = np.shape(input_gate.weights)[0]
+        num_units = np.shape(input_gate.weights)[1]
+
+        input_gate_weights = np.concatenate((input_gate_weights, input_gate.weights), 1)
+        cell_weights = np.concatenate((cell_weights, cell.weights), 1)
+        forget_gate_weights = np.concatenate((forget_gate_weights, forget_gate.weights), 1)
+        output_gate_weights = np.concatenate((output_gate_weights, output_gate.weights), 1)
+
+        # input_gate_recurrent_weights = np.concatenate((input_gate_recurrent_weights, input_gate.recurrent_weights))
+        # cell_recurrent_weights = np.concatenate((cell_recurrent_weights, cell.recurrent_weights))
+        # forget_gate_recurrent_weights = np.concatenate((forget_gate_recurrent_weights, forget_gate.recurrent_weights))
+        # output_gate_recurrent_weights = np.concatenate((output_gate_recurrent_weights, output_gate.recurrent_weights))
+        input_gate_recurrent_weights = input_gate_recurrent_weights.append(input_gate.recurrent_weights)
+        cell_recurrent_weights = input_gate_recurrent_weights.append(cell_recurrent_weights, cell.recurrent_weights)
+        forget_gate_recurrent_weights = input_gate_recurrent_weights.append(forget_gate_recurrent_weights, forget_gate.recurrent_weights)
+        output_gate_recurrent_weights = input_gate_recurrent_weights.append(output_gate_recurrent_weights, output_gate.recurrent_weights)
+
+        input_gate_bias = np.concatenate((input_gate_bias, input_gate.bias))
+        cell_bias = np.concatenate((cell_bias, cell.bias))
+        forget_gate_bias = np.concatenate((forget_bias, forget_gate.bias))
+        output_gate_bias = np.concatenate((output_gate_bias, output_gate_bias.bias))
+
+        if w_i_diag is not None:
+            w_i_diag = np.concatenate((w_i_diag, input_gate.peephole_weights))
+            w_f_diag = np.concatenate((w_f_diag, forget_gate.peephole_weights))
+            w_o_diag = np.concatenate((w_o_diag, output_gate.peephole_weights))
+
+    def Eye(arr):
+        size = len(arr[0])
+        blockCount = len(arr)
+        zeroData = np.zeros_like(arr[0])
+        rowArr = []
+        for i in range(blockCount):
+            temp = [zeroData] * blockCount
+            temp[i] = arr[i]
+            rowArr.append(np.concatenate(temp, 1))
+
+        return np.concatenate(rowArr)
+
+    input_gate_recurrent_weights = Eye(input_gate_recurrent_weights)
+    cell_recurrent_weights = Eye(cell_recurrent_weights)
+    forget_gate_recurrent_weights = Eye(forget_gate_recurrent_weights)
+    output_gate_recurrent_weights = Eye(output_gate_recurrent_weights)
+
+    weights = np.concatenate((input_gate_weights, cell_weights, forget_gate_weights, output_gate_weights), 1)
+    recurrent_weights = np.concatenate((input_gate_recurrent_weights, cell_recurrent_weights, forget_gate_recurrent_weights, output_gate_recurrent_weights), 1)
+    kernel = np.concatenate((weights, recurrent_weights))
+
+    bias = np.concatenate((input_gate_bias, cell_bias, forget_gate_bias, output_gate_bias))
+
+    return kernel, bias, w_i_diag, w_f_diag, w_o_diag, input_dim, num_units
+
 def MadmomBLSTMLayerParam(layer):
     return [MadmomLSTMLayerParam(layer.fwd_layer), MadmomLSTMLayerParam(layer.bwd_layer)]
 
