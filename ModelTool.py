@@ -192,7 +192,7 @@ def MadmomDownbeatsModelToTensorflow(madmomModel, variableScopeName, outputFileP
 
     graph = tf.Graph()
     with graph.as_default():
-        BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, np.shape(madmomWeights), np.shape(madmomBias), tfActivationFunc)
+        BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, np.shape(madmomWeights), np.shape(madmomBias), tfActivationFunc, False)
 
         with tf.Session() as sess:
             varList = tf.trainable_variables()
