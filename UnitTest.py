@@ -115,6 +115,13 @@ def RunAllDownbeatsTFModel(audioFilePath):
     clipPreCalcData = preCalcData[startIdx:endIdx]
 
     specDiff = clipPreCalcData
+
+    proc = NotePreprocess.CustomRNNDownBeatProcessor()
+    srcRes = proc(specDiff)
+    print('shape', np.shape(srcRes))
+    import DownbeatTracking
+    DownbeatTracking.SaveInstantValue(srcRes[:, 0], audioFilePath, '_rnn_src_0')
+    DownbeatTracking.SaveInstantValue(srcRes[:, 1], audioFilePath, '_rnn_src_1')
     
     batchSize = 1
     maxTime = len(specDiff)
@@ -137,11 +144,15 @@ def RunAllDownbeatsTFModel(audioFilePath):
     from functools import partial
     act = partial(np.delete, obj=0, axis=1)
     downBeatOutput = act(predict)
+    DownbeatTracking.SaveInstantValue(downBeatOutput[:, 0], audioFilePath, '_rnn_dst_0')
+    DownbeatTracking.SaveInstantValue(downBeatOutput[:, 1], audioFilePath, '_rnn_dst_1')
     sampleRate = 44100
     audioData = NotePreprocess.LoadAudioFile(audioFilePath, sampleRate)
     bpm, et = NotePreprocess.CalcBpmET(audioData, sampleRate, len(audioData) / sampleRate, downBeatOutput, downBeatOutput)
     print('bpm', bpm, 'et', et)
-    return bpm, et
+    srcBpm, srcEt = NotePreprocess.CalcBpmET(audioData, sampleRate, len(audioData) / sampleRate, srcRes, srcRes)
+    print('src bpm', srcBpm, 'src et', srcEt)
+    return True
 
 if __name__ == '__main__':
     RunAllDownbeatsTFModel(TFLstm.MakeMp3Pathname('ouxiangwanwansui'))

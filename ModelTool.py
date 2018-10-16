@@ -64,8 +64,10 @@ def FindVarByName(varList, name, appendZero = True):
 def BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc):
     with tf.variable_scope(variableScopeName):
         cells = []
+        # madmom的源码里计算gate activation时，没有用forget_bias，转过来需要设置成0
+        forgetBias = 0.0
         for i in range(numLayers * 2):
-            cell = rnn.LSTMCell(numUnits, use_peepholes=usePeepholes)
+            cell = rnn.LSTMCell(numUnits, use_peepholes=usePeepholes, forget_bias=forgetBias)
             cells.append(cell)
 
         XShape = (batchSize, maxTime, inputDim)
