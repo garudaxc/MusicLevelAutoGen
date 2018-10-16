@@ -92,12 +92,14 @@ def RunDownbeatsTFModel(xData, modelFilePath, useLSTMBlockFusedCell):
     seqLen = [maxTime] * batchSize
 
     usePeepholes = True
+    numUnits = 25
 
     graph = tf.Graph()
     variableScopeName = os.path.splitext(os.path.basename(modelFilePath))[0]
     with graph.as_default():
-        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, batchSize, maxTime, 25, inputDim, usePeepholes, [50, 3], [3], tf.nn.softmax, useLSTMBlockFusedCell)
+        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, batchSize, maxTime, numUnits, inputDim, usePeepholes, [numUnits * 2, 3], [3], tf.nn.softmax, useLSTMBlockFusedCell)
         with tf.Session() as sess:
+            # sess.run([tf.global_variables_initializer()])
             varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=variableScopeName)
             saver = tf.train.Saver(var_list=varList)
             saver.restore(sess, modelFilePath)
