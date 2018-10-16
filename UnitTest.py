@@ -80,11 +80,13 @@ def CheckSplitFuncValid():
 
 def RunDownbeatsTFModel(xData, modelFilePath, useLSTMBlockFusedCell):
     print('run model', modelFilePath)
-    batchSize = 1
     if useLSTMBlockFusedCell:
+        batchSize = len(xData[0])
         maxTime = len(xData)
     else:
+        batchSize = len(xData)
         maxTime = len(xData[0])
+
     inputDim = len(xData[0][0])
 
     seqLen = [maxTime] * batchSize
