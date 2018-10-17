@@ -192,6 +192,48 @@ def RunAllDownbeatsTFModel(audioFilePath):
     print('src bpm', srcBpm, 'src et', srcEt)
     return True
 
+def RunOnsetModel():
+    from madmom.ml.nn import NeuralNetwork
+    from madmom.models import ONSETS_CNN
+    nn = NeuralNetwork.load(ONSETS_CNN[0])
+    layers = nn.layers
+
+    testData = np.zeros((100, 80, 3))
+
+    madmomLayersRes = [testData]
+    for layer in nn.layers:
+        madmomLayersRes.append(layer(madmomLayersRes[-1]))
+    madmomLayersRes = madmomLayersRes[1:]
+    madmomModelRes = np.reshape(madmomLayersRes[-1], [-1])
+
+    graph = tf.Graph()
+    variableScopeName = 'onset'
+    modelFilePath = ModelTool.GenerateOutputModelPath(variableScopeName)
+    with graph.as_default():
+        tensorDic = ModelTool.BuildOnsetModelGraph(variableScopeName)
+        with tf.Session() as sess:
+            # sess.run([tf.global_variables_initializer()])
+            varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=variableScopeName)
+            saver = tf.train.Saver(var_list=varList)
+            saver.restore(sess, modelFilePath)
+            
+            X = tensorDic['X']
+            output = tensorDic['output']
+
+            startTime = time.time()
+            allres = sess.run([output, tensorDic['layer_0'], tensorDic['layer_1'], tensorDic['layer_2'], tensorDic['layer_3'], tensorDic['layer_4'], tensorDic['layer_5'], tensorDic['layer_6'], tensorDic['layer_7']], feed_dict={X:testData})
+            tfModelRes = allres[0]
+            tfLayersRes = allres[1:]
+            print('model real cost', time.time() - startTime)
+            print('sub res shape', np.shape(tfModelRes))
+
+    for idx, tfRes, madRes in zip(range(len(tfLayersRes)), tfLayersRes, madmomLayersRes):
+        print('compare layer idx', idx)
+        CompareData(np.reshape(tfRes, [-1]), np.reshape(madRes, [-1]))
+
+    CompareData(tfModelRes, madmomModelRes)
+    return True
+
 if __name__ == '__main__':
-    RunAllDownbeatsTFModel(TFLstm.MakeMp3Pathname('ouxiangwanwansui'))
+    RunOnsetModel()
     print('TestCase end')

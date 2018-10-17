@@ -127,7 +127,7 @@ def MadmomBLSTMLayerParam(layer):
 def MadmomFeedForwardLayerParam(layer):
     return layer.weights, layer.bias, layer.activation_fn
 
-def GetActiviationFn(func):
+def MadmomActivationFuncToTensorFlow(func):
 
     if func.__name__ == 'tanh':
         fn = tf.tanh
@@ -278,7 +278,7 @@ def MadmomDownbeatsModelToTensorflow(madmomModel, variableScopeName, outputFileP
 
     madmomWeights, madmomBias, madmomActivationFunc = madmomFeedForwardLayerParam
     
-    tfActivationFunc = GetActiviationFn(madmomActivationFunc)
+    tfActivationFunc = MadmomActivationFuncToTensorFlow(madmomActivationFunc)
     batchSize = 1
     maxTime = 128
 
@@ -343,12 +343,7 @@ def ConvertMadmomDownbeatsModelToTensorflow():
     for i in range(len(nn.processors[0].processors)):
         madmomModel = nn.processors[0].processors[i]
         varScopeName = 'downbeats_' + str(i)
-        outputFileDir = os.path.join(rootDir, 'madmom_to_tf')
-        outputFileDir = os.path.join(outputFileDir, varScopeName)
-        if not os.path.exists(outputFileDir):
-            os.mkdir(outputFileDir)
-
-        outputFilePath = os.path.join(outputFileDir, varScopeName + '.ckpt')
+        outputFilePath = GenerateOutputModelPath(varScopeName, mkdirIfNotExists=True)
         MadmomDownbeatsModelToTensorflow(madmomModel, varScopeName, outputFilePath)
     return True
 
@@ -361,9 +356,178 @@ def TFLSTMVariableName(layerIdx, isForward, paramName, prefix = None):
         name = prefix + name
     return name
 
+def TFVar(shape=None, initialValue=None, dtype=tf.float32, name=None):
+    if initialValue is not None:
+        return tf.Variable(initial_value=initialValue, dtype=dtype, name=name)
+    return tf.Variable(tf.random_normal(shape, dtype=dtype), dtype=dtype, name=name)
+
+def BatchNormalLayer(inputData, name, meanValue=None, invStdValue=None, meanShape=None, invStdShape=None, gamma=1.0, beta=0):
+    # (data - self.mean) * (self.gamma * self.inv_std) + self.beta
+    # gamma = 1.0
+    # beta = 0
+    mean = TFVar(shape=meanShape, initialValue=meanValue, name=name+'/mean')
+    invStd = TFVar(shape=invStdShape, initialValue=invStdValue, name=name+'/inv_std')
+    outputData = inputData - mean
+    if gamma != 1.0:
+        outputData = outputData * (gamma * invStd)
+    else:
+        print('gamma == 1.0 skip')
+        outputData = outputData * invStd
+    if beta != 0.0:
+        outputData = outputData + beta
+    else:
+        print('beta == 0.0 skip')
+    return outputData
+
+def ConvLayer(inputData, name, kernelValue=None, biasValue=None, kernelShape=None, biasShape=None, activationFunc=tf.tanh):
+    kernel = TFVar(shape=kernelShape, initialValue=kernelValue, name=name+'/kernel')
+    outputData = tf.nn.conv2d(inputData, kernel, [1, 1, 1, 1], 'VALID')
+    bias = TFVar(shape=biasShape, initialValue=biasValue, name=name+'/bias')
+    outputData = outputData + bias
+    outputData = activationFunc(outputData)
+    return outputData
+
+def StrideLayer(inputData, blockSize):
+    # 这个strideLayer没找到合适的实现，其实是一个重叠操作，先用frame实现
+    from tensorflow.contrib import signal
+    inputDataShape = tf.shape(inputData)    
+    frameStep = inputDataShape[2] * inputDataShape[3]
+    frameLength = frameStep * blockSize
+    outputData = tf.reshape(inputData, [-1])
+    outputData = signal.frame(outputData, frameLength, frameStep)
+    return outputData
+
+def FeedForwardLayer(inputData, name, weightValue=None, biasValue=None, weightShape=None, biasShape=None, activationFunc=tf.sigmoid):
+    weight = TFVar(shape=weightShape, initialValue=weightValue, name=name+'/weight')
+    bias = TFVar(shape=biasShape, initialValue=biasValue, name=name+'/bias')
+    outputData = tf.matmul(inputData, weight) + bias
+    outputData = activationFunc(outputData)
+    return outputData
+
+def GenerateName(dic, key):
+    val = 0
+    if key in dic:
+        val = dic[key]
+        val = val + 1
+    dic[key] = val
+    return key + '_' + str(val)
+
+def BuildOnsetModelGraph(variableScopeName):
+    nameDic = {}
+    width = 80
+    channel = 3
+    tensorDic = {}
+    with tf.variable_scope(variableScopeName):
+        X = tf.placeholder(tf.float32, shape=[None, width, channel], name='X')
+
+        inputData = tf.reshape(X, [1, -1, width, channel])
+
+        outputData = BatchNormalLayer(inputData, GenerateName(nameDic, 'batch_normal'), meanShape=[width, channel], invStdShape=[width, channel], gamma=1.0, beta=0)
+        tensorDic[GenerateName(nameDic, 'layer')] = outputData
+        
+        outputData = ConvLayer(outputData, GenerateName(nameDic, 'conv'), kernelShape=[7, 3, 3, 10], biasShape=[10], activationFunc=tf.tanh)
+        tensorDic[GenerateName(nameDic, 'layer')] = outputData
+        
+        outputData = tf.nn.max_pool(outputData, [1, 1, 3, 1], [1, 1, 3, 1], 'SAME')
+        tensorDic[GenerateName(nameDic, 'layer')] = outputData
+
+        outputData = ConvLayer(outputData, GenerateName(nameDic, 'conv'), kernelShape=[3, 3, 10, 20], biasShape=[20], activationFunc=tf.tanh)
+        tensorDic[GenerateName(nameDic, 'layer')] = outputData
+        
+        outputData = tf.nn.max_pool(outputData, [1, 1, 3, 1], [1, 1, 3, 1], 'SAME')
+        tensorDic[GenerateName(nameDic, 'layer')] = outputData
+
+        outputData = StrideLayer(outputData, 7)
+        tensorDic[GenerateName(nameDic, 'layer')] = outputData
+
+        outputData = FeedForwardLayer(outputData, GenerateName(nameDic, 'ff'), weightShape=[1120, 256], biasShape=[256], activationFunc=tf.sigmoid)
+        tensorDic[GenerateName(nameDic, 'layer')] = outputData
+
+        outputData = FeedForwardLayer(outputData, GenerateName(nameDic, 'ff'), weightShape=[256, 1], biasShape=[1], activationFunc=tf.sigmoid)
+        tensorDic[GenerateName(nameDic, 'layer')] = outputData
+
+        output = tf.reshape(outputData, [-1], name='output')
+    
+    tensorDic['X'] = X
+    tensorDic['output'] = output
+    return tensorDic
+
+def GenerateOutputModelPath(variableScopeName, mkdirIfNotExists = False):
+    rootDir = util.getRootDir()
+    outputFileDir = os.path.join(rootDir, 'madmom_to_tf')
+    if mkdirIfNotExists:
+        if not os.path.exists(outputFileDir):
+            os.path.mkdir(outputFileDir)
+    
+    outputFileDir = os.path.join(outputFileDir, variableScopeName)
+    if mkdirIfNotExists:
+        if not os.path.exists(outputFileDir):
+            os.mkdir(outputFileDir)
+
+    outputFilePath = os.path.join(outputFileDir, variableScopeName+'.ckpt')
+    return outputFilePath
+
+def ConvertMadmomOnsetModelToTensorflow():
+    from madmom.ml.nn import NeuralNetwork
+    from madmom.models import ONSETS_CNN
+    nn = NeuralNetwork.load(ONSETS_CNN[0])
+
+    rootDir = util.getRootDir()
+    variableScopeName = 'onset'
+    outputFilePath = GenerateOutputModelPath(variableScopeName, mkdirIfNotExists=True)
+
+    nameDic = {}
+
+    width = 80
+    channel = 3
+    
+    with tf.variable_scope(variableScopeName):
+        with tf.Session() as sess:
+            X = tf.placeholder(tf.float32, shape=[None, width, channel], name='X')
+            outputData = tf.reshape(X, [1, -1, width, channel])
+            for layer in nn.layers:
+                layerType = type(layer) 
+                if layerType == madmom.ml.nn.layers.BatchNormLayer:
+                    outputData = BatchNormalLayer(outputData, GenerateName(nameDic, 'batch_normal'), 
+                        meanValue=layer.mean, invStdValue=layer.inv_std, gamma=layer.gamma, beta=layer.beta)
+
+                elif layerType == madmom.ml.nn.layers.ConvolutionalLayer:
+                    activationFunc = MadmomActivationFuncToTensorFlow(layer.activation_fn)
+                    kernel = np.transpose(layer.weights, (2, 3, 0, 1))
+                    outputData = ConvLayer(outputData, GenerateName(nameDic, 'conv'), 
+                        kernelValue=kernel, biasValue=layer.bias, activationFunc=activationFunc)
+
+                elif layerType == madmom.ml.nn.layers.MaxPoolLayer:
+                    ksize = layer.size
+                    stride = layer.stride
+                    outputData = tf.nn.max_pool(outputData, [1, ksize[0], ksize[1], 1], [1, stride[0], stride[1], 1], 'SAME')
+
+                elif layerType == madmom.ml.nn.layers.StrideLayer:
+                    outputData = StrideLayer(outputData, layer.block_size)
+
+                elif layerType == madmom.ml.nn.layers.FeedForwardLayer:
+                    activationFunc = MadmomActivationFuncToTensorFlow(layer.activation_fn)
+                    outputData = FeedForwardLayer(outputData, GenerateName(nameDic, 'ff'), 
+                        weightValue=layer.weights, biasValue=layer.bias, activationFunc=activationFunc)
+
+                else:
+                    print('error. not support layer type')
+                    return False
+
+            output = tf.reshape(outputData, [-1], name='output')
+
+            sess.run([tf.global_variables_initializer()])
+
+            saver = tf.train.Saver()
+            saver.save(sess, outputFilePath)
+            print('model save to', outputFilePath)
+
+    return True
 
 if __name__ == '__main__':
-    ConvertMadmomDownbeatsModelToTensorflow()
+    # ConvertMadmomOnsetModelToTensorflow()
+
+    # ConvertMadmomDownbeatsModelToTensorflow()
     print('model tool end')
 
 
