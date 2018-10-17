@@ -467,10 +467,22 @@ def GenerateOutputModelPath(variableScopeName, mkdirIfNotExists = False):
     outputFilePath = os.path.join(outputFileDir, variableScopeName+'.ckpt')
     return outputFilePath
 
-def ConvertMadmomOnsetModelToTensorflow():
+def ConvertMadmomKernelToTensorFlow(src):
+    kernel = np.transpose(src, (2, 3, 0, 1))
+    kernelShape = np.shape(kernel)
+    # 测试顺序是反的
+    kernel = np.reshape(kernel, [-1, kernelShape[2], kernelShape[3]])
+    kernel = kernel[::-1]
+    kernel = np.reshape(kernel, kernelShape)
+    return kernel
+
+def ConvertMadmomOnsetModelToTensorflow(madmomModel=None):
     from madmom.ml.nn import NeuralNetwork
     from madmom.models import ONSETS_CNN
-    nn = NeuralNetwork.load(ONSETS_CNN[0])
+    if madmomModel is None:
+        nn = NeuralNetwork.load(ONSETS_CNN[0])
+    else:
+        nn = madmomModel
 
     rootDir = util.getRootDir()
     variableScopeName = 'onset'
@@ -493,7 +505,7 @@ def ConvertMadmomOnsetModelToTensorflow():
 
                 elif layerType == madmom.ml.nn.layers.ConvolutionalLayer:
                     activationFunc = MadmomActivationFuncToTensorFlow(layer.activation_fn)
-                    kernel = np.transpose(layer.weights, (2, 3, 0, 1))
+                    kernel = ConvertMadmomKernelToTensorFlow(layer.weights)      
                     outputData = ConvLayer(outputData, GenerateName(nameDic, 'conv'), 
                         kernelValue=kernel, biasValue=layer.bias, activationFunc=activationFunc)
 

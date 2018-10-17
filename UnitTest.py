@@ -9,6 +9,7 @@ import NotePreprocess
 import madmom
 import NoteModel
 import time
+import DownbeatTracking
 
 def CompareData(arrA, arrB):
     idA = id(arrA)
@@ -43,8 +44,8 @@ def CompareData(arrA, arrB):
     maxDis = np.max(subVal)
     minDis = np.min(subVal)
     aveDis = np.average(subVal)
-    dis = np.sqrt(np.sum(np.square(subVal)))
-    print('arrA to arrB dis %f, aveDis %f, maxDis %f, minDis %f' % (dis, aveDis, maxDis, minDis))
+    dis = np.sum(np.square(subVal))
+    print('arrA to arrB dis2 %f, aveDis %f, maxDis %f, minDis %f' % (dis, aveDis, maxDis, minDis))
 
     for vA, vB in zip(reshapeA, reshapeB):
         if vA != vB:
@@ -143,7 +144,6 @@ def RunAllDownbeatsTFModel(audioFilePath):
     proc = NotePreprocess.CustomRNNDownBeatProcessor()
     srcRes = proc(specDiff)
     print('shape', np.shape(srcRes))
-    import DownbeatTracking
     DownbeatTracking.SaveInstantValue(srcRes[:, 0], audioFilePath, '_rnn_src_0')
     DownbeatTracking.SaveInstantValue(srcRes[:, 1], audioFilePath, '_rnn_src_1')
     
@@ -200,12 +200,25 @@ def RunOnsetModel():
 
     testData = np.zeros((100, 80, 3))
 
+    songFilePath = TFLstm.MakeMp3Pathname('ouxiangwanwansui')
+    sampleRate = 44100
+    audioData = NotePreprocess.LoadAudioFile(songFilePath, sampleRate)
+    audioData = np.array(audioData)
+    specDiff, melLogSpec = NotePreprocess.SpecDiffAndMelLogSpecEx(audioData, sampleRate, [1024, 2048, 4096], [3, 6, 12], 100)
+    specDiffSrc, melLogSpecSrc = NotePreprocess.SpecDiffAndMelLogSpec(audioData, sampleRate, [1024, 2048, 4096], [3, 6, 12], 100)
+    testData = melLogSpec
+
+    madmomStartTime = time.time()
     madmomLayersRes = [testData]
     for layer in nn.layers:
         madmomLayersRes.append(layer(madmomLayersRes[-1]))
     madmomLayersRes = madmomLayersRes[1:]
     madmomModelRes = np.reshape(madmomLayersRes[-1], [-1])
+    print('madmom cost', time.time() - madmomStartTime)
 
+    # ModelTool.ConvertMadmomOnsetModelToTensorflow(nn)
+
+    modelStart = time.time()
     graph = tf.Graph()
     variableScopeName = 'onset'
     modelFilePath = ModelTool.GenerateOutputModelPath(variableScopeName)
@@ -227,11 +240,16 @@ def RunOnsetModel():
             print('model real cost', time.time() - startTime)
             print('sub res shape', np.shape(tfModelRes))
 
+    print('model all cost', time.time() - modelStart)
+
     for idx, tfRes, madRes in zip(range(len(tfLayersRes)), tfLayersRes, madmomLayersRes):
         print('compare layer idx', idx)
+        print('layer res shape', np.shape(tfRes), np.shape(madRes))
         CompareData(np.reshape(tfRes, [-1]), np.reshape(madRes, [-1]))
 
     CompareData(tfModelRes, madmomModelRes)
+    DownbeatTracking.SaveInstantValue(madmomModelRes, songFilePath, '_onset_src')
+    DownbeatTracking.SaveInstantValue(tfModelRes, songFilePath, '_onset_dst')
     return True
 
 if __name__ == '__main__':
