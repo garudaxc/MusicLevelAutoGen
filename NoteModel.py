@@ -326,7 +326,7 @@ class NoteDetectionModel():
 
     def LSTMToLogits(self, outputs, weight=None, bias=None):
         outlayerDim = tf.shape(outputs)[2]
-        outputs = tf.reshape(outputs, [self.batchSize * self.maxTime, outlayerDim])
+        outputs = tf.reshape(outputs, [-1, outlayerDim])
 
         if weight is None:
             weight = TFVariable(shape=[2 * self.numUnits, self.yDim], name='output_linear_w')
@@ -423,10 +423,12 @@ class NoteDetectionModel():
             self.RestoreForCudnnImp(sess, modelFilePath)
 
     def RestoreForCudnnImp(self, sess, modelFilePath):
-        X, sequenceLength = self.XAndSequenceLength()
         if self.restoreCudnnWithGPUMode:
+            X = tf.placeholder(dtype=tf.float32, shape=[self.batchSize, None, self.xDim], name='X')
+            sequenceLength = tf.placeholder(tf.int32, [None], name='sequence_length')
             outputs, initialStates, outputStates = self.CudnnLSTM(X, training=False)
         else:
+            X, sequenceLength = self.XAndSequenceLength()
             numUnits = self.numUnits
             numLayers = self.numLayers
             singleCell = lambda: cudnn_rnn.CudnnCompatibleLSTMCell(self.numUnits)
