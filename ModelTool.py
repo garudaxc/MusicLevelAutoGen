@@ -621,10 +621,14 @@ def LoadTFAudioData(song, frameSizeArr):
     tfAudioDataArr = PaddingAudioData(tfAudioData, frameSizeArr)
     return tfAudioDataArr, audioData
 
-def PostProcessTFLogMel(arr, frameCount):
+def PostProcessTFLogMel(arr, frameCount, swap=False):
     for idx in range(len(arr)):
         arr[idx] = arr[idx][0:frameCount]
     
+    if swap:
+        temp = arr[0]
+        arr[0] = arr[1]
+        arr[1] = temp
     arr = np.dstack(arr)
     arr = madmom.features.onsets._cnn_onset_processor_pad(arr)
     return arr
