@@ -40,13 +40,18 @@ def CompareData(arrA, arrB):
     if len(arrA) != len(arrB):
         print('compare length failed')
         return False
-        
+    
+    maxA = np.max(reshapeA)
+    maxB = np.max(reshapeB)
+    minA = np.min(reshapeA)
+    minB = np.min(reshapeB)
     subVal = np.abs(reshapeA - reshapeB)
     maxDis = np.max(subVal)
     minDis = np.min(subVal)
     aveDis = np.average(subVal)
     dis = np.sum(np.square(subVal))
     print('arrA to arrB dis2 %f, aveDis %f, maxDis %f, minDis %f' % (dis, aveDis, maxDis, minDis))
+    print('range', minA, maxA, minB, maxB)
 
     for vA, vB in zip(reshapeA, reshapeB):
         if vA != vB:
@@ -418,4 +423,5 @@ def RunNoteLevelGenerator():
 if __name__ == '__main__':
     RunNoteLevelGenerator()
     # RunOnsetModel()
+    # RunAudioPreprocess()
     print('TestCase end')

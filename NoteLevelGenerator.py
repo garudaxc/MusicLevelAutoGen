@@ -20,6 +20,9 @@ class NoteLevelGenerator():
         # todo limit time duraion
         self.minDuration = 10
         self.maxDuration = 60 * 20
+        self.noteModelBatchSize = 8
+        self.noteModelOverlap = 128
+        self.noteModelInputDim = 314
 
     def initialize(self, shortModelPath, longModelPath, onsetModelPath, bpmModelPath):
         # todo check path
@@ -46,15 +49,24 @@ class NoteLevelGenerator():
             self.preprocessTensorArr = preprocessTensorArr
             self.diffFrameArr = diffFrameArr
 
+            self.shortModel = NoteModel.NoteDetectionModel('short_note', self.noteModelBatchSize, 0, 3, 26, self.noteModelInputDim, 3, timeMajor=False, useCudnn=True, restoreCudnnWithGPUMode=True)
+            self.shortModel.Restore(sess, shortModelPath)
+            self.shortTensorDic = self.shortModel.GetTensorDic()
+            self.shortInitialStatesZero = self.shortModel.InitialStatesZero()
+            
+            self.longModel = NoteModel.NoteDetectionModel('long_note', self.noteModelBatchSize, 0, 3, 26, self.noteModelInputDim, 4, timeMajor=False, useCudnn=True, restoreCudnnWithGPUMode=True)
+            self.longModel.Restore(sess, longModelPath)
+            self.longTensorDic = self.longModel.GetTensorDic()
+            self.longInitialStatesZero  = self.longModel.InitialStatesZero()
+
             self.onsetTensorDic = ModelTool.BuildOnsetModelGraph(onsetVariableScopeName)
             varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=onsetVariableScopeName)
             saver = tf.train.Saver(var_list=varList)
             saver.restore(sess, onsetModelPath)
 
-
-
         self.graph = graph
         self.sess = sess
+
         return True
 
     def run(self, inputFilePath, outputFilePath, fakeAudioData=None, outputDebugInfo=False):
@@ -104,8 +116,19 @@ class NoteLevelGenerator():
             for idx in range(0, len(preprocessRes), 2):
                 tfLogMel.append(preprocessRes[idx])
                 tfSpecDiff.append(preprocessRes[idx + 1])
-            tfLogMel = ModelTool.PostProcessTFLogMel(tfLogMel, frameCount)
+            tfLogMel = ModelTool.PostProcessTFLogMel(tfLogMel, frameCount, swap=True)
             tfSpecDiff = ModelTool.PostProcessTFSpecDiff(tfSpecDiff, frameCount, self.diffFrameArr)
+
+            noteModelInputData = NotePreprocess.SplitData(tfSpecDiff, self.noteModelBatchSize, self.noteModelOverlap)
+            noteModelInputData = noteModelInputData.reshape(self.noteModelBatchSize, -1, self.noteModelInputDim)
+
+            shortInputTensor = self.shortTensorDic['X']
+            shortOutputTensor = self.shortTensorDic['predict_op']
+            shortInitialStatesTensor = self.shortTensorDic['initial_states']
+
+            longInputTensor = self.longTensorDic['X']
+            longOutputTensor = self.longTensorDic['predict_op']
+            longInitialStatesTensor = self.longTensorDic['initial_states']
 
             onsetInputTensor = self.onsetTensorDic['X']
             onsetOutputTensor = self.onsetTensorDic['output']
@@ -114,11 +137,28 @@ class NoteLevelGenerator():
                 print('cost temp cpu', time.time() - timeStart)
                 timeStart = time.time()
                 
-            onsetModelRes = sess.run([onsetOutputTensor], feed_dict={onsetInputTensor:tfLogMel})
-            onsetModelRes = onsetModelRes[0]
+            shortModelRes, longModelRes, onsetModelRes = sess.run([shortOutputTensor, longOutputTensor, onsetOutputTensor], feed_dict={
+                shortInputTensor: noteModelInputData,
+                shortInitialStatesTensor: self.shortInitialStatesZero,
+                longInputTensor: noteModelInputData,
+                longInitialStatesTensor: self.longInitialStatesZero,
+                onsetInputTensor: tfLogMel
+                })
+
+            shortOutputDim = len(shortModelRes[0])
+            shortModelRes = shortModelRes.reshape(self.noteModelBatchSize, -1, shortOutputDim)
+            shortModelRes = shortModelRes[:, self.noteModelOverlap : (len(shortModelRes[0]) - self.noteModelOverlap), :]
+            shortModelRes = shortModelRes.reshape(-1, shortOutputDim)
+            shortModelRes = shortModelRes[0:len(tfSpecDiff)]
+
+            longOutputDim = len(longModelRes[0])
+            longModelRes = longModelRes.reshape(self.noteModelBatchSize, -1, longOutputDim)
+            longModelRes = longModelRes[:, self.noteModelOverlap : (len(longModelRes[0]) - self.noteModelOverlap), :]
+            longModelRes = longModelRes.reshape(-1, longOutputDim)
+            longModelRes = longModelRes[0:len(tfSpecDiff)]
 
             if outputDebugInfo:
-                print('cost onset', time.time() - timeStart)
+                print('cost model', time.time() - timeStart)
                 print('shape onset res', np.shape(onsetModelRes))
                 timeStart = time.time()
 
@@ -136,7 +176,4 @@ class NoteLevelGenerator():
 
         res = sess.run(runTensorArr, feed_dict=dic)
         return res
-
-
-
 
