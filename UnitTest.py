@@ -252,6 +252,71 @@ def RunOnsetModel():
     DownbeatTracking.SaveInstantValue(tfModelRes, songFilePath, '_onset_dst')
     return True
 
+def RunSess(sess, runArr, signalTensorArr, dataArr):
+    time1 = time.time()
+    dic = {}
+    for signalTensor, data in zip(signalTensorArr, dataArr):
+        dic[signalTensor] = data
+
+    res = sess.run(runArr, feed_dict=dic)
+    print('cost', time.time() - time1)
+    return res
+
+def RunAudioPreprocess():
+    song = 'ouxiangwanwansui'
+    audioFilePath = TFLstm.MakeMp3Pathname('ouxiangwanwansui')
+    sampleRate = 44100
+    audioData = NotePreprocess.LoadAudioFile(audioFilePath, sampleRate)
+    fps = 100
+    hopSize = int(sampleRate / fps)
+    frameCount = ModelTool.FrameCount(audioData, hopSize)
+    scaleValue = ModelTool.ScaleValue(audioData)
+    tfAudioData = audioData / scaleValue
+
+    print('frames info', np.shape(audioData), sampleRate / fps, len(audioData) / (sampleRate / fps))
+    
+    frameSizeArr = [1024, 2048, 4096]
+    numBandArr = [3, 6, 12]
+    
+    timeMadmomStart = time.time()
+    madmomSTFTRes = NotePreprocess.STFT(audioData, frameSizeArr, fps)
+    madmomLogMelRes = NotePreprocess.MelLogarithmicSpectrogram(madmomSTFTRes)
+    madmomSpecDiffRes = NotePreprocess.SpectrogramDifference(madmomSTFTRes, numBandArr)
+    timeMadmomEnd = time.time()
+
+    with tf.Graph().as_default():
+        with tf.Session() as sess:
+            signalTensorArr, runTensorArr, diffFrameArr = ModelTool.BuildPreProcessGraph('preprocess', sampleRate, frameSizeArr, numBandArr, hopSize)
+            
+            sess.run([tf.global_variables_initializer()])
+            
+            tfAudioData = tfAudioData
+            tfAudioDataArr = ModelTool.PaddingAudioData(tfAudioData, frameSizeArr)
+            res = RunSess(sess, runTensorArr, signalTensorArr, tfAudioDataArr)
+            res = RunSess(sess, runTensorArr, signalTensorArr, tfAudioDataArr)
+            timePostProcessStart = time.time()
+            tfLogMel = []
+            tfSpecDiff = []
+            for idx in range(0, len(res), 2):
+                tfLogMel.append(res[idx])
+                tfSpecDiff.append(res[idx + 1])
+
+    tfLogMel = ModelTool.PostProcessTFLogMel(tfLogMel, frameCount)
+    tfSpecDiff = ModelTool.PostProcessTFSpecDiff(tfSpecDiff, frameCount, diffFrameArr)
+    print('shape log mel', np.shape(madmomLogMelRes), np.shape(tfLogMel))
+    print('shape spec diff', np.shape(madmomSpecDiffRes), np.shape(tfSpecDiff))
+    timePostProcessEnd = time.time()
+
+    CompareData(madmomLogMelRes, tfLogMel)
+    CompareData(madmomSpecDiffRes, tfSpecDiff)
+    # TFLstm.SaveFeatures(TFLstm.MakeSongDataPathName(song, 'log_mel_src'), np.reshape(madmomLogMelRes, (len(madmomLogMelRes), -1)))
+    # TFLstm.SaveFeatures(TFLstm.MakeSongDataPathName(song, 'log_mel_dst'), np.reshape(tfLogMel, (len(tfLogMel), -1)))
+    # TFLstm.SaveFeatures(TFLstm.MakeSongDataPathName(song, 'spec_diff_src'), madmomSpecDiffRes)
+    # TFLstm.SaveFeatures(TFLstm.MakeSongDataPathName(song, 'spec_diff_dst'), tfSpecDiff)
+
+    print('cost madmom', timeMadmomEnd - timeMadmomStart)
+    print('cost post process', timePostProcessEnd - timePostProcessStart)
+
 if __name__ == '__main__':
-    RunOnsetModel()
+    RunAudioPreprocess()
     print('TestCase end')

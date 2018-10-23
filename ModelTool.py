@@ -537,27 +537,11 @@ def ConvertMadmomOnsetModelToTensorflow(madmomModel=None):
 
     return True
 
-def PaddingAudioData(audioData, frameSize):
-    return np.concatenate(([0] * (frameSize // 2) , audioData))
-
-def AudioToSepc(signalTensor, sampleRate, frameSize, fps):
-    frameSize = int(frameSize)
-    hopSize = int (sampleRate / fps)
-    fftLength = None
-    stft = signal.stft(signalTensor, frameSize, hopSize, fft_length=fftLength)
-    magnitudeSpectrograms = tf.abs(stfts)
-    # logOffset = 1
-    # numerator = tf.log(magnitudeSpectrograms + logOffset)
-    # denominator = tf.log(tf.constant(10, dtype=numerator.dtype))
-    # logMagnitudeSpectrograms = numerator / denominator
-    # signal.linear_to_mel_weight_matrix
-
-def RunSess(sess, resTensor, signalTensor, data):
-    import time
-    time1 = time.time()
-    res = sess.run([resTensor], feed_dict={signalTensor:np.copy(data)})
-    print('cost', time.time() - time1)
-    return res
+def PaddingAudioData(audioData, frameSizeArr):
+    dataArr = []
+    for frameSize in frameSizeArr:
+        dataArr.append(np.concatenate(([0] * (frameSize // 2) , audioData)))
+    return dataArr
 
 def TFSTFT(signalTensor, frameSize, hopSize, fftLength=None):
     frameSize = int(frameSize)
@@ -590,13 +574,21 @@ def LogarithmicFilterbankWeight(sampleRate, numSTFTBins, numLogBand, fmin, fmax)
     return weight
 
 def TFLog10(inputData):
-    return tf.log(inputData) / tf.log(10)
+    return tf.log(inputData) / tf.log(tf.constant(10, dtype=inputData.dtype))
 
-def TFSpecDiff(magnitudeSpectrogram, sampleRate, frameSize, numBand):
+def TFSpecDiff(magnitudeSpectrogram, sampleRate, frameSize, hopSize, numBand, name=None):
     logarithmicFilterbankWeight = LogarithmicFilterbankWeight(sampleRate, frameSize // 2, numBand, 30, 17000)
     logWeight = tf.constant(logarithmicFilterbankWeight)
     logSpectrogram = tf.matmul(magnitudeSpectrogram, logWeight)
     logSpec = TFLog10(logSpectrogram + 1)
+    diffFrame = madmom.audio.spectrogram._diff_frames(0.5, hopSize, frameSize)
+    tempZero = tf.zeros((diffFrame, logSpec.shape[1]))
+    tempLogSpec = tf.concat((tempZero, logSpec), 0)
+    srcValue = tempLogSpec[diffFrame:]
+    diff = srcValue - tempLogSpec[:-diffFrame]
+    diff = tf.maximum(diff, 0)
+    diff = tf.concat((srcValue, diff), 1, name=name)
+    return diff, diffFrame
 
 def MelFilterbankWeight(sampleRate, numSTFTBins, numMelBand, fmin, fmax):
     # just for onset cnn feature
@@ -611,14 +603,14 @@ def MelFilterbankWeight(sampleRate, numSTFTBins, numMelBand, fmin, fmax):
     weight = np.array(weight)
     return weight
 
-def TFLogMelSpec(magnitudeSpectrogram, sampleRate, frameSize):
+def TFLogMelSpec(magnitudeSpectrogram, sampleRate, frameSize, name=None):
     melFilterbankWeights = MelFilterbankWeight(sampleRate, frameSize // 2, 80, 27.5, 16000)
     melWeight = tf.constant(melFilterbankWeights)
     melSpectrogram = tf.matmul(magnitudeSpectrogram, melWeight)
-    logMelSpec = tf.log(melSpectrogram + madmom.features.onsets.EPSILON)
+    logMelSpec = tf.log(melSpectrogram + madmom.features.onsets.EPSILON, name=name)
     return logMelSpec
 
-def LoadTFAudioData(song, frameSize):
+def LoadTFAudioData(song, frameSizeArr):
     import TFLstm
     import NotePreprocess
     audioFilePath = TFLstm.MakeMp3Pathname(song)
@@ -626,68 +618,51 @@ def LoadTFAudioData(song, frameSize):
     audioData = NotePreprocess.LoadAudioFile(audioFilePath, sampleRate)
     scaleValue = ScaleValue(audioData)
     tfAudioData = audioData / scaleValue
-    PaddingAudioData(tfAudioData, frameSize)
-    return tfAudioData,audioData
+    tfAudioDataArr = PaddingAudioData(tfAudioData, frameSizeArr)
+    return tfAudioDataArr, audioData
 
-def TestAudioSpec():
-    import TFLstm
-    import NotePreprocess
-    import time
-    audioFilePath = TFLstm.MakeMp3Pathname('ouxiangwanwansui')
-    sampleRate = 44100
-    audioData = NotePreprocess.LoadAudioFile(audioFilePath, sampleRate)
-    frameSize = 4096
-    fps = 100
-    # audioData = audioData[0:int(sampleRate * 10)]
-    scaleValue = ScaleValue(audioData)
-    tfAudioData = audioData / scaleValue
-    hopSize = int(sampleRate / fps)
-    print('frames info', np.shape(audioData), sampleRate / fps, len(audioData) / (sampleRate / fps))
-    time1 = time.time()
-    madmomSTFTRes = NotePreprocess.STFT(audioData, [frameSize], fps)
-    madmomRes = NotePreprocess.MelLogarithmicSpectrogram(madmomSTFTRes)
-    temp = NotePreprocess.SpectrogramDifference(madmomSTFTRes, [3])
-    time2 = time.time()
+def PostProcessTFLogMel(arr, frameCount):
+    for idx in range(len(arr)):
+        arr[idx] = arr[idx][0:frameCount]
+    
+    arr = np.dstack(arr)
+    arr = madmom.features.onsets._cnn_onset_processor_pad(arr)
+    return arr
 
-    with tf.Graph().as_default():
-        with tf.Session() as sess:
-            signalTensor = tf.placeholder(tf.float32, shape=[None])
-            frameSize = int(frameSize)
-            fftLength = None
+def PostProcessTFSpecDiff(arr, frameCount, diffFrameArr):
+    for idx, (specDiff, diffFrame) in enumerate(zip(arr, diffFrameArr)):
+        specDiff[0:diffFrame, :] = 0
+        arr[idx] = specDiff[0:frameCount]
+
+    arr = np.concatenate(arr, 1)
+    return arr
+
+def BuildPreProcessGraph(variableScopeName, sampleRate, frameSizeArr, numBandArr, hopSize):
+    fftLength = None
+    signalTensorArr = []
+    runTensorArr = []
+    diffFrameArr = []
+    with tf.variable_scope(variableScopeName):
+        for idx, (frameSize, numBand) in enumerate(zip(frameSizeArr, numBandArr)):
+            namePostfix = str(idx)
+            signalTensor = tf.placeholder(tf.float32, shape=[None], name='signal_' + namePostfix)
             stft = TFSTFT(signalTensor, frameSize, hopSize)
             # madmom 没用最后一个 nyquist hertz
             stft = stft[:, :-1]
 
             magnitudeSpectrogram = tf.abs(stft)
-            logMelSpec = TFLogMelSpec(magnitudeSpectrogram, sampleRate, frameSize)
+            logMelSpec = TFLogMelSpec(magnitudeSpectrogram, sampleRate, frameSize, name='log_mel_' + namePostfix)
+            specDiff, diffFrame = TFSpecDiff(magnitudeSpectrogram, sampleRate, frameSize, hopSize, numBand, name='spec_diff_' + namePostfix)
+            runTensorArr.append(logMelSpec)
+            runTensorArr.append(specDiff)
+            diffFrameArr.append(diffFrame)
+            signalTensorArr.append(signalTensor)
 
-            sess.run([tf.global_variables_initializer()])
-
-            tfAudioData = tfAudioData
-            tfAudioData = PaddingAudioData(tfAudioData, frameSize)
-            res = RunSess(sess, logMelSpec, signalTensor, tfAudioData)
-            tfRes = res[0]
-
-    import UnitTest
-    madmomRes = np.reshape(madmomRes, np.shape(madmomRes)[0:2])
-    frameCount = FrameCount(audioData, hopSize)
-    tfRes = tfRes[0:frameCount, :]
-    tfRes = np.dstack([tfRes])
-    tfRes = madmom.features.onsets._cnn_onset_processor_pad(tfRes)
-    tfRes = np.reshape(tfRes, np.shape(tfRes)[0:2])
-
-    UnitTest.CompareData(madmomRes, tfRes)
-    import DownbeatTracking
-    DownbeatTracking.SaveInstantValue(np.reshape(madmomRes, [-1]), audioFilePath, '_logspec_src')
-    DownbeatTracking.SaveInstantValue(np.reshape(tfRes, [-1]), audioFilePath, '_logspec_dst')
-
-    print('shape', np.shape(madmomRes), np.shape(tfRes))
-    print('cost madmom', time2 - time1)
-
+    return signalTensorArr, runTensorArr, diffFrameArr
 
 if __name__ == '__main__':
     # ConvertMadmomOnsetModelToTensorflow()
-    TestAudioSpec()
+    
     # ConvertMadmomDownbeatsModelToTensorflow()
     print('model tool end')
 
