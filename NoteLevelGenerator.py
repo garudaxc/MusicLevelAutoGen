@@ -66,6 +66,9 @@ class NoteLevelGenerator():
 
         self.graph = graph
         self.sess = sess
+        # just for gpu version init
+        fakeAudioData = [0.0] * self.sampleRate * 60 * 1
+        self.run('', '', fakeAudioData=fakeAudioData)
 
         return True
 
