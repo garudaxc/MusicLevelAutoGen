@@ -1,0 +1,142 @@
+import os
+import numpy as np
+import tensorflow as tf
+import madmom
+import NotePreprocess
+import NoteEnvironment
+import NoteModel
+import ModelTool
+import time
+
+class NoteLevelGenerator():
+    def __init__(self):
+        self.graph = None
+        self.sess = None
+        self.fps = 100
+        self.sampleRate = 44100
+        self.hopSize = int(self.sampleRate / self.fps)
+        self.frameSizeArr = [1024, 2048, 4096]
+        self.numBandArr = [3, 6, 12]
+        # todo limit time duraion
+        self.minDuration = 10
+        self.maxDuration = 60 * 20
+
+    def initialize(self, shortModelPath, longModelPath, onsetModelPath, bpmModelPath):
+        # todo check path
+
+        graph = tf.Graph()
+
+        sampleRate = self.sampleRate
+        fps = self.fps 
+        hopSize = self.hopSize
+        frameSizeArr = self.frameSizeArr
+        numBandArr = self.numBandArr
+
+        preprocessVariableScopeName = 'preprocess'
+        onsetVariableScopeName = 'onset'
+
+        with graph.as_default():
+            # todo use enviroment setting
+            # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
+            # gpu_options.allow_growth = False
+            # sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+            sess = tf.Session()
+            signalTensorArr, preprocessTensorArr, diffFrameArr = ModelTool.BuildPreProcessGraph(preprocessVariableScopeName, sampleRate, frameSizeArr, numBandArr, hopSize)
+            self.signalTensorArr = signalTensorArr
+            self.preprocessTensorArr = preprocessTensorArr
+            self.diffFrameArr = diffFrameArr
+
+            self.onsetTensorDic = ModelTool.BuildOnsetModelGraph(onsetVariableScopeName)
+            varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=onsetVariableScopeName)
+            saver = tf.train.Saver(var_list=varList)
+            saver.restore(sess, onsetModelPath)
+
+
+
+        self.graph = graph
+        self.sess = sess
+        return True
+
+    def run(self, inputFilePath, outputFilePath, fakeAudioData=None, outputDebugInfo=False):
+        if self.graph is None or self.sess is None:
+            return False
+
+        sampleRate = self.sampleRate
+
+        if outputDebugInfo:
+            timeStart = time.time()
+
+        if fakeAudioData is None:
+            audioData = NotePreprocess.LoadAudioFile(inputFilePath, sampleRate)
+        else:
+            audioData = fakeAudioData
+        audioData = np.array(audioData)
+        minSampleCount = self.minDuration * sampleRate
+        maxSampleCoun = self.maxDuration * sampleRate
+        lenAudioData = len(audioData)
+        if audioData is None or lenAudioData < minSampleCount or lenAudioData > maxSampleCoun:
+            return False
+
+        if outputDebugInfo:
+            print('cost audio decode', time.time() - timeStart)
+            timeStart = time.time()
+
+        frameCount = ModelTool.FrameCount(audioData, self.hopSize)
+        scaleValue = ModelTool.ScaleValue(audioData)
+        tfAudioData = audioData / scaleValue
+        tfAudioDataArr = ModelTool.PaddingAudioData(tfAudioData, self.frameSizeArr)
+
+        graph = self.graph
+        sess = self.sess
+        with graph.as_default():
+            if outputDebugInfo:
+                print('cost audio padding', time.time() - timeStart)
+                timeStart = time.time()
+
+            preprocessRes = self.runSess(sess, self.preprocessTensorArr, self.signalTensorArr, tfAudioDataArr)
+
+            if outputDebugInfo:
+                print('cost process', time.time() - timeStart)
+                timeStart = time.time()
+
+            tfLogMel = []
+            tfSpecDiff = []
+            for idx in range(0, len(preprocessRes), 2):
+                tfLogMel.append(preprocessRes[idx])
+                tfSpecDiff.append(preprocessRes[idx + 1])
+            tfLogMel = ModelTool.PostProcessTFLogMel(tfLogMel, frameCount)
+            tfSpecDiff = ModelTool.PostProcessTFSpecDiff(tfSpecDiff, frameCount, self.diffFrameArr)
+
+            onsetInputTensor = self.onsetTensorDic['X']
+            onsetOutputTensor = self.onsetTensorDic['output']
+
+            if outputDebugInfo:
+                print('cost temp cpu', time.time() - timeStart)
+                timeStart = time.time()
+                
+            onsetModelRes = sess.run([onsetOutputTensor], feed_dict={onsetInputTensor:tfLogMel})
+            onsetModelRes = onsetModelRes[0]
+
+            if outputDebugInfo:
+                print('cost onset', time.time() - timeStart)
+                print('shape onset res', np.shape(onsetModelRes))
+                timeStart = time.time()
+
+        return True
+
+    def releaseResource():
+        if self.sess is not None:
+            self.sess.close()
+
+
+    def runSess(self, sess, runTensorArr, inputTensorArr, inputDataArr):
+        dic = {}
+        for inputTensor, inputData in zip(inputTensorArr, inputDataArr):
+            dic[inputTensor] = inputData
+
+        res = sess.run(runTensorArr, feed_dict=dic)
+        return res
+
+
+
+

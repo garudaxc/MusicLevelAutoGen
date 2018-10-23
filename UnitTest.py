@@ -10,6 +10,7 @@ import madmom
 import NoteModel
 import time
 import DownbeatTracking
+import NoteLevelGenerator
 
 def CompareData(arrA, arrB):
     idA = id(arrA)
@@ -264,7 +265,7 @@ def RunSess(sess, runArr, signalTensorArr, dataArr):
 
 def RunAudioPreprocess():
     song = 'ouxiangwanwansui'
-    audioFilePath = TFLstm.MakeMp3Pathname('ouxiangwanwansui')
+    audioFilePath = TFLstm.MakeMp3Pathname(song)
     sampleRate = 44100
     audioData = NotePreprocess.LoadAudioFile(audioFilePath, sampleRate)
     fps = 100
@@ -317,6 +318,104 @@ def RunAudioPreprocess():
     print('cost madmom', timeMadmomEnd - timeMadmomStart)
     print('cost post process', timePostProcessEnd - timePostProcessStart)
 
+def TestAudioSpec():
+    import TFLstm
+    import NotePreprocess
+    import time
+    audioFilePath = TFLstm.MakeMp3Pathname('ouxiangwanwansui')
+    sampleRate = 44100
+    audioData = NotePreprocess.LoadAudioFile(audioFilePath, sampleRate)
+    frameSize = 4096
+    fps = 100
+    # audioData = audioData[0:int(sampleRate * 10)]
+    scaleValue = ModelTool.ScaleValue(audioData)
+    tfAudioData = audioData / scaleValue
+    hopSize = int(sampleRate / fps)
+    print('frames info', np.shape(audioData), sampleRate / fps, len(audioData) / (sampleRate / fps))
+    time1 = time.time()
+    from madmom.audio.spectrogram import (
+        FilteredSpectrogramProcessor, LogarithmicSpectrogramProcessor,
+        SpectrogramDifferenceProcessor)
+    madmomSTFTRes = NotePreprocess.STFT(audioData, [frameSize], fps)
+    filt = FilteredSpectrogramProcessor(filterbank=madmom.audio.filters.MelFilterbank, num_bands=80, fmin=27.5, fmax=16000, norm_filters=True, unique_filters=False)
+    spec = LogarithmicSpectrogramProcessor(log=np.log, add=madmom.features.onsets.EPSILON)
+    print('type of madmom.features.onsets.EPSILON', type(madmom.features.onsets.EPSILON))
+    filtRes = filt(madmomSTFTRes[0])
+    madmomRes = spec(filtRes)
+    madmomRes = madmom.features.onsets._cnn_onset_processor_pad(np.dstack([madmomRes]))
+    # madmomRes = NotePreprocess.MelLogarithmicSpectrogram(madmomSTFTRes)
+    time2 = time.time()
+
+    with tf.Graph().as_default():
+        with tf.Session() as sess:
+            signalTensor = tf.placeholder(tf.float32, shape=[None])
+            frameSize = int(frameSize)
+            fftLength = None
+            stft = ModelTool.TFSTFT(signalTensor, frameSize, hopSize)
+            # madmom 没用最后一个 nyquist hertz
+            stft = stft[:, :-1]
+
+            magnitudeSpectrogram = tf.abs(stft)
+            melFilterbankWeights = ModelTool.MelFilterbankWeight(sampleRate, frameSize // 2, 80, 27.5, 16000)
+            melWeight = tf.constant(melFilterbankWeights)
+            melSpectrogram = tf.matmul(magnitudeSpectrogram, melWeight)
+            logMelSpec = melSpectrogram + madmom.features.onsets.EPSILON
+            logMelSpec = tf.log(logMelSpec)
+
+            sess.run([tf.global_variables_initializer()])
+
+            tfAudioDataArr = ModelTool.PaddingAudioData(tfAudioData, [frameSize])
+            res = RunSess(sess, [logMelSpec, magnitudeSpectrogram, melSpectrogram], [signalTensor], tfAudioDataArr)
+            tfRes = res[0]
+            magnitudeSpectrogramRes = res[1]
+            melSpectrogramRes = res[2]
+
+    madmomRes = np.reshape(madmomRes, np.shape(madmomRes)[0:2])
+    frameCount = ModelTool.FrameCount(audioData, hopSize)
+    tfRes = tfRes[0:frameCount, :]
+    tfRes = np.dstack([tfRes])
+    tfRes = madmom.features.onsets._cnn_onset_processor_pad(tfRes)
+    tfRes = np.reshape(tfRes, np.shape(tfRes)[0:2])
+
+    CompareData(madmomRes, tfRes)
+
+    tempSTFT1 = np.array(np.abs(madmomSTFTRes[0]))
+    tempSTFT2 = magnitudeSpectrogramRes[0:frameCount, :]
+    tempMelSpec1 = filtRes
+    tempMelSpec2 = melSpectrogramRes[0:frameCount, :]
+    CompareData(tempSTFT1, tempSTFT2)
+    CompareData(tempMelSpec1, tempMelSpec2)
+
+    print('shape', np.shape(madmomRes), np.shape(tfRes))
+    print('cost madmom', time2 - time1)
+
+def RunNoteLevelGenerator():
+    generator = NoteLevelGenerator.NoteLevelGenerator()
+    rootDir = util.getRootDir()
+
+    shortModelPath = os.path.join(rootDir, 'model_singing')
+    shortModelPath = os.path.join(shortModelPath, 'model_singing.ckpt')
+
+    longModelPath = os.path.join(rootDir, 'model')
+    longModelPath = os.path.join(longModelPath, 'model_longnote.ckpt')
+
+    onsetModelPath = modelFilePath = ModelTool.GenerateOutputModelPath('onset')
+
+    bpmModelPath = ''
+    if not generator.initialize(shortModelPath, longModelPath, onsetModelPath, bpmModelPath):
+        return False
+
+    songArr = ['ouxiangwanwansui', 'jinzhongzhao', 'gundong', 'baaifangkai']
+    for song in songArr:
+        outputFilePath = ''
+        runStart = time.time()
+        generator.run(TFLstm.MakeMp3Pathname(song), outputFilePath, outputDebugInfo=True)
+        print('cost _______ ', song, time.time() - runStart)
+
+    return True
+
+
 if __name__ == '__main__':
-    RunAudioPreprocess()
+    RunNoteLevelGenerator()
+    # RunOnsetModel()
     print('TestCase end')
