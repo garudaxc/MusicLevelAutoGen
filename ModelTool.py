@@ -10,6 +10,17 @@ import util
 import os
 import functools
 
+def ExpandArrDiagBlock(arr):
+    blockCount = len(arr)
+    zeroData = np.zeros_like(arr[0])
+    rowArr = []
+    for i in range(blockCount):
+        temp = [zeroData] * blockCount
+        temp[i] = arr[i]
+        rowArr.append(np.concatenate(temp, 1))
+
+    return np.concatenate(rowArr)
+
 def MadmomLSTMLayerParam(layer):
     input_gate = layer.input_gate
     cell = layer.cell
@@ -31,25 +42,18 @@ def MadmomLSTMLayerParam(layer):
 
     return kernel, bias, w_i_diag, w_f_diag, w_o_diag, input_dim, num_units
 
-def MadmomLSTMLayersParam(layerArr):
-
-    # not completed
-
+def MadmomLSTMLayerParam_MergeAll(layerArr):
     layer = layerArr[0]
     input_gate = layer.input_gate
     cell = layer.cell
     forget_gate = layer.forget_gate
     output_gate = layer.output_gate
 
-    input_gate_weights = input_gate.weights
-    cell_weights = cell.weights
-    forget_gate_weights = forget_gate.weights
-    output_gate_weights = output_gate.weights
+    input_gate_weights = [input_gate.weights]
+    cell_weights = [cell.weights]
+    forget_gate_weights = [forget_gate.weights]
+    output_gate_weights = [output_gate.weights]
 
-    # input_gate_recurrent_weights = input_gate.recurrent_weights
-    # cell_recurrent_weights = cell.recurrent_weights
-    # forget_gate_recurrent_weights = forget_gate.recurrent_weights
-    # output_gate_recurrent_weights = output_gate.recurrent_weights
     input_gate_recurrent_weights = [input_gate.recurrent_weights]
     cell_recurrent_weights = [cell.recurrent_weights]
     forget_gate_recurrent_weights = [forget_gate.recurrent_weights]
@@ -57,14 +61,14 @@ def MadmomLSTMLayersParam(layerArr):
 
     input_gate_bias = input_gate.bias
     cell_bias = cell.bias
-    forget_bias = forget_gate.bias
+    forget_gate_bias = forget_gate.bias
     output_gate_bias = output_gate.bias
 
     w_i_diag = input_gate.peephole_weights
     w_f_diag = forget_gate.peephole_weights
     w_o_diag = output_gate.peephole_weights
 
-    for i in range(len(layerArr)):
+    for i in range(1, len(layerArr)):
         layer = layerArr[i]
         input_gate = layer.input_gate
         cell = layer.cell
@@ -74,46 +78,35 @@ def MadmomLSTMLayersParam(layerArr):
         input_dim = np.shape(input_gate.weights)[0]
         num_units = np.shape(input_gate.weights)[1]
 
-        input_gate_weights = np.concatenate((input_gate_weights, input_gate.weights), 1)
-        cell_weights = np.concatenate((cell_weights, cell.weights), 1)
-        forget_gate_weights = np.concatenate((forget_gate_weights, forget_gate.weights), 1)
-        output_gate_weights = np.concatenate((output_gate_weights, output_gate.weights), 1)
+        input_gate_weights.append(input_gate.weights)
+        cell_weights.append(cell.weights)
+        forget_gate_weights.append(forget_gate.weights)
+        output_gate_weights.append(output_gate.weights)
 
-        # input_gate_recurrent_weights = np.concatenate((input_gate_recurrent_weights, input_gate.recurrent_weights))
-        # cell_recurrent_weights = np.concatenate((cell_recurrent_weights, cell.recurrent_weights))
-        # forget_gate_recurrent_weights = np.concatenate((forget_gate_recurrent_weights, forget_gate.recurrent_weights))
-        # output_gate_recurrent_weights = np.concatenate((output_gate_recurrent_weights, output_gate.recurrent_weights))
-        input_gate_recurrent_weights = input_gate_recurrent_weights.append(input_gate.recurrent_weights)
-        cell_recurrent_weights = input_gate_recurrent_weights.append(cell_recurrent_weights, cell.recurrent_weights)
-        forget_gate_recurrent_weights = input_gate_recurrent_weights.append(forget_gate_recurrent_weights, forget_gate.recurrent_weights)
-        output_gate_recurrent_weights = input_gate_recurrent_weights.append(output_gate_recurrent_weights, output_gate.recurrent_weights)
+        input_gate_recurrent_weights.append(input_gate.recurrent_weights)
+        cell_recurrent_weights.append(cell.recurrent_weights)
+        forget_gate_recurrent_weights.append(forget_gate.recurrent_weights)
+        output_gate_recurrent_weights.append(output_gate.recurrent_weights)
 
         input_gate_bias = np.concatenate((input_gate_bias, input_gate.bias))
         cell_bias = np.concatenate((cell_bias, cell.bias))
-        forget_gate_bias = np.concatenate((forget_bias, forget_gate.bias))
-        output_gate_bias = np.concatenate((output_gate_bias, output_gate_bias.bias))
+        forget_gate_bias = np.concatenate((forget_gate_bias, forget_gate.bias))
+        output_gate_bias = np.concatenate((output_gate_bias, output_gate.bias))
 
         if w_i_diag is not None:
             w_i_diag = np.concatenate((w_i_diag, input_gate.peephole_weights))
             w_f_diag = np.concatenate((w_f_diag, forget_gate.peephole_weights))
             w_o_diag = np.concatenate((w_o_diag, output_gate.peephole_weights))
 
-    def Eye(arr):
-        size = len(arr[0])
-        blockCount = len(arr)
-        zeroData = np.zeros_like(arr[0])
-        rowArr = []
-        for i in range(blockCount):
-            temp = [zeroData] * blockCount
-            temp[i] = arr[i]
-            rowArr.append(np.concatenate(temp, 1))
+    input_gate_weights = ExpandArrDiagBlock(input_gate_weights)
+    cell_weights = ExpandArrDiagBlock(cell_weights)
+    forget_gate_weights = ExpandArrDiagBlock(forget_gate_weights)
+    output_gate_weights = ExpandArrDiagBlock(output_gate_weights)
 
-        return np.concatenate(rowArr)
-
-    input_gate_recurrent_weights = Eye(input_gate_recurrent_weights)
-    cell_recurrent_weights = Eye(cell_recurrent_weights)
-    forget_gate_recurrent_weights = Eye(forget_gate_recurrent_weights)
-    output_gate_recurrent_weights = Eye(output_gate_recurrent_weights)
+    input_gate_recurrent_weights = ExpandArrDiagBlock(input_gate_recurrent_weights)
+    cell_recurrent_weights = ExpandArrDiagBlock(cell_recurrent_weights)
+    forget_gate_recurrent_weights = ExpandArrDiagBlock(forget_gate_recurrent_weights)
+    output_gate_recurrent_weights = ExpandArrDiagBlock(output_gate_recurrent_weights)
 
     weights = np.concatenate((input_gate_weights, cell_weights, forget_gate_weights, output_gate_weights), 1)
     recurrent_weights = np.concatenate((input_gate_recurrent_weights, cell_recurrent_weights, forget_gate_recurrent_weights, output_gate_recurrent_weights), 1)
@@ -121,13 +114,35 @@ def MadmomLSTMLayersParam(layerArr):
 
     bias = np.concatenate((input_gate_bias, cell_bias, forget_gate_bias, output_gate_bias))
 
+    input_dim = input_dim * len(layerArr)
+    num_units = num_units * len(layerArr)
     return kernel, bias, w_i_diag, w_f_diag, w_o_diag, input_dim, num_units
 
 def MadmomBLSTMLayerParam(layer):
     return [MadmomLSTMLayerParam(layer.fwd_layer), MadmomLSTMLayerParam(layer.bwd_layer)]
 
+def MadmomBLSTMLayerParam_MergeAll(layerArr):
+    fwdArr = []
+    bwdArr = []
+    for layer in layerArr:
+        fwdArr.append(layer.fwd_layer)
+        bwdArr.append(layer.bwd_layer)
+    return [MadmomLSTMLayerParam_MergeAll(fwdArr), MadmomLSTMLayerParam_MergeAll(bwdArr)]
+
 def MadmomFeedForwardLayerParam(layer):
     return layer.weights, layer.bias, layer.activation_fn
+
+def MadmomFeedForwardLayerParam_MergeAll(layerArr):
+    weights = []
+    bias = []
+    activation_fn = layerArr[0].activation_fn
+    for layer in layerArr:
+        weights.append(layer.weights)
+        bias.append(layer.bias)
+
+    weights = ExpandArrDiagBlock(weights)
+    bias = np.concatenate(bias)
+    return weights, bias, activation_fn
 
 def MadmomActivationFuncToTensorFlow(func):
 
@@ -259,19 +274,19 @@ def BuildDownbeatsModelGraphWithLSTMBlockFusedCell(variableScopeName, numLayers,
     tensorDic['output'] = logits
     return tensorDic
 
-def MadmomDownbeatsModelToTensorflow(madmomModel, variableScopeName, outputFilePath):
-    madmomBLSTMParamArr = []
-    madmomFeedForwardLayerParam = None
-    for layer in madmomModel.layers:
-        layerType = type(layer)
-        if layerType == madmom.ml.nn.layers.BidirectionalLayer:
-            madmomBLSTMParamArr.append(MadmomBLSTMLayerParam(layer))
-        elif layerType == madmom.ml.nn.layers.FeedForwardLayer:
-            madmomFeedForwardLayerParam = MadmomFeedForwardLayerParam(layer)
-        else:
-            print('not support type', layerType)
-            return False
-
+def MadmomDownbeatsModelToTensorflow(madmomModel, variableScopeName, outputFilePath, madmomBLSTMParamArr=None, madmomFeedForwardLayerParam=None):
+    if madmomBLSTMParamArr is None or madmomFeedForwardLayerParam is None:
+        madmomBLSTMParamArr = []
+        madmomFeedForwardLayerParam = None
+        for layer in madmomModel.layers:
+            layerType = type(layer)
+            if layerType == madmom.ml.nn.layers.BidirectionalLayer:
+                madmomBLSTMParamArr.append(MadmomBLSTMLayerParam(layer))
+            elif layerType == madmom.ml.nn.layers.FeedForwardLayer:
+                madmomFeedForwardLayerParam = MadmomFeedForwardLayerParam(layer)
+            else:
+                print('not support type', layerType)
+                return False
 
     numLayers = len(madmomBLSTMParamArr)
     firstFWLayer = madmomBLSTMParamArr[0][0]
@@ -287,7 +302,7 @@ def MadmomDownbeatsModelToTensorflow(madmomModel, variableScopeName, outputFileP
 
     graph = tf.Graph()
     with graph.as_default():
-        BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, np.shape(madmomWeights), np.shape(madmomBias), tfActivationFunc, False)
+        BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, np.shape(madmomWeights), np.shape(madmomBias), tfActivationFunc, False)
 
         with tf.Session() as sess:
             varList = tf.trainable_variables()
@@ -348,6 +363,39 @@ def ConvertMadmomDownbeatsModelToTensorflow():
         varScopeName = 'downbeats_' + str(i)
         outputFilePath = GenerateOutputModelPath(varScopeName, mkdirIfNotExists=True)
         MadmomDownbeatsModelToTensorflow(madmomModel, varScopeName, outputFilePath)
+    return True
+
+def ConvertMadmomDownbeatsModelToTensorflow_MergeAll():
+    nn = NeuralNetworkEnsemble.load(DOWNBEATS_BLSTM)
+    rootDir = util.getRootDir()
+    madmomModel = nn.processors[0].processors[0]
+    layerArrs = []
+    for i in range(len(madmomModel.layers)):
+        layerArrs.append([])
+
+    for i in range(len(nn.processors[0].processors)):
+        madmomModel = nn.processors[0].processors[i]
+        for idx, layer in enumerate(madmomModel.layers):
+            layerArrs[idx].append(layer)
+
+    madmomBLSTMParamArr = []
+    madmomFeedForwardLayerParam = None
+    for layerArr in layerArrs:
+        layer = layerArr[0]
+        layerType = type(layer)
+        if layerType == madmom.ml.nn.layers.BidirectionalLayer:
+            madmomBLSTMParamArr.append(MadmomBLSTMLayerParam_MergeAll(layerArr))
+        elif layerType == madmom.ml.nn.layers.FeedForwardLayer:
+            madmomFeedForwardLayerParam = MadmomFeedForwardLayerParam_MergeAll(layerArr)
+        else:
+            print('not support type', layerType)
+            return False
+
+    varScopeName = 'downbeats'
+    outputFilePath = GenerateOutputModelPath(varScopeName, mkdirIfNotExists=True)
+    MadmomDownbeatsModelToTensorflow(None, 'downbeats', outputFilePath, madmomBLSTMParamArr, madmomFeedForwardLayerParam)
+    import NoteModel
+    NoteModel.TFVariableToShapeMap(outputFilePath)
     return True
 
 def TFLSTMVariableName(layerIdx, isForward, paramName, prefix = None):
@@ -669,6 +717,7 @@ if __name__ == '__main__':
     # ConvertMadmomOnsetModelToTensorflow()
     
     # ConvertMadmomDownbeatsModelToTensorflow()
+    # ConvertMadmomDownbeatsModelToTensorflow_MergeAll()
     print('model tool end')
 
 
