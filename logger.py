@@ -30,7 +30,7 @@ def info(*objs):
 def error(*objs):
     __log.error(*objs)
 
-__log = Logger(to_console=True)
+# __log = Logger(to_console=True)
 
 def init(filename = 'default.log', to_console = False):
     globals()['__log'] = Logger(filename, to_console)
