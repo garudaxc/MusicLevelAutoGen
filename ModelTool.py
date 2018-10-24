@@ -121,26 +121,55 @@ def MadmomLSTMLayerParam_MergeAll(layerArr):
 def MadmomBLSTMLayerParam(layer):
     return [MadmomLSTMLayerParam(layer.fwd_layer), MadmomLSTMLayerParam(layer.bwd_layer)]
 
-def MadmomBLSTMLayerParam_MergeAll(layerArr):
+def SwapKernerFWAndBW(kernel, inputDim, numUnits, modelCount):
+    kernelFW = []
+    kernerBW = []
+    offset = numUnits // modelCount
+    for idx in range(modelCount):
+        start = idx * offset * 2
+        kernelFW.append(kernel[start : start + offset, :])
+        kernerBW.append(kernel[start + offset : start + 2 * offset, :])
+
+    kernelPre = kernel[inputDim:, :]
+
+    kernelFW = np.concatenate(kernelFW)
+    kernerBW = np.concatenate(kernerBW)
+    return np.concatenate((kernelFW, kernerBW, kernelPre))
+
+
+def MadmomBLSTMLayerParam_MergeAll(layerArr, swapLstmLayerFWAndBW):
     fwdArr = []
     bwdArr = []
     for layer in layerArr:
         fwdArr.append(layer.fwd_layer)
         bwdArr.append(layer.bwd_layer)
-    return [MadmomLSTMLayerParam_MergeAll(fwdArr), MadmomLSTMLayerParam_MergeAll(bwdArr)]
+
+    fwParams = MadmomLSTMLayerParam_MergeAll(fwdArr)
+    bwParams = MadmomLSTMLayerParam_MergeAll(bwdArr)
+    if swapLstmLayerFWAndBW:
+        modelCount = len(layerArr)
+        fwParams = (SwapKernerFWAndBW(fwParams[0], fwParams[5], fwParams[6], modelCount), fwParams[1], fwParams[2], fwParams[3], fwParams[4], fwParams[5], fwParams[6])
+        bwParams = (SwapKernerFWAndBW(bwParams[0], bwParams[5], bwParams[6], modelCount), bwParams[1], bwParams[2], bwParams[3], bwParams[4], bwParams[5], bwParams[6])
+
+    return [fwParams, bwParams]
 
 def MadmomFeedForwardLayerParam(layer):
     return layer.weights, layer.bias, layer.activation_fn
 
 def MadmomFeedForwardLayerParam_MergeAll(layerArr):
-    weights = []
+    weightsFW = []
+    weightsBW = []
     bias = []
     activation_fn = layerArr[0].activation_fn
     for layer in layerArr:
-        weights.append(layer.weights)
+        count = len(layer.weights) // 2
+        weightsFW.append(layer.weights[0:count, :])
+        weightsBW.append(layer.weights[count:, :])
         bias.append(layer.bias)
 
-    weights = ExpandArrDiagBlock(weights)
+    weightsFW = ExpandArrDiagBlock(weightsFW)
+    weightsBW = ExpandArrDiagBlock(weightsBW)
+    weights = np.concatenate((weightsFW, weightsBW))
     bias = np.concatenate(bias)
     return weights, bias, activation_fn
 
@@ -380,11 +409,11 @@ def ConvertMadmomDownbeatsModelToTensorflow_MergeAll():
 
     madmomBLSTMParamArr = []
     madmomFeedForwardLayerParam = None
-    for layerArr in layerArrs:
+    for idx, layerArr in enumerate(layerArrs):
         layer = layerArr[0]
         layerType = type(layer)
         if layerType == madmom.ml.nn.layers.BidirectionalLayer:
-            madmomBLSTMParamArr.append(MadmomBLSTMLayerParam_MergeAll(layerArr))
+            madmomBLSTMParamArr.append(MadmomBLSTMLayerParam_MergeAll(layerArr, idx > 0))
         elif layerType == madmom.ml.nn.layers.FeedForwardLayer:
             madmomFeedForwardLayerParam = MadmomFeedForwardLayerParam_MergeAll(layerArr)
         else:
@@ -394,8 +423,6 @@ def ConvertMadmomDownbeatsModelToTensorflow_MergeAll():
     varScopeName = 'downbeats'
     outputFilePath = GenerateOutputModelPath(varScopeName, mkdirIfNotExists=True)
     MadmomDownbeatsModelToTensorflow(None, 'downbeats', outputFilePath, madmomBLSTMParamArr, madmomFeedForwardLayerParam)
-    import NoteModel
-    NoteModel.TFVariableToShapeMap(outputFilePath)
     return True
 
 def TFLSTMVariableName(layerIdx, isForward, paramName, prefix = None):

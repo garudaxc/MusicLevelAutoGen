@@ -23,6 +23,8 @@ class NoteLevelGenerator():
         self.noteModelBatchSize = 8
         self.noteModelOverlap = 128
         self.noteModelInputDim = 314
+
+        self.bpmModelUseMerged = True
         self.bpmModelInputDim = 314
         self.bpmModelBatchSize = 1
         self.bpmModelCount = 8
@@ -44,8 +46,16 @@ class NoteLevelGenerator():
         longModelPath = self.getModelPath(resourceDir, 'model_longnote')
         onsetModelPath = self.getModelPath(resourceDir, 'onset')
         bpmModelPathArr = []
-        for i in range(self.bpmModelCount):
-            bpmModelPathArr.append(self.getModelPath(resourceDir, 'downbeats_' + str(i)))
+        bpmModelVariableScopeNameArr = []
+        if self.bpmModelUseMerged:
+            varScopeName = 'downbeats'
+            bpmModelVariableScopeNameArr.append(varScopeName)
+            bpmModelPathArr.append(self.getModelPath(resourceDir, varScopeName))
+        else:
+            for i in range(self.bpmModelCount):
+                varScopeName = 'downbeats_' + str(i)
+                bpmModelVariableScopeNameArr.append(varScopeName)
+                bpmModelPathArr.append(self.getModelPath(resourceDir, varScopeName))
 
         graph = tf.Graph()
 
@@ -85,8 +95,8 @@ class NoteLevelGenerator():
             saver.restore(sess, onsetModelPath)
 
             bpmModelTensorDicArr = []
-            for idx, bpmModelPath in enumerate(bpmModelPathArr):
-                bpmModelTensorDicArr.append(self.initBPMModel(sess, bpmModelPath, 'downbeats_' + str(idx)))
+            for bpmModelPath, bpmModelVariableScopeName in zip(bpmModelPathArr, bpmModelVariableScopeNameArr):
+                bpmModelTensorDicArr.append(self.initBPMModel(sess, bpmModelPath, bpmModelVariableScopeName))
             self.bpmModelTensorDicArr = bpmModelTensorDicArr
 
         self.graph = graph
@@ -166,6 +176,9 @@ class NoteLevelGenerator():
 
             bpmModelInputData = np.reshape(clipPreCalcData, (-1, self.bpmModelBatchSize, self.bpmModelInputDim))
             bpmSeqLen = [len(bpmModelInputData)] * self.bpmModelBatchSize
+            if self.bpmModelUseMerged:
+                bpmModelInputData = [bpmModelInputData] * self.bpmModelCount
+                bpmModelInputData = np.concatenate(bpmModelInputData, 2)
 
             runTensorArr = []
             inputTensorArr = []
@@ -196,7 +209,14 @@ class NoteLevelGenerator():
         shortModelRes = self.postProcessNoteModelRes(shortModelRes, len(tfSpecDiff))
         longModelRes = self.postProcessNoteModelRes(longModelRes, len(tfSpecDiff))
 
-        bpmRes = res[len(res) - self.bpmModelCount:]
+        if self.bpmModelUseMerged:
+            tempRes = res[3]
+            bpmRes = []
+            bpmSubOutputDim = len(tempRes[0]) // self.bpmModelCount
+            for idx in range(self.bpmModelCount):
+                bpmRes.append(tempRes[:, idx*bpmSubOutputDim: (idx+1)*bpmSubOutputDim])
+        else:
+            bpmRes = res[len(res) - self.bpmModelCount:]
         bpm, et, duration = self.postProcessBPMModelRes(bpmRes, audioData, inputFilePath, isTranscodeByQAAC)
 
         postprocess.GenerateLevelImp(inputFilePath, duraion, bpm, et, 
@@ -238,10 +258,16 @@ class NoteLevelGenerator():
     def initBPMModel(self, sess, modelPath, variableScopeName):
         batchSize = 1
         numUnits = 25
-        inputDim = 314
+        inputDim = self.bpmModelInputDim
+        outputDim = 3
+        if self.bpmModelUseMerged:
+            numUnits = numUnits * self.bpmModelCount
+            inputDim = inputDim * self.bpmModelCount
+            outputDim = outputDim * self.bpmModelCount
+
         usePeepholes = True
         useLSTMBlockFusedCell = True
-        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, batchSize, numUnits, inputDim, usePeepholes, [numUnits * 2, 3], [3], tf.nn.softmax, useLSTMBlockFusedCell)
+        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, batchSize, numUnits, inputDim, usePeepholes, [numUnits * 2, outputDim], [outputDim], tf.nn.softmax, useLSTMBlockFusedCell)
 
         varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=variableScopeName)
         saver = tf.train.Saver(var_list=varList)
