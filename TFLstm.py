@@ -31,7 +31,7 @@ bSaveModel = True
 
 epch = 10000
 
-useCudnnGPUModeForInference = True    
+useCudnnGPUModeForInference = NoteEnvironment.IsGPUAvailable()    
 class ModelParam():
     def __init__(self, variableScopeName, batchSize=16, maxTime=128, numLayers=3, numUnits=26, dropout=0.4, 
         timeMajor=False, useCudnn=False, restoreCudnnWithGPUMode=False, featureProcessorClass=NoteFeatureProcessor.ShortNoteFeatureProcessor):
@@ -957,7 +957,7 @@ def GenerateLevel():
     xData = myprocesser.FeatureStandardize(specDiff)
     print('preprocess cost time', time.time() - startTime)
 
-    multiProcessAllTask = True
+    multiProcessAllTask = False
     if multiProcessAllTask:
         # todo 内存不够，待调整
         shortModelParam.restoreCudnnWithGPUMode = False
