@@ -9,6 +9,7 @@ import ModelTool
 import time
 import myprocesser
 from functools import partial
+import postprocess
 
 class NoteLevelGenerator():
     def __init__(self):
@@ -36,6 +37,8 @@ class NoteLevelGenerator():
 
         if not os.path.exists(resourceDir):
             return False
+
+        self.resourceDir = resourceDir
 
         shortModelPath = self.getModelPath(resourceDir, 'model_singing')
         longModelPath = self.getModelPath(resourceDir, 'model_longnote')
@@ -97,6 +100,10 @@ class NoteLevelGenerator():
 
     def run(self, inputFilePath, outputFilePath, isTranscodeByQAAC=False, fakeAudioData=None, outputDebugInfo=False):
         if self.graph is None or self.sess is None:
+            return False
+
+        templateFilePath = self.getLevelTemplatePath(self.resourceDir)
+        if not os.path.exists(templateFilePath):
             return False
 
         sampleRate = self.sampleRate
@@ -191,8 +198,10 @@ class NoteLevelGenerator():
 
         bpmRes = res[len(res) - self.bpmModelCount:]
         bpm, et, duration = self.postProcessBPMModelRes(bpmRes, audioData, inputFilePath, isTranscodeByQAAC)
-        if outputDebugInfo:
-            print('bpm', bpm, 'et', et, 'duration', duration)
+
+        postprocess.GenerateLevelImp(inputFilePath, duraion, bpm, et, 
+                    shortModelRes, longModelRes, outputFilePath, templateFilePath, 0.7, 0.7, 
+                    onsetActivation=onsetModelRes, enableDecodeOffset=isTranscodeByQAAC)
 
         return True
 
