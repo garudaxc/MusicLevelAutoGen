@@ -396,18 +396,7 @@ def TestAudioSpec():
 
 def RunNoteLevelGenerator():
     generator = NoteLevelGenerator.NoteLevelGenerator()
-    rootDir = util.getRootDir()
-
-    shortModelPath = os.path.join(rootDir, 'model_singing')
-    shortModelPath = os.path.join(shortModelPath, 'model_singing.ckpt')
-
-    longModelPath = os.path.join(rootDir, 'model')
-    longModelPath = os.path.join(longModelPath, 'model_longnote.ckpt')
-
-    onsetModelPath = modelFilePath = ModelTool.GenerateOutputModelPath('onset')
-
-    bpmModelPath = ''
-    if not generator.initialize(shortModelPath, longModelPath, onsetModelPath, bpmModelPath):
+    if not generator.initialize():
         return False
 
     songArr = ['ouxiangwanwansui', 'jinzhongzhao', 'gundong', 'baaifangkai']

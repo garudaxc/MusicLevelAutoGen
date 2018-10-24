@@ -7,6 +7,7 @@ import NoteEnvironment
 import NoteModel
 import ModelTool
 import time
+import myprocesser
 
 class NoteLevelGenerator():
     def __init__(self):
@@ -24,8 +25,19 @@ class NoteLevelGenerator():
         self.noteModelOverlap = 128
         self.noteModelInputDim = 314
 
-    def initialize(self, shortModelPath, longModelPath, onsetModelPath, bpmModelPath):
-        # todo check path
+    def initialize(self, resourceDir=None):
+        if resourceDir is None:
+            resourceDir = self.defaultResourceDir()
+
+        if not os.path.exists(resourceDir):
+            return False
+
+        shortModelPath = self.getModelPath(resourceDir, 'model_singing')
+        longModelPath = self.getModelPath(resourceDir, 'model_longnote')
+        onsetModelPath = self.getModelPath(resourceDir, 'onset')
+        bpmModelPathArr = []
+        for i in range(8):
+            bpmModelPathArr.append(self.getModelPath(resourceDir, 'downbeats_' + str(i)))
 
         graph = tf.Graph()
 
@@ -69,6 +81,7 @@ class NoteLevelGenerator():
         # just for gpu version init
         fakeAudioData = [0.0] * self.sampleRate * 60 * 1
         self.run('', '', fakeAudioData=fakeAudioData)
+        print('initialize end')
 
         return True
 
@@ -122,7 +135,8 @@ class NoteLevelGenerator():
             tfLogMel = ModelTool.PostProcessTFLogMel(tfLogMel, frameCount, swap=True)
             tfSpecDiff = ModelTool.PostProcessTFSpecDiff(tfSpecDiff, frameCount, self.diffFrameArr)
 
-            noteModelInputData = NotePreprocess.SplitData(tfSpecDiff, self.noteModelBatchSize, self.noteModelOverlap)
+            noteModelInputData = myprocesser.FeatureStandardize(tfSpecDiff)
+            noteModelInputData = NotePreprocess.SplitData(noteModelInputData, self.noteModelBatchSize, self.noteModelOverlap)
             noteModelInputData = noteModelInputData.reshape(self.noteModelBatchSize, -1, self.noteModelInputDim)
 
             shortInputTensor = self.shortTensorDic['X']
@@ -179,4 +193,22 @@ class NoteLevelGenerator():
 
         res = sess.run(runTensorArr, feed_dict=dic)
         return res
+
+    def defaultResourceDir(self):
+        filePath = os.path.abspath(__file__)
+        fileDir = os.path.dirname(filePath)
+        resourceDir = os.path.join(fileDir, 'resource')
+        return resourceDir
+
+    def getModelPath(self, resourceDir, modelName):
+        modelDir = os.path.join(resourceDir, 'model')
+        modelDir = os.path.join(modelDir, modelName)
+        modelFilePath = os.path.join(modelDir, modelName + '.ckpt')
+        return modelFilePath
+
+    def getLevelTemplatePath(self, resourceDir):
+        fileDir= os.path.join(resourceDir, 'template')
+        filePath = os.path.join(fileDir, 'idol_template.xml')
+        return filePath
+
 
