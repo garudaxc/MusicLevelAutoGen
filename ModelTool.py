@@ -155,17 +155,17 @@ def FindVarByName(varList, name, appendZero = True):
     print('search', searchName, '   failed')
     return None
 
-def BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc, useLSTMBlockFusedCell):
-    print('variableScopeName', variableScopeName, 'numLayers', numLayers, 'batchSize', batchSize, 'maxTime', maxTime, 'numUnits', numUnits)
+def BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc, useLSTMBlockFusedCell):
+    print('variableScopeName', variableScopeName, 'numLayers', numLayers, 'batchSize', batchSize, 'numUnits', numUnits)
     print('usePeepholes', usePeepholes, 'weightsShape', weightsShape, 'biasShape', biasShape)
     
     buildFunc = BuildDownbeatsModelGraphWithLSTMCell
     if useLSTMBlockFusedCell:
         buildFunc = BuildDownbeatsModelGraphWithLSTMBlockFusedCell
     
-    return buildFunc(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc)
+    return buildFunc(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc)
 
-def BuildDownbeatsModelGraphWithLSTMCell(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc):
+def BuildDownbeatsModelGraphWithLSTMCell(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc):
     print('BuildDownbeatsModelGraph With LSTMCell')
     with tf.variable_scope(variableScopeName):
         cells = []
@@ -175,7 +175,7 @@ def BuildDownbeatsModelGraphWithLSTMCell(variableScopeName, numLayers, batchSize
             cell = rnn.LSTMCell(numUnits, use_peepholes=usePeepholes, forget_bias=forgetBias)
             cells.append(cell)
 
-        XShape = (batchSize, maxTime, inputDim)
+        XShape = (batchSize, None, inputDim)
         X = tf.placeholder(dtype=tf.float32, shape=XShape, name='X')
         sequenceLength = tf.placeholder(tf.int32, [None], name='sequence_length')
         outputs, statesFW, statesBW = rnn.stack_bidirectional_dynamic_rnn(
@@ -183,7 +183,7 @@ def BuildDownbeatsModelGraphWithLSTMCell(variableScopeName, numLayers, batchSize
             X, sequence_length=sequenceLength, dtype=tf.float32)
         
         outlayerDim = tf.shape(outputs)[2]
-        outputs = tf.reshape(outputs, [batchSize * maxTime, outlayerDim])
+        outputs = tf.reshape(outputs, [-1, outlayerDim])
 
         weights = tf.Variable(tf.random_normal(weightsShape, dtype=tf.float32), name='output_linear_w')
         bias = tf.Variable(tf.random_normal(biasShape, dtype=tf.float32), name='output_linear_b')
@@ -202,13 +202,14 @@ def CreateLSTMBlockFusedCell(layerIdx, isForward, numUnits, usePeepholes, forget
     cell = rnn.LSTMBlockFusedCell(numUnits, use_peephole=usePeepholes, forget_bias=forgetBias, name=cellName)
     return cell
 
-def BuildDownbeatsModelGraphWithLSTMBlockFusedCell(variableScopeName, numLayers, batchSize, maxTime, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc):    
+def BuildDownbeatsModelGraphWithLSTMBlockFusedCell(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc):    
     print('BuildDownbeatsModelGraph With LSTMBlockFusedCell')
     with tf.variable_scope(variableScopeName):
         cells = []
-        tempInputFirst = tf.zeros([maxTime, batchSize, inputDim])
+        # 这里的shape只用来build，只会用的shape[2],考虑换个更直接的函数....
+        tempInputFirst = tf.zeros([1, batchSize, inputDim])
         inputShapeFirst = tempInputFirst.get_shape().with_rank(3)
-        tempInputOther = tf.zeros([maxTime, batchSize, numUnits * 2])
+        tempInputOther = tf.zeros([1, batchSize, numUnits * 2])
         inputShapeOther = tempInputOther.get_shape().with_rank(3)
         # madmom的源码里计算gate activation时，没有用forget_bias，转过来需要设置成0
         forgetBias = 0.0
@@ -223,7 +224,7 @@ def BuildDownbeatsModelGraphWithLSTMBlockFusedCell(variableScopeName, numLayers,
                 bwCell.build(inputShapeOther)
             cells.append((fwCell, bwCell))
 
-        XShape = (maxTime, batchSize, inputDim)
+        XShape = (None, batchSize, inputDim)
         X = tf.placeholder(dtype=tf.float32, shape=XShape, name='X')
         sequenceLength = tf.placeholder(tf.int32, [None], name='sequence_length')
 
@@ -245,7 +246,7 @@ def BuildDownbeatsModelGraphWithLSTMBlockFusedCell(variableScopeName, numLayers,
         outputs = currentFWInput
         
         outlayerDim = tf.shape(outputs)[2]
-        outputs = tf.reshape(outputs, [batchSize * maxTime, outlayerDim])
+        outputs = tf.reshape(outputs, [-1, outlayerDim])
 
         weights = tf.Variable(tf.random_normal(weightsShape, dtype=tf.float32), name='output_linear_w')
         bias = tf.Variable(tf.random_normal(biasShape, dtype=tf.float32), name='output_linear_b')
