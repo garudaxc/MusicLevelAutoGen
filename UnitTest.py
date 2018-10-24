@@ -102,6 +102,11 @@ def RunDownbeatsTFModel(xData, modelFilePath, useLSTMBlockFusedCell):
     usePeepholes = True
     numUnits = 25
 
+    # mergeSize = 8
+    # inputDim = inputDim * mergeSize
+    # numUnits = numUnits * mergeSize
+    # xData = np.random.rand(6000 * 4, 1, inputDim)
+
     graph = tf.Graph()
     variableScopeName = os.path.splitext(os.path.basename(modelFilePath))[0]
     with graph.as_default():
