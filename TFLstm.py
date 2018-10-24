@@ -726,8 +726,8 @@ def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredict
         DownbeatTracking.SaveInstantValue(tempShort, songFilePath, '_long_temp_short')
         DownbeatTracking.SaveInstantValue(tempLong, songFilePath, '_long_temp_long')
 
-    mergeShort = DownbeatTracking.AppendEmptyDataWithDecodeOffset(songFilePath, mergeShort, fps)
-    longNote = DownbeatTracking.AppendEmptyDataWithDecodeOffset(songFilePath, longNote, fps)
+    mergeShort = NotePreprocess.AppendEmptyDataWithDecodeOffset(songFilePath, mergeShort, fps)
+    longNote = NotePreprocess.AppendEmptyDataWithDecodeOffset(songFilePath, longNote, fps)
     levelNotes = postprocess.ProcessSampleToIdolLevel2(longNote, mergeShort, bpm, et)
     LevelInfo.GenerateIdolLevel(levelFilePath, levelNotes, bpm, et, duration, templateFilePath)
     print('GenerateLevelImp cost', time.time() - startTime)

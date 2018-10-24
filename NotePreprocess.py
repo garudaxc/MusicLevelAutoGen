@@ -18,7 +18,6 @@ from functools import partial
 from madmom.models import ONSETS_CNN
 from madmom.ml.nn import NeuralNetwork
 
-import DownbeatTracking
 import multiprocessing as mp
 import math
 
@@ -152,6 +151,23 @@ def madmom_features_downbeats_filter_downbeats(beats):
     # return only downbeats (timestamps)
     return beats[beats[:, 1] == 1][:, 0]
     
+def DecodeOffset(filename):
+    offset = 0
+    if os.path.splitext(filename)[1] == '.m4a':
+        offset = (2112 * 2 - 2048) / 44100
+
+    print('decode offset', offset)
+    return offset
+
+def AppendEmptyDataWithDecodeOffset(filename, arr, fps):
+    decodeOffset = DecodeOffset(filename)
+    count = round(decodeOffset * 100)
+    if count <= 0:
+        return arr
+
+    print('append decode offset frame count', count)
+    return np.concatenate(([0] * count, arr))
+
 def AnalysisInfo(duration):
     analysisLength = 60
     start = int(duration * 0.3)
@@ -514,7 +530,7 @@ class AllTaskProcessor(Processor):
         bpm, et = CalcBpmET(self.bpmParam[1], self.bpmParam[2], self.bpmParam[3], downBeatOutput, downBeatOutput)
         duration = int(self.bpmParam[3] * 1000)
         print('origin et', et)
-        et = et + DownbeatTracking.DecodeOffset(self.bpmParam[4])
+        et = et + DecodeOffset(self.bpmParam[4])
         print('decode offset et', et)
         et = int(et * 1000)
         bpmEndTime = time.time()

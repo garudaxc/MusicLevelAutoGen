@@ -261,24 +261,6 @@ def SaveDownbeat(bpm, et, lastBeat, filename):
     downbeat = np.arange(numBar) * downbeatInter + et
     SaveInstantValue(downbeat, filename, '_downbeat')
 
-
-def DecodeOffset(filename):
-    offset = 0
-    if os.path.splitext(filename)[1] == '.m4a':
-        offset = (2112 * 2 - 2048) / 44100
-
-    print('decode offset', offset)
-    return offset
-
-def AppendEmptyDataWithDecodeOffset(filename, arr, fps):
-    decodeOffset = DecodeOffset(filename)
-    count = round(decodeOffset * 100)
-    if count <= 0:
-        return arr
-
-    print('append decode offset frame count', count)
-    return np.concatenate(([0] * count, arr))
-
 def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1, saveToFile=True, preCalcData = None, audioData = None):
     if audioData is None:
         y, sr = librosa.load(filename, mono=True, sr=44100)
@@ -306,7 +288,7 @@ def CalcMusicInfoFromFile(filename, debugET = -1, debugBPM = -1, saveToFile=True
         bpm, etAuto = NotePreprocess.CalcBpmET(y, sr, duration, preCalcData)
 
         print('bpm', bpm, 'et', etAuto)
-        etAuto = etAuto + DecodeOffset(filename)
+        etAuto = etAuto + NotePreprocess.DecodeOffset(filename)
         print('et apply decode offset', etAuto)
     if (debugET >= 0):
         print('force set et:', debugET)
