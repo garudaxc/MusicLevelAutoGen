@@ -181,7 +181,7 @@ class NoteLevelGenerator():
 
         return True
 
-    def releaseResource():
+    def releaseResource(self):
         if self.sess is not None:
             self.sess.close()
 

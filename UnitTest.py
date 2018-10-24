@@ -406,6 +406,8 @@ def RunNoteLevelGenerator():
         generator.run(TFLstm.MakeMp3Pathname(song), outputFilePath, outputDebugInfo=True)
         print('cost _______ ', song, time.time() - runStart)
 
+    generator.releaseResource()
+
     return True
 
 
