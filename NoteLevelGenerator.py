@@ -8,6 +8,7 @@ import NoteModel
 import ModelTool
 import time
 import myprocesser
+from functools import partial
 
 class NoteLevelGenerator():
     def __init__(self):
@@ -94,7 +95,7 @@ class NoteLevelGenerator():
 
         return True
 
-    def run(self, inputFilePath, outputFilePath, fakeAudioData=None, outputDebugInfo=False):
+    def run(self, inputFilePath, outputFilePath, isTranscodeByQAAC=False, fakeAudioData=None, outputDebugInfo=False):
         if self.graph is None or self.sess is None:
             return False
 
@@ -149,7 +150,14 @@ class NoteLevelGenerator():
             noteModelInputData = noteModelInputData.reshape(self.noteModelBatchSize, -1, self.noteModelInputDim)
             noteModelSeqLen = [len(noteModelInputData[0])] * self.noteModelBatchSize
 
-            bpmModelInputData = np.reshape(tfSpecDiff, (-1, self.bpmModelBatchSize, self.bpmModelInputDim))
+            preCalcData = tfSpecDiff
+            duraion = len(audioData) / self.sampleRate
+            start, analysisLength = NotePreprocess.AnalysisInfo(duraion)
+            startIdx = int(start * self.fps)
+            endIdx = startIdx + int(analysisLength * self.fps)
+            clipPreCalcData = preCalcData[startIdx:endIdx]
+
+            bpmModelInputData = np.reshape(clipPreCalcData, (-1, self.bpmModelBatchSize, self.bpmModelInputDim))
             bpmSeqLen = [len(bpmModelInputData)] * self.bpmModelBatchSize
 
             runTensorArr = []
@@ -167,17 +175,24 @@ class NoteLevelGenerator():
                 timeStart = time.time()
                 
             res = self.runSess(sess, runTensorArr, inputTensorArr, inputDataArr)
-            shortModelRes = res[0]
-            longModelRes = res[1]
-            onsetModelRes = res[2]
-
-            shortModelRes = self.postProcessNoteModelRes(shortModelRes, len(tfSpecDiff))
-            longModelRes = self.postProcessNoteModelRes(longModelRes, len(tfSpecDiff))
-
             if outputDebugInfo:
                 print('cost model', time.time() - timeStart)
-                print('shape onset res', np.shape(onsetModelRes))
                 timeStart = time.time()
+
+        if fakeAudioData is not None:
+            return True
+
+        shortModelRes = res[0]
+        longModelRes = res[1]
+        onsetModelRes = res[2]
+
+        shortModelRes = self.postProcessNoteModelRes(shortModelRes, len(tfSpecDiff))
+        longModelRes = self.postProcessNoteModelRes(longModelRes, len(tfSpecDiff))
+
+        bpmRes = res[len(res) - self.bpmModelCount:]
+        bpm, et, duration = self.postProcessBPMModelRes(bpmRes, audioData, inputFilePath, isTranscodeByQAAC)
+        if outputDebugInfo:
+            print('bpm', bpm, 'et', et, 'duration', duration)
 
         return True
 
@@ -252,3 +267,16 @@ class NoteLevelGenerator():
         res = res.reshape(-1, outputDim)
         res = res[0:frameCount]
         return res
+
+    def postProcessBPMModelRes(self, res, audioData, audioFilePath, isTranscodeByQAAC):
+        predict = madmom.ml.nn.average_predictions(res)
+        act = partial(np.delete, obj=0, axis=1)
+        downBeatOutput = act(predict)
+        duration = len(audioData) / self.sampleRate
+        bpm, et = NotePreprocess.CalcBpmET(audioData, self.sampleRate, duration, downBeatOutput, downBeatOutput)
+        if isTranscodeByQAAC:
+            et = et + NotePreprocess.DecodeOffset(audioFilePath)
+
+        duration = int(duration * 1000)
+        et = int(et * 1000)
+        return bpm, et, duration
