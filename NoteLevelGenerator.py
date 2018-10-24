@@ -51,6 +51,8 @@ class NoteLevelGenerator():
         frameSizeArr = self.frameSizeArr
         numBandArr = self.numBandArr
 
+        restoreCudnnWithGPUMode = NoteEnvironment.IsGPUAvailable()
+
         with graph.as_default():
             # todo use enviroment setting
             # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
@@ -62,12 +64,12 @@ class NoteLevelGenerator():
             self.preprocessTensorArr = preprocessTensorArr
             self.diffFrameArr = diffFrameArr
 
-            self.shortModel = NoteModel.NoteDetectionModel('short_note', self.noteModelBatchSize, 0, 3, 26, self.noteModelInputDim, 3, timeMajor=False, useCudnn=True, restoreCudnnWithGPUMode=True)
+            self.shortModel = NoteModel.NoteDetectionModel('short_note', self.noteModelBatchSize, 0, 3, 26, self.noteModelInputDim, 3, timeMajor=False, useCudnn=True, restoreCudnnWithGPUMode=restoreCudnnWithGPUMode)
             self.shortModel.Restore(sess, shortModelPath)
             self.shortTensorDic = self.shortModel.GetTensorDic()
             self.shortInitialStatesZero = self.shortModel.InitialStatesZero()
             
-            self.longModel = NoteModel.NoteDetectionModel('long_note', self.noteModelBatchSize, 0, 3, 26, self.noteModelInputDim, 4, timeMajor=False, useCudnn=True, restoreCudnnWithGPUMode=True)
+            self.longModel = NoteModel.NoteDetectionModel('long_note', self.noteModelBatchSize, 0, 3, 26, self.noteModelInputDim, 4, timeMajor=False, useCudnn=True, restoreCudnnWithGPUMode=restoreCudnnWithGPUMode)
             self.longModel.Restore(sess, longModelPath)
             self.longTensorDic = self.longModel.GetTensorDic()
             self.longInitialStatesZero  = self.longModel.InitialStatesZero()

@@ -1,5 +1,6 @@
 import os
 import tensorflow as tf
+from tensorflow.python.client import device_lib
 
 def GetEnv(key):
     if key not in os.environ:
@@ -14,6 +15,17 @@ def SetEnv(key, val):
 
 def IsLinux():
     return 'nt' != os.name
+
+def IsGPUAvailable():
+    deviceList = device_lib.list_local_devices()
+    if deviceList is None:
+        return False
+
+    for device in deviceList:
+        if device.device_type == 'GPU':
+            return True
+
+    return False
 
 def SetPrefrenceEnvironmentVariable():
     if IsLinux():
