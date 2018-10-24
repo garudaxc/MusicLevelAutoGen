@@ -173,9 +173,9 @@ class NoteDetectionModel():
         return classifyInfo
 
     def XAndSequenceLength(self):
-        XShape = (self.batchSize, self.maxTime, self.xDim)
+        XShape = (self.batchSize, None, self.xDim)
         if self.timeMajor:
-            XShape = (self.maxTime, self.batchSize, self.xDim)
+            XShape = (None, self.batchSize, self.xDim)
 
         X = tf.placeholder(dtype=tf.float32, shape=XShape, name='X')
         sequenceLength = tf.placeholder(tf.int32, [None], name='sequence_length')
@@ -423,9 +423,8 @@ class NoteDetectionModel():
             self.RestoreForCudnnImp(sess, modelFilePath)
 
     def RestoreForCudnnImp(self, sess, modelFilePath):
+        X, sequenceLength = self.XAndSequenceLength()
         if self.restoreCudnnWithGPUMode:
-            X = tf.placeholder(dtype=tf.float32, shape=[self.batchSize, None, self.xDim], name='X')
-            sequenceLength = tf.placeholder(tf.int32, [None], name='sequence_length')
             outputs, initialStates, outputStates = self.CudnnLSTM(X, training=False)
         else:
             X, sequenceLength = self.XAndSequenceLength()

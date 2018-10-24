@@ -147,6 +147,7 @@ class NoteLevelGenerator():
             noteModelInputData = myprocesser.FeatureStandardize(tfSpecDiff)
             noteModelInputData = NotePreprocess.SplitData(noteModelInputData, self.noteModelBatchSize, self.noteModelOverlap)
             noteModelInputData = noteModelInputData.reshape(self.noteModelBatchSize, -1, self.noteModelInputDim)
+            noteModelSeqLen = [len(noteModelInputData[0])] * self.noteModelBatchSize
 
             bpmModelInputData = np.reshape(tfSpecDiff, (-1, self.bpmModelBatchSize, self.bpmModelInputDim))
             bpmSeqLen = [len(bpmModelInputData)] * self.bpmModelBatchSize
@@ -155,8 +156,8 @@ class NoteLevelGenerator():
             inputTensorArr = []
             inputDataArr = []
 
-            self.addNoteModelSessData(runTensorArr, inputTensorArr, inputDataArr, self.shortTensorDic, noteModelInputData, self.shortInitialStatesZero)
-            self.addNoteModelSessData(runTensorArr, inputTensorArr, inputDataArr, self.longTensorDic, noteModelInputData, self.longInitialStatesZero)
+            self.addNoteModelSessData(runTensorArr, inputTensorArr, inputDataArr, self.shortTensorDic, noteModelInputData, noteModelSeqLen, self.shortInitialStatesZero)
+            self.addNoteModelSessData(runTensorArr, inputTensorArr, inputDataArr, self.longTensorDic, noteModelInputData, noteModelSeqLen, self.longInitialStatesZero)
             self.addOnsetModelSessData(runTensorArr, inputTensorArr, inputDataArr, self.onsetTensorDic, tfLogMel)
             for bpmTensorDic in self.bpmModelTensorDicArr:
                 self.addBPMModelSessData(runTensorArr, inputTensorArr, inputDataArr, bpmTensorDic, bpmModelInputData, bpmSeqLen)
@@ -223,11 +224,13 @@ class NoteLevelGenerator():
         saver.restore(sess, modelPath)
         return tensorDic
 
-    def addNoteModelSessData(self, runTensorArr, inputTensorArr, inputDataArr, tensorDic, inputData, initState):
+    def addNoteModelSessData(self, runTensorArr, inputTensorArr, inputDataArr, tensorDic, inputData, seqLen, initState):
         runTensorArr.append(tensorDic['predict_op'])
         inputTensorArr.append(tensorDic['X'])
+        inputTensorArr.append(tensorDic['sequence_length'])
         inputTensorArr.append(tensorDic['initial_states'])
         inputDataArr.append(inputData)
+        inputDataArr.append(seqLen)
         inputDataArr.append(initState)
 
     def addOnsetModelSessData(self, runTensorArr, inputTensorArr, inputDataArr, tensorDic, inputData):
