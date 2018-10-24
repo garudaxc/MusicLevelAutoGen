@@ -18,12 +18,16 @@ class NoteLevelGenerator():
         self.hopSize = int(self.sampleRate / self.fps)
         self.frameSizeArr = [1024, 2048, 4096]
         self.numBandArr = [3, 6, 12]
-        # todo limit time duraion
-        self.minDuration = 10
-        self.maxDuration = 60 * 20
         self.noteModelBatchSize = 8
         self.noteModelOverlap = 128
         self.noteModelInputDim = 314
+        self.bpmModelInputDim = 314
+        self.bpmModelBatchSize = 1
+        self.bpmModelCount = 8
+
+        # todo limit time duraion
+        self.minDuration = 10
+        self.maxDuration = 60 * 20
 
     def initialize(self, resourceDir=None):
         if resourceDir is None:
@@ -36,7 +40,7 @@ class NoteLevelGenerator():
         longModelPath = self.getModelPath(resourceDir, 'model_longnote')
         onsetModelPath = self.getModelPath(resourceDir, 'onset')
         bpmModelPathArr = []
-        for i in range(8):
+        for i in range(self.bpmModelCount):
             bpmModelPathArr.append(self.getModelPath(resourceDir, 'downbeats_' + str(i)))
 
         graph = tf.Graph()
@@ -47,16 +51,13 @@ class NoteLevelGenerator():
         frameSizeArr = self.frameSizeArr
         numBandArr = self.numBandArr
 
-        preprocessVariableScopeName = 'preprocess'
-        onsetVariableScopeName = 'onset'
-
         with graph.as_default():
             # todo use enviroment setting
             # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
             # gpu_options.allow_growth = False
             # sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
             sess = tf.Session()
-            signalTensorArr, preprocessTensorArr, diffFrameArr = ModelTool.BuildPreProcessGraph(preprocessVariableScopeName, sampleRate, frameSizeArr, numBandArr, hopSize)
+            signalTensorArr, preprocessTensorArr, diffFrameArr = ModelTool.BuildPreProcessGraph('preprocess', sampleRate, frameSizeArr, numBandArr, hopSize)
             self.signalTensorArr = signalTensorArr
             self.preprocessTensorArr = preprocessTensorArr
             self.diffFrameArr = diffFrameArr
@@ -71,10 +72,16 @@ class NoteLevelGenerator():
             self.longTensorDic = self.longModel.GetTensorDic()
             self.longInitialStatesZero  = self.longModel.InitialStatesZero()
 
+            onsetVariableScopeName = 'onset'
             self.onsetTensorDic = ModelTool.BuildOnsetModelGraph(onsetVariableScopeName)
             varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=onsetVariableScopeName)
             saver = tf.train.Saver(var_list=varList)
             saver.restore(sess, onsetModelPath)
+
+            bpmModelTensorDicArr = []
+            for idx, bpmModelPath in enumerate(bpmModelPathArr):
+                bpmModelTensorDicArr.append(self.initBPMModel(sess, bpmModelPath, 'downbeats_' + str(idx)))
+            self.bpmModelTensorDicArr = bpmModelTensorDicArr
 
         self.graph = graph
         self.sess = sess
@@ -139,40 +146,30 @@ class NoteLevelGenerator():
             noteModelInputData = NotePreprocess.SplitData(noteModelInputData, self.noteModelBatchSize, self.noteModelOverlap)
             noteModelInputData = noteModelInputData.reshape(self.noteModelBatchSize, -1, self.noteModelInputDim)
 
-            shortInputTensor = self.shortTensorDic['X']
-            shortOutputTensor = self.shortTensorDic['predict_op']
-            shortInitialStatesTensor = self.shortTensorDic['initial_states']
+            bpmModelInputData = np.reshape(tfSpecDiff, (-1, self.bpmModelBatchSize, self.bpmModelInputDim))
+            bpmSeqLen = [len(bpmModelInputData)] * self.bpmModelBatchSize
 
-            longInputTensor = self.longTensorDic['X']
-            longOutputTensor = self.longTensorDic['predict_op']
-            longInitialStatesTensor = self.longTensorDic['initial_states']
+            runTensorArr = []
+            inputTensorArr = []
+            inputDataArr = []
 
-            onsetInputTensor = self.onsetTensorDic['X']
-            onsetOutputTensor = self.onsetTensorDic['output']
+            self.addNoteModelSessData(runTensorArr, inputTensorArr, inputDataArr, self.shortTensorDic, noteModelInputData, self.shortInitialStatesZero)
+            self.addNoteModelSessData(runTensorArr, inputTensorArr, inputDataArr, self.longTensorDic, noteModelInputData, self.longInitialStatesZero)
+            self.addOnsetModelSessData(runTensorArr, inputTensorArr, inputDataArr, self.onsetTensorDic, tfLogMel)
+            for bpmTensorDic in self.bpmModelTensorDicArr:
+                self.addBPMModelSessData(runTensorArr, inputTensorArr, inputDataArr, bpmTensorDic, bpmModelInputData, bpmSeqLen)
 
             if outputDebugInfo:
                 print('cost temp cpu', time.time() - timeStart)
                 timeStart = time.time()
                 
-            shortModelRes, longModelRes, onsetModelRes = sess.run([shortOutputTensor, longOutputTensor, onsetOutputTensor], feed_dict={
-                shortInputTensor: noteModelInputData,
-                shortInitialStatesTensor: self.shortInitialStatesZero,
-                longInputTensor: noteModelInputData,
-                longInitialStatesTensor: self.longInitialStatesZero,
-                onsetInputTensor: tfLogMel
-                })
+            res = self.runSess(sess, runTensorArr, inputTensorArr, inputDataArr)
+            shortModelRes = res[0]
+            longModelRes = res[1]
+            onsetModelRes = res[2]
 
-            shortOutputDim = len(shortModelRes[0])
-            shortModelRes = shortModelRes.reshape(self.noteModelBatchSize, -1, shortOutputDim)
-            shortModelRes = shortModelRes[:, self.noteModelOverlap : (len(shortModelRes[0]) - self.noteModelOverlap), :]
-            shortModelRes = shortModelRes.reshape(-1, shortOutputDim)
-            shortModelRes = shortModelRes[0:len(tfSpecDiff)]
-
-            longOutputDim = len(longModelRes[0])
-            longModelRes = longModelRes.reshape(self.noteModelBatchSize, -1, longOutputDim)
-            longModelRes = longModelRes[:, self.noteModelOverlap : (len(longModelRes[0]) - self.noteModelOverlap), :]
-            longModelRes = longModelRes.reshape(-1, longOutputDim)
-            longModelRes = longModelRes[0:len(tfSpecDiff)]
+            shortModelRes = self.postProcessNoteModelRes(shortModelRes, len(tfSpecDiff))
+            longModelRes = self.postProcessNoteModelRes(longModelRes, len(tfSpecDiff))
 
             if outputDebugInfo:
                 print('cost model', time.time() - timeStart)
@@ -211,4 +208,42 @@ class NoteLevelGenerator():
         filePath = os.path.join(fileDir, 'idol_template.xml')
         return filePath
 
+    def initBPMModel(self, sess, modelPath, variableScopeName):
+        batchSize = 1
+        numUnits = 25
+        inputDim = 314
+        usePeepholes = True
+        useLSTMBlockFusedCell = True
+        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, batchSize, numUnits, inputDim, usePeepholes, [numUnits * 2, 3], [3], tf.nn.softmax, useLSTMBlockFusedCell)
 
+        varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=variableScopeName)
+        saver = tf.train.Saver(var_list=varList)
+        saver.restore(sess, modelPath)
+        return tensorDic
+
+    def addNoteModelSessData(self, runTensorArr, inputTensorArr, inputDataArr, tensorDic, inputData, initState):
+        runTensorArr.append(tensorDic['predict_op'])
+        inputTensorArr.append(tensorDic['X'])
+        inputTensorArr.append(tensorDic['initial_states'])
+        inputDataArr.append(inputData)
+        inputDataArr.append(initState)
+
+    def addOnsetModelSessData(self, runTensorArr, inputTensorArr, inputDataArr, tensorDic, inputData):
+        runTensorArr.append(tensorDic['output'])
+        inputTensorArr.append(tensorDic['X'])
+        inputDataArr.append(inputData)
+
+    def addBPMModelSessData(self, runTensorArr, inputTensorArr, inputDataArr, tensorDic, inputData, seqLen):
+        runTensorArr.append(tensorDic['output'])
+        inputTensorArr.append(tensorDic['X'])
+        inputTensorArr.append(tensorDic['sequence_length'])
+        inputDataArr.append(inputData)
+        inputDataArr.append(seqLen)
+
+    def postProcessNoteModelRes(self, res, frameCount):
+        outputDim = len(res[0])
+        res = res.reshape(self.noteModelBatchSize, -1, outputDim)
+        res = res[:, self.noteModelOverlap : (len(res[0]) - self.noteModelOverlap), :]
+        res = res.reshape(-1, outputDim)
+        res = res[0:frameCount]
+        return res

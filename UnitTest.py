@@ -412,8 +412,8 @@ def RunNoteLevelGenerator():
 
 
 if __name__ == '__main__':
-    # RunNoteLevelGenerator()
+    RunNoteLevelGenerator()
     # RunOnsetModel()
     # RunAudioPreprocess()
-    RunAllDownbeatsTFModel(TFLstm.MakeMp3Pathname('ouxiangwanwansui'))
+    # RunAllDownbeatsTFModel(TFLstm.MakeMp3Pathname('ouxiangwanwansui'))
     print('TestCase end')
