@@ -6,7 +6,10 @@ import numpy.random
 import bisect
 import LevelInfo
 import os
-
+import DownbeatTracking
+import madmom
+import time
+import NotePreprocess
 
 def TrainDataToLevelData(data, sampleInterval, threhold, timeOffset=0):
     notes = []
@@ -869,7 +872,224 @@ def MergeLongNote(longNotesArr):
                 baseArr[note[0]:note[1]] = 1
 
     return baseArr
-    
+
+def AlignNoteWithBPMAndET(notes, frameInterval, bpm, et):
+    '''
+    notes 10 ms
+    et ms
+    '''
+    beatInterval = 60.0 / bpm
+    beatInterval *= 1000
+    posPerbeat = 8
+    posInterval = beatInterval / posPerbeat
+    secondPerBeat = 60.0 / bpm
+    noteTimes = []
+    alignedPos = []
+    maxNotePerBeat = 2
+    posScale = posInterval * (posPerbeat / maxNotePerBeat)
+    for i in range(len(notes)):
+        if notes[i] < 1:
+            continue
+
+        timeInMS = i * frameInterval - et
+        pos = round(timeInMS / posScale)
+        addPos = pos
+        # if pos % maxNotePerBeat == 0:
+        #     addPos = pos
+        # else:
+        #     lenAlignedPos = len(alignedPos)
+        #     if lenAlignedPos > 0 and (pos - alignedPos[-1]) < maxNotePerBeat:
+        #         subPos = (timeInMS - noteTimes[-1]) / posScale
+        #         if subPos > 1.5:
+        #             subPos = 2
+        #             addPos = alignedPos[-1] + subPos
+        #         else:
+        #             addPos = pos
+        #     else:
+        #         addPos = addPos
+
+        if len(alignedPos) > 0:
+            if addPos <= alignedPos[-1]:
+                continue
+
+        alignedPos.append(addPos)
+        noteTimes.append(timeInMS)
+
+    halfBeatInfoDic = {}
+    for idx in range(len(alignedPos)):
+        pos = alignedPos[idx]
+        if pos % maxNotePerBeat != 0:
+            hasPre = (idx > 0) and (pos - alignedPos[idx - 1] == 1)
+            hasPost = (idx < len(alignedPos) -1) and (alignedPos[idx + 1] - pos == 1)
+            count = 0
+            if hasPre:
+                count += 1
+            if hasPost:
+                count += 1
+            halfBeatInfoDic[pos] = (pos, hasPre, hasPost, count)
+
+    # DownbeatTracking.SaveInstantValue(alignedPos, MakeMp3Pathname('jinjuebianjingxian'), '_alignpos')
+    newNotes = [0.0] * len(notes)
+    for i in range(len(alignedPos)):
+        pos = alignedPos[i]
+        idx = int((pos * posScale + et + posInterval / 2) / frameInterval)
+        if idx >= len(notes):
+            continue
+
+        # 只移除孤立的半拍
+        if pos % maxNotePerBeat != 0:
+            curHalfBeat = halfBeatInfoDic[pos]
+            if curHalfBeat[3] == 0:
+                halfBeatInfoDic.pop(pos)
+                continue
+
+
+        # if pos % maxNotePerBeat != 0:
+        #     curHalfBeat = halfBeatInfoDic[pos]
+        #     if (pos - maxNotePerBeat not in halfBeatInfoDic) and (pos + maxNotePerBeat not in halfBeatInfoDic):
+        #         # if curHalfBeat[3] != 2:
+        #         halfBeatInfoDic.pop(pos)
+        #         continue
+        #     elif curHalfBeat[3] == 0:
+        #         threshold = 4
+        #         tempCount = 0
+        #         for tempIdx in range(-(threshold - 1), threshold):
+        #             if pos + maxNotePerBeat * tempIdx not in halfBeatInfoDic:
+        #                 tempCount = 0
+        #                 continue
+                    
+        #             halfBeat = halfBeatInfoDic[pos + maxNotePerBeat * tempIdx]
+        #             if halfBeat[3] == 0:
+        #                 tempCount += 1
+                    
+        #             if tempCount == threshold:
+        #                 break
+
+        #         if tempCount < threshold:
+        #             halfBeatInfoDic.pop(pos)
+        #             continue
+
+        #     elif not curHalfBeat[2]:
+        #         if pos - maxNotePerBeat not in halfBeatInfoDic:
+        #             halfBeatInfoDic.pop(pos)
+        #             continue
+        #         else:
+        #             beat = halfBeatInfoDic[pos - maxNotePerBeat]
+        #             if beat[3] != 2:
+        #                 halfBeatInfoDic.pop(pos)
+        #                 continue        
+        #     else:
+        #         if not curHalfBeat[1] and (pos - maxNotePerBeat not in halfBeatInfoDic):
+        #             halfBeatInfoDic.pop(pos)
+        #             continue
+
+        #         if (pos - maxNotePerBeat in halfBeatInfoDic) and (pos - 2 * maxNotePerBeat in halfBeatInfoDic):
+        #             beatA = halfBeatInfoDic[pos - maxNotePerBeat]
+        #             beatB = halfBeatInfoDic[pos - 2 * maxNotePerBeat]
+        #             if beatA[3] != 0 and beatB[3] != 0:
+        #                 halfBeatInfoDic.pop(pos)
+        #                 continue
+        newNotes[idx] = 1
+
+    return np.array(newNotes)
+
+def GenerateLevelImp(songFilePath, duration, bpm, et, shortPredicts, longPredicts, levelFilePath, templateFilePath, onsetThreshold, shortThreshold, saveDebugFile = False, onsetActivation = None, enableDecodeOffset=True):    
+    startTime = time.time()
+    print('bpm', bpm, 'et', et, 'dur', duration)
+    fps = 100
+    frameInterval = int(1000 / fps)
+
+    time1 = time.time()
+    if onsetActivation is None:
+        onsetProcessor = madmom.features.onsets.CNNOnsetProcessor()
+        onsetActivation = onsetProcessor(songFilePath)
+
+    frameCount = len(onsetActivation)
+    print('pick cost', time.time() - time1)
+
+    singingPredicts = shortPredicts
+    singingActivation = singingPredicts[:, 1]
+    dis_time = 60 / bpm / 8
+    singingPicker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=shortThreshold, smooth=0.0, pre_max=dis_time, post_max=dis_time, fps=fps)
+    singingTimes = singingPicker(singingActivation)
+    print('sing pick count', shortThreshold, len(singingTimes))
+
+    def IsPureMusic(singingTimes, bpm, duration):
+        minInterval = 60 / bpm * 2
+        minCount = int(duration / minInterval)
+        print('singingTimes', len(singingTimes), 'minCount', minCount)
+        return len(singingTimes) < minCount
+
+    songIsPureMusic = IsPureMusic(singingTimes, bpm, duration / 1000)
+    print('pure music', songIsPureMusic)
+    if songIsPureMusic:
+        print('adjust onset threshold from', onsetThreshold, 'to', onsetThreshold /2, 'for pure music')
+        onsetThreshold = onsetThreshold / 2
+
+    singingTimes = singingTimes * fps
+    singingTimes = singingTimes.astype(int)
+    singing = np.zeros_like(onsetActivation)
+    singing[singingTimes] = 1
+
+    if saveDebugFile:
+        DownbeatTracking.SaveInstantValue(singingActivation, songFilePath, '_result_singing')
+        if len(singingPredicts[0]) > 2:
+            DownbeatTracking.SaveInstantValue(singingPredicts[:, 2], songFilePath, '_result_bg')
+        if len(singingPredicts[0]) > 3:
+            DownbeatTracking.SaveInstantValue(singingPredicts[:, 3], songFilePath, '_result_dur')
+        DownbeatTracking.SaveInstantValue(singingPredicts[:, 0], songFilePath, '_result_no_label')
+        DownbeatTracking.SaveInstantValue(singingTimes / fps, songFilePath, '_result_singing_pick')
+
+    onset = DownbeatTracking.PickOnsetFromFile(songFilePath, bpm, duration, onsetThreshold, onsetActivation, saveDebugFile, songIsPureMusic)
+
+    countBefore = [np.sum(singing), np.sum(onset)]
+    singing = AlignNoteWithBPMAndET(singing, frameInterval, bpm, et)
+    onset = AlignNoteWithBPMAndET(onset, frameInterval, bpm, et)
+    countAfter = [np.sum(singing), np.sum(onset)]
+    print('count before', countBefore, 'count after', countAfter)
+
+    mergeShort = np.copy(onset)
+    idxOffsetPre = int(60 / bpm * 1 * fps * 0.9)
+    idxOffsetPost = int(60 / bpm * 1 * fps * 0.9)
+    for singIdx in range(0, frameCount):
+        if (singing[singIdx] < 1):
+            continue
+        
+        idxStart = max(singIdx - idxOffsetPre, 0)
+        idxEnd = min(singIdx + idxOffsetPost, frameCount)
+        for idx in range(idxStart, idxEnd):
+            mergeShort[idx] = 0
+
+    checkShortCount = 0
+    for val in mergeShort:
+        if val > 0:
+            checkShortCount += 1
+    print('remove some short by singing. remain ', checkShortCount)
+    mergeShort[singing > mergeShort] = 1
+    countBefore = np.sum(mergeShort)
+    mergeShort = AlignNoteWithBPMAndET(mergeShort, frameInterval, bpm, et)
+    print('count before', countBefore, 'count after', np.sum(mergeShort))
+
+    longNoteSrc = LongNoteActivationProcess(longPredicts)
+    longNoteSrc.resize(frameCount)
+    beatThreshold = 1.5
+    shorter, longer = SplitLongNoteWithDuration(longNoteSrc, fps, bpm, beatThreshold)
+    tempShort, tempLong = ShorterLongNote(mergeShort, shorter, fps, bpm)
+    mergeShort = tempShort
+    longNote = MergeLongNote([longer, tempLong])
+    if saveDebugFile:
+        DownbeatTracking.SaveInstantValue(longNoteSrc, songFilePath, '_long_processed')
+        DownbeatTracking.SaveInstantValue(shorter, songFilePath, '_long_shorter')
+        DownbeatTracking.SaveInstantValue(longer, songFilePath, '_long_longer')
+        DownbeatTracking.SaveInstantValue(tempShort, songFilePath, '_long_temp_short')
+        DownbeatTracking.SaveInstantValue(tempLong, songFilePath, '_long_temp_long')
+
+    if enableDecodeOffset:
+        mergeShort = NotePreprocess.AppendEmptyDataWithDecodeOffset(songFilePath, mergeShort, fps)
+        longNote = NotePreprocess.AppendEmptyDataWithDecodeOffset(songFilePath, longNote, fps)
+    levelNotes = ProcessSampleToIdolLevel2(longNote, mergeShort, bpm, et)
+    LevelInfo.GenerateIdolLevel(levelFilePath, levelNotes, bpm, et, duration, templateFilePath)
+    print('GenerateLevelImp cost', time.time() - startTime)
 
 def Run():
 
