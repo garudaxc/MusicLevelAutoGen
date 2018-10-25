@@ -746,9 +746,12 @@ def PostProcessTFSpecDiff(arr, frameCount, diffFrameArr):
 def BuildPreProcessGraph(variableScopeName, sampleRate, frameSizeArr, numBandArr, hopSize):
     fftLength = None
     signalTensorArr = []
-    runTensorArr = []
+    allTensorArr = []
     diffFrameArr = []
+    logMelSpecArr = []
+    specDiffArr = []
     with tf.variable_scope(variableScopeName):
+        frameCount = tf.placeholder(tf.int32)
         for idx, (frameSize, numBand) in enumerate(zip(frameSizeArr, numBandArr)):
             namePostfix = str(idx)
             signalTensor = tf.placeholder(tf.float32, shape=[None], name='signal_' + namePostfix)
@@ -759,12 +762,35 @@ def BuildPreProcessGraph(variableScopeName, sampleRate, frameSizeArr, numBandArr
             magnitudeSpectrogram = tf.abs(stft)
             logMelSpec = TFLogMelSpec(magnitudeSpectrogram, sampleRate, frameSize, name='log_mel_' + namePostfix)
             specDiff, diffFrame = TFSpecDiff(magnitudeSpectrogram, sampleRate, frameSize, hopSize, numBand, name='spec_diff_' + namePostfix)
-            runTensorArr.append(logMelSpec)
-            runTensorArr.append(specDiff)
+            allTensorArr.append(logMelSpec)
+            allTensorArr.append(specDiff)
+            logMelSpecArr.append(logMelSpec)
+            specDiffArr.append(specDiff)
             diffFrameArr.append(diffFrame)
             signalTensorArr.append(signalTensor)
 
-    return signalTensorArr, runTensorArr, diffFrameArr
+        # PostProcessTFLogMel
+        tempLogMelSpecArr = []
+        for logMelSpec in logMelSpecArr:
+            tempLogMelSpecArr.append(logMelSpec[0:frameCount])
+
+        temp = tempLogMelSpecArr[0]
+        tempLogMelSpecArr[0] = tempLogMelSpecArr[1]
+        tempLogMelSpecArr[1] = temp
+        logMelSpec = tf.stack(tempLogMelSpecArr, 2)
+        logMelSpec = tf.concat((tf.tile(logMelSpec[:1], [7, 1, 1]), logMelSpec, tf.tile(logMelSpec[-1:], [7, 1, 1])), 0)
+
+        # PostProcessTFSpecDiff
+        tempSpecDiffArr = []
+        for specDiff, diffFrame in zip(specDiffArr, diffFrameArr):
+            if diffFrame > 0:
+                tempSpecDiff = tf.concat((tf.zeros_like(specDiff[0:diffFrame]), specDiff[diffFrame:frameCount]), 0)
+            else:
+                tempSpecDiff = specDiff[0:frameCount]
+            tempSpecDiffArr.append(tempSpecDiff)
+        specDiff = tf.concat(tempSpecDiffArr, 1)
+
+    return signalTensorArr, allTensorArr, diffFrameArr, logMelSpec, specDiff, frameCount
 
 if __name__ == '__main__':
     # ConvertMadmomOnsetModelToTensorflow()

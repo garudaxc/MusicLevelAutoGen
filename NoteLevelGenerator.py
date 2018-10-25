@@ -10,6 +10,7 @@ import time
 import myprocesser
 from functools import partial
 import postprocess
+from tensorflow.contrib import signal
 
 class NoteLevelGenerator():
     def __init__(self):
@@ -74,10 +75,17 @@ class NoteLevelGenerator():
             # gpu_options.allow_growth = False
             # sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
             sess = tf.Session()
-            signalTensorArr, preprocessTensorArr, diffFrameArr = ModelTool.BuildPreProcessGraph('preprocess', sampleRate, frameSizeArr, numBandArr, hopSize)
+            signalTensorArr, preprocessTensorArr, diffFrameArr, logMelSpecTensor, specDiffTensor, frameCountTensor = ModelTool.BuildPreProcessGraph('preprocess', sampleRate, frameSizeArr, numBandArr, hopSize)
             self.signalTensorArr = signalTensorArr
             self.preprocessTensorArr = preprocessTensorArr
             self.diffFrameArr = diffFrameArr
+            self.logMelSpecTensor = logMelSpecTensor
+            self.specDiffTensor = specDiffTensor
+            self.frameCountTensor = frameCountTensor
+
+            noteModelInputDataTensor, bpmInputDataTensor = self.tfFeatureToModelInput(logMelSpecTensor, specDiffTensor)
+            self.noteModelInputDataTensor = noteModelInputDataTensor
+            self.bpmInputDataTensor = bpmInputDataTensor
 
             self.shortModel = NoteModel.NoteDetectionModel('short_note', self.noteModelBatchSize, 0, 3, 26, self.noteModelInputDim, 3, timeMajor=False, useCudnn=True, restoreCudnnWithGPUMode=restoreCudnnWithGPUMode)
             self.shortModel.Restore(sess, shortModelPath)
@@ -149,28 +157,20 @@ class NoteLevelGenerator():
                 print('cost audio padding', time.time() - timeStart)
                 timeStart = time.time()
 
-            preprocessRes = self.runSess(sess, self.preprocessTensorArr, self.signalTensorArr, tfAudioDataArr)
-
+            
+            preprocessRunTensorArr = [self.noteModelInputDataTensor, self.bpmInputDataTensor, self.logMelSpecTensor, self.specDiffTensor]
+            preprocessInputTensorArr = np.concatenate((self.signalTensorArr, [self.frameCountTensor]))
+            preprocessInputDataArr = np.concatenate((tfAudioDataArr, [frameCount]))
+            preprocessRes = self.runSess(sess, preprocessRunTensorArr, preprocessInputTensorArr, preprocessInputDataArr)
+            noteModelInputData = preprocessRes[0]
+            bpmModelInputData = preprocessRes[1]
+            tfLogMel = preprocessRes[2]
+            tfSpecDiff = preprocessRes[3]
             if outputDebugInfo:
                 print('cost process', time.time() - timeStart)
                 timeStart = time.time()
 
-            tfLogMel = []
-            tfSpecDiff = []
-            for idx in range(0, len(preprocessRes), 2):
-                tfLogMel.append(preprocessRes[idx])
-                tfSpecDiff.append(preprocessRes[idx + 1])
-            tfLogMel = ModelTool.PostProcessTFLogMel(tfLogMel, frameCount, swap=True)
-            tfSpecDiff = ModelTool.PostProcessTFSpecDiff(tfSpecDiff, frameCount, self.diffFrameArr)
-
-            noteModelInputData = myprocesser.FeatureStandardize(tfSpecDiff)
-            noteModelInputData = NotePreprocess.SplitData(noteModelInputData, self.noteModelBatchSize, self.noteModelOverlap)
-            noteModelInputData = noteModelInputData.reshape(self.noteModelBatchSize, -1, self.noteModelInputDim)
             noteModelSeqLen = [len(noteModelInputData[0])] * self.noteModelBatchSize
-
-            bpmModelInputData = NotePreprocess.SplitData(tfSpecDiff, self.bpmModelBatchSize, self.bpmModelOverlap)
-            bpmModelInputData = bpmModelInputData.reshape(self.bpmModelBatchSize, -1, self.bpmModelInputDim)
-            bpmModelInputData = bpmModelInputData.transpose(1, 0, 2)
             bpmSeqLen = [len(bpmModelInputData)] * self.bpmModelBatchSize
 
             runTensorArr = []
@@ -328,3 +328,28 @@ class NoteLevelGenerator():
         # DownbeatTracking.SaveInstantValue(srcRes[:, 1], audioFilePath, '_bpm_src_1')
 
         return bpm, et, duration
+
+    def tfSplitData(self, arr, splitCount, overlap):
+        srcArrShape = tf.shape(arr)
+        subArrDataLength = tf.cast((tf.ceil(srcArrShape[0] / splitCount)), tf.int32)
+        appendLength = subArrDataLength * splitCount - srcArrShape[0]
+        arr = tf.pad(arr, [[overlap, overlap + appendLength], [0, 0]])
+        doubleOverlap = 2 * overlap
+        return signal.frame(arr, subArrDataLength + doubleOverlap, subArrDataLength, pad_end=False, axis=-2)
+
+    def tfStandardize(self, data):
+        featureMin = tf.reduce_min(data)
+        featureMax = tf.reduce_max(data)
+        delta = featureMax - featureMin
+        data = data * (1.0 / delta) - featureMin / delta
+        return data
+
+    def tfFeatureToModelInput(self, tfLogMel, tfSpecDiff):
+        noteModelInputData = self.tfStandardize(tfSpecDiff)
+        noteModelInputData = self.tfSplitData(noteModelInputData, self.noteModelBatchSize, self.noteModelOverlap)
+        noteModelInputData = tf.reshape(noteModelInputData, (self.noteModelBatchSize, -1, self.noteModelInputDim))
+
+        bpmModelInputData = self.tfSplitData(tfSpecDiff, self.bpmModelBatchSize, self.bpmModelOverlap)
+        bpmModelInputData = tf.reshape(bpmModelInputData, (self.bpmModelBatchSize, -1, self.bpmModelInputDim))
+        bpmModelInputData = tf.transpose(bpmModelInputData, (1, 0, 2))
+        return noteModelInputData, bpmModelInputData
