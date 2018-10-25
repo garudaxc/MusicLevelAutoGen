@@ -207,7 +207,7 @@ def FindVarByName(varList, name, appendZero = True):
     print('search', searchName, '   failed')
     return None
 
-def BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc, useLSTMBlockFusedCell):
+def BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc, useLSTMBlockFusedCell, inputDimTile=None):
     print('variableScopeName', variableScopeName, 'numLayers', numLayers, 'batchSize', batchSize, 'numUnits', numUnits)
     print('usePeepholes', usePeepholes, 'weightsShape', weightsShape, 'biasShape', biasShape)
     
@@ -215,9 +215,9 @@ def BuildDownbeatsModelGraph(variableScopeName, numLayers, batchSize, numUnits, 
     if useLSTMBlockFusedCell:
         buildFunc = BuildDownbeatsModelGraphWithLSTMBlockFusedCell
     
-    return buildFunc(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc)
+    return buildFunc(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc, inputDimTile)
 
-def BuildDownbeatsModelGraphWithLSTMCell(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc):
+def BuildDownbeatsModelGraphWithLSTMCell(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc, inputDimTile=None):
     print('BuildDownbeatsModelGraph With LSTMCell')
     with tf.variable_scope(variableScopeName):
         cells = []
@@ -228,11 +228,19 @@ def BuildDownbeatsModelGraphWithLSTMCell(variableScopeName, numLayers, batchSize
             cells.append(cell)
 
         XShape = (batchSize, None, inputDim)
+        if inputDimTile is not None:
+            XShape = (None, batchSize, inputDim // inputDimTile)
+
         X = tf.placeholder(dtype=tf.float32, shape=XShape, name='X')
+
+        inputX = X
+        if inputDimTile is not None:
+            inputX = tf.tile(X, [1, 1, inputDimTile])
+
         sequenceLength = tf.placeholder(tf.int32, [None], name='sequence_length')
         outputs, statesFW, statesBW = rnn.stack_bidirectional_dynamic_rnn(
             cells[0:numLayers], cells[numLayers:], 
-            X, sequence_length=sequenceLength, dtype=tf.float32)
+            inputX, sequence_length=sequenceLength, dtype=tf.float32)
         
         outlayerDim = tf.shape(outputs)[2]
         outputs = tf.reshape(outputs, [-1, outlayerDim])
@@ -254,7 +262,7 @@ def CreateLSTMBlockFusedCell(layerIdx, isForward, numUnits, usePeepholes, forget
     cell = rnn.LSTMBlockFusedCell(numUnits, use_peephole=usePeepholes, forget_bias=forgetBias, name=cellName)
     return cell
 
-def BuildDownbeatsModelGraphWithLSTMBlockFusedCell(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc):    
+def BuildDownbeatsModelGraphWithLSTMBlockFusedCell(variableScopeName, numLayers, batchSize, numUnits, inputDim, usePeepholes, weightsShape, biasShape, tfActivationFunc, inputDimTile=None):    
     print('BuildDownbeatsModelGraph With LSTMBlockFusedCell')
     with tf.variable_scope(variableScopeName):
         cells = []
@@ -277,14 +285,22 @@ def BuildDownbeatsModelGraphWithLSTMBlockFusedCell(variableScopeName, numLayers,
             cells.append((fwCell, bwCell))
 
         XShape = (None, batchSize, inputDim)
+        if inputDimTile is not None:
+            XShape = (None, batchSize, inputDim // inputDimTile)
+
         X = tf.placeholder(dtype=tf.float32, shape=XShape, name='X')
+
+        inputX = X
+        if inputDimTile is not None:
+            inputX = tf.tile(X, [1, 1, inputDimTile])
+
         sequenceLength = tf.placeholder(tf.int32, [None], name='sequence_length')
 
         def reverseOp(inputOp):
             return tf.reverse(inputOp, [0])
 
         reverseDim = [0]
-        currentFWInput = X
+        currentFWInput = inputX
         currentBWInput = reverseOp(currentFWInput)
         fwOutputs = None
         bwOutputs = None
