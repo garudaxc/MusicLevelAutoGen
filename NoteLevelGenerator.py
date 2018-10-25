@@ -171,11 +171,7 @@ class NoteLevelGenerator():
             bpmModelInputData = NotePreprocess.SplitData(tfSpecDiff, self.bpmModelBatchSize, self.bpmModelOverlap)
             bpmModelInputData = bpmModelInputData.reshape(self.bpmModelBatchSize, -1, self.bpmModelInputDim)
             bpmModelInputData = bpmModelInputData.transpose(1, 0, 2)
-
             bpmSeqLen = [len(bpmModelInputData)] * self.bpmModelBatchSize
-            if self.bpmModelUseMerged:
-                bpmModelInputData = [bpmModelInputData] * self.bpmModelCount
-                bpmModelInputData = np.concatenate(bpmModelInputData, 2)
 
             runTensorArr = []
             inputTensorArr = []
@@ -245,17 +241,19 @@ class NoteLevelGenerator():
         inputDim = self.bpmModelInputDim
         outputDim = 3
         tfActivationFunc = tf.nn.softmax
+        inputDimTile = None
         if self.bpmModelUseMerged:
             numUnits = numUnits * self.bpmModelCount
             inputDim = inputDim * self.bpmModelCount
             tfActivationFunc = partial(ModelTool.TFSoftMaxForMergeAll, modelCount=self.bpmModelCount, outputDimPerModel=outputDim)
             outputDim = outputDim * self.bpmModelCount
+            inputDimTile = self.bpmModelCount
 
         usePeepholes = True
         useLSTMBlockFusedCell = True
         tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, self.bpmModelBatchSize, 
                     numUnits, inputDim, usePeepholes, [numUnits * 2, outputDim], [outputDim], 
-                    tfActivationFunc, useLSTMBlockFusedCell)
+                    tfActivationFunc, useLSTMBlockFusedCell, inputDimTile=inputDimTile)
 
         varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=variableScopeName)
         saver = tf.train.Saver(var_list=varList)
