@@ -186,11 +186,11 @@ def MadmomActivationFuncToTensorFlow(func):
 
     return fn
 
-def TFSoftMaxForMergeAll(logits, modelCount=8, outputDim=3):
+def TFSoftMaxForMergeAll(logits, modelCount=8, outputDimPerModel=3):
     subRes = []
     for idx in range(modelCount):
-        start = idx * outputDim
-        subRes.append(tf.nn.softmax(logits[:, start : start + outputDim]))
+        start = idx * outputDimPerModel
+        subRes.append(tf.nn.softmax(logits[:, start : start + outputDimPerModel]))
 
     return tf.stack(subRes)
 
