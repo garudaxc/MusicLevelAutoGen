@@ -238,8 +238,8 @@ def SplitData(srcArr, splitCount, overlap):
     arr = srcArr
     subArrDataLength = int(math.ceil(arrLength / splitCount))
     allLength = subArrDataLength * splitCount
-    if allLength > splitCount:
-        appendShape = np.concatenate(([allLength - splitCount], np.shape(arr[0])))
+    if allLength > arrLength:
+        appendShape = np.concatenate(([allLength - arrLength], np.shape(arr[0])))
         appendArr = np.zeros(appendShape)
         arr = np.concatenate((arr, appendArr))
 
