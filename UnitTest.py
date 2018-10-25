@@ -409,7 +409,7 @@ def RunNoteLevelGenerator():
         audioFilePath = TFLstm.MakeMp3Pathname(song)
         levelFilePath = os.path.join(os.path.dirname(audioFilePath), song+'.xml')
         runStart = time.time()
-        generator.run(audioFilePath, levelFilePath, isTranscodeByQAAC=True, outputDebugInfo=True)
+        generator.run(audioFilePath, levelFilePath, isTranscodeByQAAC=True, outputDebugInfo=True, saveDebugFile=True)
         print('cost _______ ', song, time.time() - runStart)
 
     generator.releaseResource()

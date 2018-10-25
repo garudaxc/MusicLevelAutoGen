@@ -25,9 +25,10 @@ class NoteLevelGenerator():
         self.noteModelInputDim = 314
 
         self.bpmModelUseMerged = True
-        self.bpmModelInputDim = 314
-        self.bpmModelBatchSize = 1
         self.bpmModelCount = 8
+        self.bpmModelInputDim = 314
+        self.bpmModelBatchSize = 16
+        self.bpmModelOverlap = 500
 
         # todo limit time duraion
         self.minDuration = 10
@@ -108,7 +109,7 @@ class NoteLevelGenerator():
 
         return True
 
-    def run(self, inputFilePath, outputFilePath, isTranscodeByQAAC=False, fakeAudioData=None, outputDebugInfo=False):
+    def run(self, inputFilePath, outputFilePath, isTranscodeByQAAC=False, fakeAudioData=None, outputDebugInfo=False, saveDebugFile=False):
         if self.graph is None or self.sess is None:
             return False
 
@@ -167,14 +168,10 @@ class NoteLevelGenerator():
             noteModelInputData = noteModelInputData.reshape(self.noteModelBatchSize, -1, self.noteModelInputDim)
             noteModelSeqLen = [len(noteModelInputData[0])] * self.noteModelBatchSize
 
-            preCalcData = tfSpecDiff
-            duraion = len(audioData) / self.sampleRate
-            start, analysisLength = NotePreprocess.AnalysisInfo(duraion)
-            startIdx = int(start * self.fps)
-            endIdx = startIdx + int(analysisLength * self.fps)
-            clipPreCalcData = preCalcData[startIdx:endIdx]
+            bpmModelInputData = NotePreprocess.SplitData(tfSpecDiff, self.bpmModelBatchSize, self.bpmModelOverlap)
+            bpmModelInputData = bpmModelInputData.reshape(self.bpmModelBatchSize, -1, self.bpmModelInputDim)
+            bpmModelInputData = bpmModelInputData.transpose(1, 0, 2)
 
-            bpmModelInputData = np.reshape(clipPreCalcData, (-1, self.bpmModelBatchSize, self.bpmModelInputDim))
             bpmSeqLen = [len(bpmModelInputData)] * self.bpmModelBatchSize
             if self.bpmModelUseMerged:
                 bpmModelInputData = [bpmModelInputData] * self.bpmModelCount
@@ -201,28 +198,16 @@ class NoteLevelGenerator():
 
         if fakeAudioData is not None:
             return True
-
-        shortModelRes = res[0]
-        longModelRes = res[1]
+        
+        shortModelRes = self.postProcessNoteModelRes(res[0], len(tfSpecDiff))
+        longModelRes = self.postProcessNoteModelRes(res[1], len(tfSpecDiff))
         onsetModelRes = res[2]
+        bpm, et, duration = self.postProcessBPMModelRes(res, audioData, tfSpecDiff, inputFilePath, isTranscodeByQAAC)
 
-        shortModelRes = self.postProcessNoteModelRes(shortModelRes, len(tfSpecDiff))
-        longModelRes = self.postProcessNoteModelRes(longModelRes, len(tfSpecDiff))
-
-        if self.bpmModelUseMerged:
-            tempRes = res[3]
-            bpmRes = []
-            bpmSubOutputDim = len(tempRes[0]) // self.bpmModelCount
-            for idx in range(self.bpmModelCount):
-                bpmRes.append(tempRes[:, idx*bpmSubOutputDim: (idx+1)*bpmSubOutputDim])
-        else:
-            bpmRes = res[len(res) - self.bpmModelCount:]
-        bpm, et, duration = self.postProcessBPMModelRes(bpmRes, audioData, inputFilePath, isTranscodeByQAAC)
-
-        postprocess.GenerateLevelImp(inputFilePath, duraion, bpm, et, 
+        postprocess.GenerateLevelImp(inputFilePath, duration, bpm, et, 
                     shortModelRes, longModelRes, outputFilePath, templateFilePath, 0.7, 0.7, 
+                    saveDebugFile=saveDebugFile, 
                     onsetActivation=onsetModelRes, enableDecodeOffset=isTranscodeByQAAC)
-
         return True
 
     def releaseResource(self):
@@ -256,18 +241,21 @@ class NoteLevelGenerator():
         return filePath
 
     def initBPMModel(self, sess, modelPath, variableScopeName):
-        batchSize = 1
         numUnits = 25
         inputDim = self.bpmModelInputDim
         outputDim = 3
+        tfActivationFunc = tf.nn.softmax
         if self.bpmModelUseMerged:
             numUnits = numUnits * self.bpmModelCount
             inputDim = inputDim * self.bpmModelCount
+            tfActivationFunc = partial(ModelTool.TFSoftMaxForMergeAll, modelCount=self.bpmModelCount, outputDimPerModel=outputDim)
             outputDim = outputDim * self.bpmModelCount
 
         usePeepholes = True
         useLSTMBlockFusedCell = True
-        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, batchSize, numUnits, inputDim, usePeepholes, [numUnits * 2, outputDim], [outputDim], tf.nn.softmax, useLSTMBlockFusedCell)
+        tensorDic = ModelTool.BuildDownbeatsModelGraph(variableScopeName, 3, self.bpmModelBatchSize, 
+                    numUnits, inputDim, usePeepholes, [numUnits * 2, outputDim], [outputDim], 
+                    tfActivationFunc, useLSTMBlockFusedCell)
 
         varList = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=variableScopeName)
         saver = tf.train.Saver(var_list=varList)
@@ -303,15 +291,42 @@ class NoteLevelGenerator():
         res = res[0:frameCount]
         return res
 
-    def postProcessBPMModelRes(self, res, audioData, audioFilePath, isTranscodeByQAAC):
-        predict = madmom.ml.nn.average_predictions(res)
+    def postProcessBPMModelRes(self, sessRes, audioData, featureData, audioFilePath, isTranscodeByQAAC):
+        if self.bpmModelUseMerged:
+            bpmRes = sessRes[3]
+            bpmOutputDim = bpmRes.shape[-1]
+            bpmRes = bpmRes.reshape(len(bpmRes), -1, self.bpmModelBatchSize, bpmOutputDim)
+            bpmRes = bpmRes[:, self.bpmModelOverlap: len(bpmRes[0]) - self.bpmModelOverlap, :, :]
+            bpmRes = bpmRes.transpose(0, 2, 1, 3)
+            bpmRes = bpmRes.reshape(len(bpmRes), -1, bpmOutputDim)
+        else:
+            bpmRes = sessRes[len(sessRes) - self.bpmModelCount:]
+
+        predict = madmom.ml.nn.average_predictions(bpmRes)
         act = partial(np.delete, obj=0, axis=1)
         downBeatOutput = act(predict)
+
         duration = len(audioData) / self.sampleRate
-        bpm, et = NotePreprocess.CalcBpmET(audioData, self.sampleRate, duration, downBeatOutput, downBeatOutput)
+        analysisRange = (0, int(duration))
+        bpm, et = NotePreprocess.CalcBpmET(audioData, self.sampleRate, duration, downBeatOutput, downBeatOutput, analysisRange)
         if isTranscodeByQAAC:
             et = et + NotePreprocess.DecodeOffset(audioFilePath)
 
         duration = int(duration * 1000)
         et = int(et * 1000)
+
+        # proc = NotePreprocess.CustomRNNDownBeatProcessor()
+        # srcRes = proc(featureData)
+        # srcBPM, srcET = NotePreprocess.CalcBpmET(audioData, self.sampleRate, duration, srcRes, srcRes, analysisRange)
+        # if isTranscodeByQAAC:
+        #     srcET = srcET + NotePreprocess.DecodeOffset(audioFilePath)
+        # srcDuration = duration
+        # srcET = int(srcET * 1000)
+        # print('src bpm', srcBPM, 'et', srcET, 'duration', srcDuration)
+        # import DownbeatTracking
+        # DownbeatTracking.SaveInstantValue(downBeatOutput[:, 0], audioFilePath, '_bpm_split_0_%d_overlap_%d' % (self.bpmModelBatchSize, self.bpmModelOverlap))
+        # DownbeatTracking.SaveInstantValue(downBeatOutput[:, 1], audioFilePath, '_bpm_split_1_%d_overlap_%d' % (self.bpmModelBatchSize, self.bpmModelOverlap))
+        # DownbeatTracking.SaveInstantValue(srcRes[:, 0], audioFilePath, '_bpm_src_0')
+        # DownbeatTracking.SaveInstantValue(srcRes[:, 1], audioFilePath, '_bpm_src_1')
+
         return bpm, et, duration

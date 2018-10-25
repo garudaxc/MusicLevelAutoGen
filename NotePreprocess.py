@@ -178,9 +178,12 @@ def AnalysisInfo(duration):
 
     return start, analysisLength
 
-def CalcBpmET(y, sr, duration, preCalcData = None, downBeatData = None):
+def CalcBpmET(y, sr, duration, preCalcData = None, downBeatData = None, analysisRange = None):
     # calc downbeat entertime
-    start, analysisLength = AnalysisInfo(duration)
+    if analysisRange is None:
+        start, analysisLength = AnalysisInfo(duration)
+    else:
+        start, analysisLength = analysisRange
     minimumMusicLength = 110
     maximumMusicLength = 360
     numThread = 8
