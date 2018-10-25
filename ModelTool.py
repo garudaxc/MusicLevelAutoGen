@@ -186,6 +186,14 @@ def MadmomActivationFuncToTensorFlow(func):
 
     return fn
 
+def TFSoftMaxForMergeAll(logits, modelCount=8, outputDim=3):
+    subRes = []
+    for idx in range(modelCount):
+        start = idx * outputDim
+        subRes.append(tf.nn.softmax(logits[:, start : start + outputDim]))
+
+    return tf.stack(subRes)
+
 def FindVarByName(varList, name, appendZero = True):
     searchName = name
     if appendZero:
@@ -303,7 +311,7 @@ def BuildDownbeatsModelGraphWithLSTMBlockFusedCell(variableScopeName, numLayers,
     tensorDic['output'] = logits
     return tensorDic
 
-def MadmomDownbeatsModelToTensorflow(madmomModel, variableScopeName, outputFilePath, madmomBLSTMParamArr=None, madmomFeedForwardLayerParam=None):
+def MadmomDownbeatsModelToTensorflow(madmomModel, variableScopeName, outputFilePath, madmomBLSTMParamArr=None, madmomFeedForwardLayerParam=None, tfActivationFunc=None):
     if madmomBLSTMParamArr is None or madmomFeedForwardLayerParam is None:
         madmomBLSTMParamArr = []
         madmomFeedForwardLayerParam = None
@@ -325,7 +333,9 @@ def MadmomDownbeatsModelToTensorflow(madmomModel, variableScopeName, outputFileP
 
     madmomWeights, madmomBias, madmomActivationFunc = madmomFeedForwardLayerParam
     
-    tfActivationFunc = MadmomActivationFuncToTensorFlow(madmomActivationFunc)
+    if tfActivationFunc is None:
+        tfActivationFunc = MadmomActivationFuncToTensorFlow(madmomActivationFunc)
+
     batchSize = 1
     maxTime = 128
 
@@ -422,7 +432,7 @@ def ConvertMadmomDownbeatsModelToTensorflow_MergeAll():
 
     varScopeName = 'downbeats'
     outputFilePath = GenerateOutputModelPath(varScopeName, mkdirIfNotExists=True)
-    MadmomDownbeatsModelToTensorflow(None, 'downbeats', outputFilePath, madmomBLSTMParamArr, madmomFeedForwardLayerParam)
+    MadmomDownbeatsModelToTensorflow(None, 'downbeats', outputFilePath, madmomBLSTMParamArr, madmomFeedForwardLayerParam, TFSoftMaxForMergeAll)
     return True
 
 def TFLSTMVariableName(layerIdx, isForward, paramName, prefix = None):
