@@ -129,6 +129,7 @@ class NoteLevelGenerator():
 
         if outputDebugInfo:
             timeStart = time.time()
+            allTimeStart = timeStart
 
         if fakeAudioData is None:
             audioData = NotePreprocess.LoadAudioFile(inputFilePath, sampleRate)
@@ -156,7 +157,6 @@ class NoteLevelGenerator():
             if outputDebugInfo:
                 print('cost audio padding', time.time() - timeStart)
                 timeStart = time.time()
-
             
             preprocessRunTensorArr = [self.noteModelInputDataTensor, self.bpmInputDataTensor, self.logMelSpecTensor, self.specDiffTensor]
             preprocessInputTensorArr = np.concatenate((self.signalTensorArr, [self.frameCountTensor]))
@@ -191,6 +191,7 @@ class NoteLevelGenerator():
             if outputDebugInfo:
                 print('cost model', time.time() - timeStart)
                 timeStart = time.time()
+                print('tf cost', timeStart - allTimeStart)
 
         if fakeAudioData is not None:
             return True
@@ -199,6 +200,8 @@ class NoteLevelGenerator():
         longModelRes = self.postProcessNoteModelRes(res[1], len(tfSpecDiff))
         onsetModelRes = res[2]
         bpm, et, duration = self.postProcessBPMModelRes(res, audioData, tfSpecDiff, inputFilePath, isTranscodeByQAAC)
+        if outputDebugInfo:
+            print('cost post', time.time() - timeStart)
 
         postprocess.GenerateLevelImp(inputFilePath, duration, bpm, et, 
                     shortModelRes, longModelRes, outputFilePath, templateFilePath, 0.7, 0.7, 
