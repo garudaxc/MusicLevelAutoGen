@@ -863,6 +863,7 @@ def MergeLongNote(longNotesArr):
     if len(longNotesArr) < 1:
         return []
 
+    # 把n组长音符直接合并到1组里
     baseArr = longNotesArr[0]
     if len(longNotesArr) >= 2:
         for idx in range(1, len(longNotesArr)):
