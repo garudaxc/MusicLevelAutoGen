@@ -282,7 +282,6 @@ def RunAudioPreprocess():
     hopSize = int(sampleRate / fps)
     frameCount = ModelTool.FrameCount(audioData, hopSize)
     scaleValue = ModelTool.ScaleValue(audioData)
-    tfAudioData = audioData / scaleValue
 
     print('frames info', np.shape(audioData), sampleRate / fps, len(audioData) / (sampleRate / fps))
     
@@ -297,14 +296,14 @@ def RunAudioPreprocess():
 
     with tf.Graph().as_default():
         with tf.Session() as sess:
-            signalTensorArr, runTensorArr, diffFrameArr = ModelTool.BuildPreProcessGraph('preprocess', sampleRate, frameSizeArr, numBandArr, hopSize)
+            signalTensor, runTensorArr, diffFrameArr, logMelSpecTensor, specDiffTensor, frameCountTensor, scaleValueTensor = ModelTool.BuildPreProcessGraph('preprocess', sampleRate, frameSizeArr, numBandArr, hopSize)
             
             sess.run([tf.global_variables_initializer()])
-            
-            tfAudioData = tfAudioData
-            tfAudioDataArr = ModelTool.PaddingAudioData(tfAudioData, frameSizeArr)
-            res = RunSess(sess, runTensorArr, signalTensorArr, tfAudioDataArr)
-            res = RunSess(sess, runTensorArr, signalTensorArr, tfAudioDataArr)
+
+            inputTensorArr = [signalTensor, frameCountTensor, scaleValueTensor]
+            inputDataArr = [audioData, frameCount, scaleValue]
+            res = RunSess(sess, runTensorArr, inputTensorArr, inputDataArr)
+            res = RunSess(sess, runTensorArr, inputTensorArr, inputDataArr)
             timePostProcessStart = time.time()
             tfLogMel = []
             tfSpecDiff = []

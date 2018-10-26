@@ -75,13 +75,14 @@ class NoteLevelGenerator():
             # gpu_options.allow_growth = False
             # sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
             sess = tf.Session()
-            signalTensorArr, preprocessTensorArr, diffFrameArr, logMelSpecTensor, specDiffTensor, frameCountTensor = ModelTool.BuildPreProcessGraph('preprocess', sampleRate, frameSizeArr, numBandArr, hopSize)
-            self.signalTensorArr = signalTensorArr
+            signalTensor, preprocessTensorArr, diffFrameArr, logMelSpecTensor, specDiffTensor, frameCountTensor, scaleValueTensor = ModelTool.BuildPreProcessGraph('preprocess', sampleRate, frameSizeArr, numBandArr, hopSize)
+            self.signalTensor = signalTensor
             self.preprocessTensorArr = preprocessTensorArr
             self.diffFrameArr = diffFrameArr
             self.logMelSpecTensor = logMelSpecTensor
             self.specDiffTensor = specDiffTensor
             self.frameCountTensor = frameCountTensor
+            self.scaleValueTensor = scaleValueTensor
 
             noteModelInputDataTensor, bpmInputDataTensor = self.tfFeatureToModelInput(logMelSpecTensor, specDiffTensor)
             self.noteModelInputDataTensor = noteModelInputDataTensor
@@ -145,23 +146,19 @@ class NoteLevelGenerator():
         if outputDebugInfo:
             print('cost audio decode', time.time() - timeStart)
             timeStart = time.time()
+            tfTimeStart = timeStart
 
         frameCount = ModelTool.FrameCount(audioData, self.hopSize)
         scaleValue = ModelTool.ScaleValue(audioData)
-        tfAudioData = audioData / scaleValue
-        tfAudioDataArr = ModelTool.PaddingAudioData(tfAudioData, self.frameSizeArr)
 
         graph = self.graph
         sess = self.sess
         with graph.as_default():
-            if outputDebugInfo:
-                print('cost audio padding', time.time() - timeStart)
-                timeStart = time.time()
-            
-            preprocessRunTensorArr = [self.noteModelInputDataTensor, self.bpmInputDataTensor, self.logMelSpecTensor, self.specDiffTensor]
-            preprocessInputTensorArr = np.concatenate((self.signalTensorArr, [self.frameCountTensor]))
-            preprocessInputDataArr = np.concatenate((tfAudioDataArr, [frameCount]))
-            preprocessRes = self.runSess(sess, preprocessRunTensorArr, preprocessInputTensorArr, preprocessInputDataArr)
+            preprocessRes = self.runSess(sess, 
+                    [self.noteModelInputDataTensor, self.bpmInputDataTensor, self.logMelSpecTensor, self.specDiffTensor], 
+                    [self.signalTensor, self.frameCountTensor, self.scaleValueTensor], 
+                    [audioData, frameCount, scaleValue]
+            )
             noteModelInputData = preprocessRes[0]
             bpmModelInputData = preprocessRes[1]
             tfLogMel = preprocessRes[2]
@@ -189,9 +186,10 @@ class NoteLevelGenerator():
                 
             res = self.runSess(sess, runTensorArr, inputTensorArr, inputDataArr)
             if outputDebugInfo:
-                print('cost model', time.time() - timeStart)
-                timeStart = time.time()
-                print('tf cost', timeStart - allTimeStart)
+                curTime = time.time()
+                print('cost model', curTime - timeStart)
+                print('tf cost', curTime - tfTimeStart)
+                timeStart = curTime
 
         if fakeAudioData is not None:
             return True

@@ -645,6 +645,9 @@ def PaddingAudioData(audioData, frameSizeArr):
         dataArr.append(np.concatenate(([0] * (frameSize // 2) , audioData)))
     return dataArr
 
+def TFPaddingAudioData(audioData, frameSize):
+    return tf.pad(audioData, [[frameSize // 2, 0]])
+
 def TFSTFT(signalTensor, frameSize, hopSize, fftLength=None):
     frameSize = int(frameSize)
     stft = signal.stft(signalTensor, frameSize, hopSize, fft_length=fftLength, window_fn=functools.partial(signal.hann_window, periodic=False), pad_end=True)
@@ -712,17 +715,6 @@ def TFLogMelSpec(magnitudeSpectrogram, sampleRate, frameSize, name=None):
     logMelSpec = tf.log(melSpectrogram + madmom.features.onsets.EPSILON, name=name)
     return logMelSpec
 
-def LoadTFAudioData(song, frameSizeArr):
-    import TFLstm
-    import NotePreprocess
-    audioFilePath = TFLstm.MakeMp3Pathname(song)
-    sampleRate = 44100
-    audioData = NotePreprocess.LoadAudioFile(audioFilePath, sampleRate)
-    scaleValue = ScaleValue(audioData)
-    tfAudioData = audioData / scaleValue
-    tfAudioDataArr = PaddingAudioData(tfAudioData, frameSizeArr)
-    return tfAudioDataArr, audioData
-
 def PostProcessTFLogMel(arr, frameCount, swap=False):
     for idx in range(len(arr)):
         arr[idx] = arr[idx][0:frameCount]
@@ -746,24 +738,28 @@ def PostProcessTFSpecDiff(arr, frameCount, diffFrameArr):
 def BuildPreProcessGraph(variableScopeName, sampleRate, frameSizeArr, numBandArr, hopSize):
     fftLength = None
     signalTensorArr = []
-    allTensorArr = []
+    subTensorArr = []
     diffFrameArr = []
     logMelSpecArr = []
     specDiffArr = []
     with tf.variable_scope(variableScopeName):
-        frameCount = tf.placeholder(tf.int32)
+        signalTensor = tf.placeholder(tf.float32, shape=[None], name='signal')
+        frameCount = tf.placeholder(tf.int32, shape=[], name='frame_count')
+        scaleValue = tf.placeholder(tf.float32, shape=[], name='scale_value')
+        scaleData = signalTensor / scaleValue
         for idx, (frameSize, numBand) in enumerate(zip(frameSizeArr, numBandArr)):
             namePostfix = str(idx)
-            signalTensor = tf.placeholder(tf.float32, shape=[None], name='signal_' + namePostfix)
-            stft = TFSTFT(signalTensor, frameSize, hopSize)
+            
+            paddingData = TFPaddingAudioData(scaleData, frameSize)
+            stft = TFSTFT(paddingData, frameSize, hopSize)
             # madmom 没用最后一个 nyquist hertz
             stft = stft[:, :-1]
 
             magnitudeSpectrogram = tf.abs(stft)
             logMelSpec = TFLogMelSpec(magnitudeSpectrogram, sampleRate, frameSize, name='log_mel_' + namePostfix)
             specDiff, diffFrame = TFSpecDiff(magnitudeSpectrogram, sampleRate, frameSize, hopSize, numBand, name='spec_diff_' + namePostfix)
-            allTensorArr.append(logMelSpec)
-            allTensorArr.append(specDiff)
+            subTensorArr.append(logMelSpec)
+            subTensorArr.append(specDiff)
             logMelSpecArr.append(logMelSpec)
             specDiffArr.append(specDiff)
             diffFrameArr.append(diffFrame)
@@ -778,9 +774,12 @@ def BuildPreProcessGraph(variableScopeName, sampleRate, frameSizeArr, numBandArr
         tempLogMelSpecArr[0] = tempLogMelSpecArr[1]
         tempLogMelSpecArr[1] = temp
         logMelSpec = tf.stack(tempLogMelSpecArr, 2)
-        logMelSpec = tf.concat((tf.tile(logMelSpec[:1], [7, 1, 1]), logMelSpec, tf.tile(logMelSpec[-1:], [7, 1, 1])), 0)
+        # 参考 madmom.features.onsets._cnn_onset_processor_pad
+        repeatSize = 7
+        logMelSpec = tf.concat((tf.tile(logMelSpec[:1], [repeatSize, 1, 1]), logMelSpec, tf.tile(logMelSpec[-1:], [repeatSize, 1, 1])), 0, name='log_mel')
 
         # PostProcessTFSpecDiff
+        # 参考 madmom SpectrogramDifferenceProcessor
         tempSpecDiffArr = []
         for specDiff, diffFrame in zip(specDiffArr, diffFrameArr):
             if diffFrame > 0:
@@ -788,9 +787,9 @@ def BuildPreProcessGraph(variableScopeName, sampleRate, frameSizeArr, numBandArr
             else:
                 tempSpecDiff = specDiff[0:frameCount]
             tempSpecDiffArr.append(tempSpecDiff)
-        specDiff = tf.concat(tempSpecDiffArr, 1)
+        specDiff = tf.concat(tempSpecDiffArr, 1,  name='spec_diff')
 
-    return signalTensorArr, allTensorArr, diffFrameArr, logMelSpec, specDiff, frameCount
+    return signalTensor, subTensorArr, diffFrameArr, logMelSpec, specDiff, frameCount, scaleValue
 
 if __name__ == '__main__':
     # ConvertMadmomOnsetModelToTensorflow()
