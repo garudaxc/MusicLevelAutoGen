@@ -587,11 +587,13 @@ def PickOnsetFromFile(filename, bpm, duration, threhold = 0.7, onsets = None, sa
 
     # print(type(samples), samples.shape, len(samples))
 
+    fps = 100
     dis_time = 0.1
+    dis_time_delta = 1.0 / fps / 2
     while True:
         picker = madmom.features.onsets.OnsetPeakPickingProcessor(threshold=threhold, smooth=0.0, 
         pre_max=dis_time, post_max=dis_time, 
-        fps=100)
+        fps=fps)
         onsettime = picker(samples)
         # print(threhold, dis_time, len(onsettime))
         if len(onsettime) < count:
@@ -600,7 +602,7 @@ def PickOnsetFromFile(filename, bpm, duration, threhold = 0.7, onsets = None, sa
         if dis_time >= 60 / bpm:
             print('dis time is more than one beat. break')
             break
-        dis_time += 0.0001
+        dis_time += dis_time_delta
 
     print(threhold, len(onsettime))
     if saveDebugFile:
