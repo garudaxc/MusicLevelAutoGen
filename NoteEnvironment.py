@@ -27,7 +27,12 @@ def IsGPUAvailable():
 
     return False
 
+EnvironmentVariableHasSet = False
 def SetPrefrenceEnvironmentVariable():
+    if EnvironmentVariableHasSet:
+        print('[NoteEnvironment] environment variable has set.')
+        return
+
     if IsLinux():
         # SetEnv('KMP_BLOCKTIME', 0)
         # SetEnv('KMP_SETTINGS', 'true')
@@ -37,6 +42,7 @@ def SetPrefrenceEnvironmentVariable():
         # SetEnv('MKL_DYNAMIC', 'FALSE')
     else:
         print('[NoteEnvironment] windows system not set mkl env now.')
+    globals()['EnvironmentVariableHasSet'] = True
 
 def GenerateDefaultSessionConfig():
     config = None
