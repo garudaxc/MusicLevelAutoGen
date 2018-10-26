@@ -40,11 +40,17 @@ def SetPrefrenceEnvironmentVariable():
 
 def GenerateDefaultSessionConfig():
     config = None
+    gpuOptions = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
     if IsLinux():
-        config = tf.ConfigProto()
+        config = tf.ConfigProto(gpu_options=gpuOptions)
         config.intra_op_parallelism_threads = 4
         config.inter_op_parallelism_threads = 2
-        print('[NoteEnvironment] tensorflow config', 'intra', config.intra_op_parallelism_threads, 'inter', config.inter_op_parallelism_threads)
+        print('[NoteEnvironment] tensorflow config', 
+                'intra', config.intra_op_parallelism_threads, 
+                'inter', config.inter_op_parallelism_threads, 
+                'gpu per_process_gpu_memory_fraction', gpuOptions.per_process_gpu_memory_fraction)
     else:
-        print('[NoteEnvironment] windows system not set tensorflow config now.')
+        config = tf.ConfigProto(gpu_options=gpuOptions)
+        print('[NoteEnvironment] tensorflow config', 
+            'gpu per_process_gpu_memory_fraction', gpuOptions.per_process_gpu_memory_fraction)
     return config

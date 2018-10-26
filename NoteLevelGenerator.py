@@ -68,13 +68,10 @@ class NoteLevelGenerator():
         numBandArr = self.numBandArr
 
         restoreCudnnWithGPUMode = NoteEnvironment.IsGPUAvailable()
+        NoteEnvironment.SetPrefrenceEnvironmentVariable()
 
         with graph.as_default():
-            # todo use enviroment setting
-            # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
-            # gpu_options.allow_growth = False
-            # sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-            sess = tf.Session()
+            sess = tf.Session(config=NoteEnvironment.GenerateDefaultSessionConfig())
             signalTensor, preprocessTensorArr, diffFrameArr, logMelSpecTensor, specDiffTensor, frameCountTensor, scaleValueTensor = ModelTool.BuildPreProcessGraph('preprocess', sampleRate, frameSizeArr, numBandArr, hopSize)
             self.signalTensor = signalTensor
             self.preprocessTensorArr = preprocessTensorArr
