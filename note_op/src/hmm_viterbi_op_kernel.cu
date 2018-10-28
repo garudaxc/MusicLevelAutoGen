@@ -31,7 +31,7 @@ void HMMViterbiStep(int frameIdx, int stateCount,
     const double *omDensities, int omDensitiesSliceSize, const unsigned int *omPointers, 
     const double *preViterbi, double *curViterbi, unsigned int *btPointers) {
 
-    dim3 blockSize(128)
+    dim3 blockSize(128);
     // 如果正好整除，多一个block有多少影响？
     int blockCount = stateCount / blockSize.x + 1;
     dim3 gridSize(blockCount);
