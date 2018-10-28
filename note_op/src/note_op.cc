@@ -13,4 +13,4 @@ REGISTER_OP("NoteHMMViterbi")
     .Output("path: uint32")
     .Output("logProbability: float64")
     .Doc(R"doc(native implement of madmom hmm viterbi, support cuda only now.)doc");
-REGISTER_KERNEL_BUILDER(Name("NoteHMMViterbi").Device(DEVICE_GPU), NoteHMMViterbiOp);
+REGISTER_KERNEL_BUILDER(Name("NoteHMMViterbi").Device(tensorflow::DEVICE_GPU), NoteHMMViterbiOp);

@@ -1,6 +1,8 @@
 #include "hmm_viterbi_op.h"
 #include "note_op_util.h"
 
+using namespace tensorflow;
+
 void HMMViterbiStep(int frameIdx, int stateCount, 
     const unsigned int *tmStates, const unsigned int *tmPointers, const double *tmProbabilities, 
     const double *omDensities, int omDensitiesSliceSize, const unsigned int *omPointers, 
@@ -28,7 +30,7 @@ void NoteHMMViterbiOp::Compute(OpKernelContext *context) {
 
     const Tensor &omDensitiesTensor = context->input(4);
     auto omDensities = omDensitiesTensor.flat<double>().data();
-    int frameCount = omDensities.shape()[0];
+    int frameCount = omDensitiesTensor.shape()[0];
 
     const Tensor &omPointersTensor = context->input(5);
     auto omPointers = omPointersTensor.flat<uint32>().data();
@@ -48,7 +50,7 @@ void NoteHMMViterbiOp::Compute(OpKernelContext *context) {
     Tensor *logProbabilityTensor = nullptr;
     OP_REQUIRES_OK(context, context->allocate_output(1, input_tensor.shape(), &logProbabilityTensor));
     
-    int omDensitiesSliceSize = omDensities.shape()[1];
+    int omDensitiesSliceSize = omDensitiesTensor.shape()[1];
     for (int i = 0; i < frameCount; ++i) {
         HMMViterbiStep(i, stateCount, tmStates, tmPointers, tmProbabilities, 
             omDensities, omDensitiesSliceSize, omPointers, preViterbi, curViterbi, btPointers);

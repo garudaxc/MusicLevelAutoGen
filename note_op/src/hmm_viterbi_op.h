@@ -4,10 +4,10 @@
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/op_kernel.h"
 
-class NoteHMMViterbiOp : public OpKernel {
+class NoteHMMViterbiOp : public tensorflow::OpKernel {
 public:
-    explicit NoteHMMViterbiOp(OpKernelConstruction *context);
-    void Compute(OpKernelContext *context) override;
+    explicit NoteHMMViterbiOp(tensorflow::OpKernelConstruction *context);
+    void Compute(tensorflow::OpKernelContext *context) override;
 };
 
 #endif
