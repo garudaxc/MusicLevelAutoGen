@@ -2,6 +2,15 @@ import os
 import tensorflow as tf
 from tensorflow.python.client import device_lib
 
+NoteEnvironmentDic = {}
+def GetNoteEnvironmentDicValue(key):
+    if key in NoteEnvironmentDic:
+        return NoteEnvironmentDic[key]
+    return None
+
+def SetNoteEnvironmentDicValue(key, value):
+    NoteEnvironmentDic[key] = value
+
 def GetEnv(key):
     if key not in os.environ:
         return '(not_defined)'
@@ -27,9 +36,9 @@ def IsGPUAvailable():
 
     return False
 
-EnvironmentVariableHasSet = False
 def SetPrefrenceEnvironmentVariable():
-    if EnvironmentVariableHasSet:
+    key = 'EnvironmentVariableHasSet'
+    if GetNoteEnvironmentDicValue(key):
         print('[NoteEnvironment] environment variable has set.')
         return
 
@@ -42,7 +51,16 @@ def SetPrefrenceEnvironmentVariable():
         # SetEnv('MKL_DYNAMIC', 'FALSE')
     else:
         print('[NoteEnvironment] windows system not set mkl env now.')
-    globals()['EnvironmentVariableHasSet'] = True
+    SetNoteEnvironmentDicValue(key, True)
+
+def LoadOpLibrary(libFilePath):
+    key = os.path.basename(libFilePath)
+    opLib = GetNoteEnvironmentDicValue(key)
+    if opLib is None:
+        opLib = tf.load_op_library(libFilePath)
+        SetNoteEnvironmentDicValue(key, opLib)
+
+    return opLib    
 
 def GenerateDefaultSessionConfig():
     config = None
