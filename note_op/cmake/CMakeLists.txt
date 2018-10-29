@@ -79,6 +79,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${tf_cflag}")
 set(CMAKE_LIBRARY_PATH_FLAG "${CMAKE_LIBRARY_PATH_FLAG} -L${custom_op_link_lib_dir}")
 set(CMAKE_LINK_LIBRARY_FLAG "${CMAKE_LINK_LIBRARY_FLAG} -l${custom_op_link_lib}")
 
+if (WIN32)
+  # windows下为了解决tensorshape里的std limts max min 和vs的max min的冲突
+  add_definitions(-DNOMINMAX)
+endif()
+
 set(note_op_cuda_srcs
     "${note_op_src_dir}/hmm_viterbi_op_kernel.cu"
 )
