@@ -11,6 +11,7 @@ import NoteModel
 import time
 import DownbeatTracking
 import NoteLevelGenerator
+import LevelInfo
 
 def CompareData(arrA, arrB):
     idA = id(arrA)
@@ -415,8 +416,93 @@ def RunNoteLevelGenerator():
 
     return True
 
+def BPMAndETTestCallback(dic, runCallbackParam=None):
+    levelBPM = runCallbackParam[0]
+    levelET = runCallbackParam[1]
+    resArr = runCallbackParam[2]
+
+    generator = dic['generator']
+    specDiff = dic['specDiff']
+    generatorBpm = dic['bpm']
+    generatorET = dic['et']
+    audioData = dic['audioData']
+    sampleRate = dic['sampleRate']
+    isTranscodeByQAAC = dic['isTranscodeByQAAC']
+    bpmModelRes = dic['bpmModelRes']
+    audioFilePath = dic['audioFilePath']
+
+    proc = NotePreprocess.CustomRNNDownBeatProcessor()
+    srcRes = proc(specDiff)
+    duration = len(audioData) / sampleRate
+    analysisRange = generator.getBPMAnalysisRange(duration)
+    srcBPM, srcET = NotePreprocess.CalcBpmET(audioData, sampleRate, duration, srcRes, srcRes, analysisRange)
+    if isTranscodeByQAAC:
+        srcET = srcET + NotePreprocess.DecodeOffset(audioFilePath)
+    srcET = int(srcET * 1000)
+    audioFileName = os.path.basename(audioFilePath)
+    print('song', audioFileName)
+    print('level    ', [levelBPM, levelET])
+    print('generator', [generatorBpm, generatorET])
+    print('old one  ', [srcBPM, srcET])
+
+    resArr.append([levelBPM, levelET, generatorBpm, generatorET, srcBPM, srcET, audioFileName])
+
+    # DownbeatTracking.SaveInstantValue(bpmModelRes[:, 0], audioFilePath, '_bpm_split_0_%d_overlap_%d' % (generator.bpmModelBatchSize, generator.bpmModelOverlap))
+    # DownbeatTracking.SaveInstantValue(bpmModelRes[:, 1], audioFilePath, '_bpm_split_1_%d_overlap_%d' % (generator.bpmModelBatchSize, generator.bpmModelOverlap))
+    # DownbeatTracking.SaveInstantValue(srcRes[:, 0], audioFilePath, '_bpm_src_0')
+    # DownbeatTracking.SaveInstantValue(srcRes[:, 1], audioFilePath, '_bpm_src_1')
+
+def RunBPMAndETTest():
+    resourceDir = 'F:/p4resroot/H3D_X51_res/QQX5_Mainland/trunc/exe/resources'
+    levelDir = os.path.join(resourceDir, 'level', 'game_level')
+    audioDir = os.path.join(resourceDir, 'media', 'audio', 'Music')
+    levelFileList = os.listdir(levelDir)
+    levelInfoArr = LevelInfo.load_levels(levelDir, getSongFileName=True)
+    testCaseArr = []
+    for info in levelInfoArr:
+        print('pre process', info['id'])
+        audioFilePath = os.path.join(audioDir, info['songFileName'])
+        if not os.path.exists(audioFilePath):
+            print('audio file not exist', info['songFileName'])
+            continue
+        
+        etVal = float(info['et'])
+        testCaseArr.append((audioFilePath, float(info['bpm']), int(etVal)))
+
+    generator = NoteLevelGenerator.NoteLevelGenerator()
+    if not generator.initialize(runCallbackFunc=BPMAndETTestCallback):
+        return False
+
+    count = len(testCaseArr)
+    resArr = []
+    for idx, (audioFilePath, bpm, et) in enumerate(testCaseArr):
+        print('%d/%d %s' % (idx + 1, count, audioFilePath))
+        generator.run(audioFilePath, '', isTranscodeByQAAC=True, outputDebugInfo=True, runCallbackParam=(bpm, et, resArr))
+
+    generator.releaseResource()
+
+    resArr = np.array(resArr)
+    rootDir = util.getRootDir()
+    bpmTestResPath = os.path.join(rootDir, 'bpm_test_result.csv')
+    TFLstm.SaveFeatures(bpmTestResPath, resArr)
+
+    levelBPMArr = resArr[:, 0].astype(float)
+    levelETArr = resArr[:, 1].astype(int)
+    generatorBpmArr = resArr[:, 2].astype(float)
+    generatorET = resArr[:, 3].astype(int)
+    srcBPM = resArr[:, 4].astype(float)
+    srcET = resArr[:, 5].astype(int)
+    CompareData(levelBPMArr, generatorBpmArr)
+    CompareData(levelBPMArr, srcBPM)
+    CompareData(generatorBpmArr, srcBPM)
+    CompareData(levelETArr, generatorET)
+    CompareData(levelETArr, srcET)
+    CompareData(generatorET, srcET)
+    return True
+
 
 if __name__ == '__main__':
+    # RunBPMAndETTest()
     RunNoteLevelGenerator()
     # RunOnsetModel()
     # RunAudioPreprocess()
