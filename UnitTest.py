@@ -444,7 +444,7 @@ def BPMAndETTestCallback(dic, runCallbackParam=None):
             srcET = srcET + NotePreprocess.DecodeOffset(audioFilePath)
         srcET = int(srcET * 1000)
     audioFileName = os.path.basename(audioFilePath)
-    print('song', audioFileName)
+    print('song', audioFileName, 'duration', duration)
     print('level    ', [levelBPM, levelET])
     print('generator', [generatorBpm, generatorET])
     print('old one  ', [srcBPM, srcET])
@@ -477,7 +477,7 @@ def RunBPMAndETTest():
     if not generator.initialize(runCallbackFunc=BPMAndETTestCallback):
         return False
 
-    calcOldBPMAndET = True
+    calcOldBPMAndET = False
     count = len(testCaseArr)
     resArr = []
     for idx, (audioFilePath, bpm, et) in enumerate(testCaseArr):
@@ -509,8 +509,8 @@ def RunBPMAndETTest():
 
 
 if __name__ == '__main__':
-    # RunBPMAndETTest()
-    RunNoteLevelGenerator()
+    RunBPMAndETTest()
+    # RunNoteLevelGenerator()
     # RunOnsetModel()
     # RunAudioPreprocess()
     # RunAllDownbeatsTFModel(TFLstm.MakeMp3Pathname('ouxiangwanwansui'))
