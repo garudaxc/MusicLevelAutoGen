@@ -12,6 +12,7 @@ import time
 import DownbeatTracking
 import NoteLevelGenerator
 import LevelInfo
+import NoteEnvironment
 
 def CompareData(arrA, arrB):
     idA = id(arrA)
@@ -498,26 +499,33 @@ def RunBPMAndETTest():
     generator.releaseResource()
 
     resArr = np.array(resArr)
-    bpmTestResPath = os.path.join(rootDir, 'bpm_test_result', bpm_test_result.csv)
-    TFLstm.SaveFeatures(bpmTestResPath, resArr)
+    if len(resArr) > 0:
+        bpmTestResPath = os.path.join(rootDir, 'bpm_test_result', 'bpm_test_result.csv')
+        TFLstm.SaveFeatures(bpmTestResPath, resArr)
 
-    levelBPMArr = resArr[:, 0].astype(float)
-    levelETArr = resArr[:, 1].astype(int)
-    generatorBpmArr = resArr[:, 2].astype(float)
-    generatorET = resArr[:, 3].astype(int)
-    srcBPM = resArr[:, 4].astype(float)
-    srcET = resArr[:, 5].astype(int)
-    CompareData(levelBPMArr, generatorBpmArr)
-    CompareData(levelBPMArr, srcBPM)
-    CompareData(generatorBpmArr, srcBPM)
-    CompareData(levelETArr, generatorET)
-    CompareData(levelETArr, srcET)
-    CompareData(generatorET, srcET)
+        levelBPMArr = resArr[:, 0].astype(float)
+        levelETArr = resArr[:, 1].astype(int)
+        generatorBpmArr = resArr[:, 2].astype(float)
+        generatorET = resArr[:, 3].astype(int)
+        srcBPM = resArr[:, 4].astype(float)
+        srcET = resArr[:, 5].astype(int)
+        CompareData(levelBPMArr, generatorBpmArr)
+        CompareData(levelBPMArr, srcBPM)
+        CompareData(generatorBpmArr, srcBPM)
+        CompareData(levelETArr, generatorET)
+        CompareData(levelETArr, srcET)
+        CompareData(generatorET, srcET)
     return True
 
+def RunLoadNoteOp():
+    filePath = os.path.abspath(__file__)
+    fileDir = os.path.dirname(filePath)
+    libFilePath = os.path.join(fileDir, 'note_op', 'lib', 'note_op.so')
+    noteOpLib = NoteEnvironment.LoadOpLibrary(libFilePath)
 
 if __name__ == '__main__':
-    RunBPMAndETTest()
+    RunLoadNoteOp()
+    # RunBPMAndETTest()
     # RunNoteLevelGenerator()
     # RunOnsetModel()
     # RunAudioPreprocess()

@@ -1,6 +1,7 @@
 import os
 import tensorflow as tf
 from tensorflow.python.client import device_lib
+from tensorflow.contrib import util
 
 NoteEnvironmentDic = {}
 def GetNoteEnvironmentDicValue(key):
@@ -57,7 +58,7 @@ def LoadOpLibrary(libFilePath):
     key = os.path.basename(libFilePath)
     opLib = GetNoteEnvironmentDicValue(key)
     if opLib is None:
-        opLib = tf.load_op_library(libFilePath)
+        opLib = util.loader.load_op_library(libFilePath)
         SetNoteEnvironmentDicValue(key, opLib)
 
     return opLib    
