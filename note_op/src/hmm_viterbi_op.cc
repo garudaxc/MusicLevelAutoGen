@@ -30,7 +30,8 @@ void NoteHMMViterbiOp::Compute(OpKernelContext *context) {
 
     const Tensor &omDensitiesTensor = context->input(4);
     auto omDensities = omDensitiesTensor.flat<double>().data();
-    int frameCount = omDensitiesTensor.shape()[0];
+    const TensorShape &omDensitiesTensorShape = omDensitiesTensor.shape();
+    int frameCount = omDensitiesTensorShape.dim_size(0);
 
     const Tensor &omPointersTensor = context->input(5);
     auto omPointers = omPointersTensor.flat<uint32>().data();
@@ -46,11 +47,11 @@ void NoteHMMViterbiOp::Compute(OpKernelContext *context) {
 
     // todo output shape
     Tensor *pathTensor = nullptr;
-    OP_REQUIRES_OK(context, context->allocate_output(0, input_tensor.shape(), &pathTensor));
+    OP_REQUIRES_OK(context, context->allocate_output(0, TensorShape({stateCount}), &pathTensor));
     Tensor *logProbabilityTensor = nullptr;
-    OP_REQUIRES_OK(context, context->allocate_output(1, input_tensor.shape(), &logProbabilityTensor));
+    OP_REQUIRES_OK(context, context->allocate_output(1, TensorShape({}), &logProbabilityTensor));
     
-    int omDensitiesSliceSize = omDensitiesTensor.shape()[1];
+    int omDensitiesSliceSize = omDensitiesTensorShape.dim_size(1);
     for (int i = 0; i < frameCount; ++i) {
         HMMViterbiStep(i, stateCount, tmStates, tmPointers, tmProbabilities, 
             omDensities, omDensitiesSliceSize, omPointers, preViterbi, curViterbi, btPointers);
