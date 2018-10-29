@@ -74,10 +74,11 @@ message("tf_cflag_result: ${tf_cflag_result}; value: ${tf_cflag}")
 message("tf_lflag_result: ${tf_lflag_result}; value: ${tf_lflag}")
 
 set(custom_op_link_lib_dir "${tf_lib_dir}/python")
-set(custom_op_link_lib "${custom_op_link_lib_dir}/pywrap_tensorflow_internal_lib")
+set(custom_op_link_lib "pywrap_tensorflow_internal")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${tf_cflag}")
-set(CMAKE_LIBRARY_PATH_FLAG "${CMAKE_LIBRARY_PATH_FLAG} -L${custom_op_link_lib_dir}")
-set(CMAKE_LINK_LIBRARY_FLAG "${CMAKE_LINK_LIBRARY_FLAG} -l${custom_op_link_lib}")
+
+link_directories(${custom_op_link_lib_dir})
+link_directories("${CUDA_TOOLKIT_ROOT_DIR}/lib/x64")
 
 if (WIN32)
   # windows下为了解决tensorshape里的std limts max min 和vs的max min的冲突
@@ -99,3 +100,4 @@ set(note_op_srcs
 )
 
 add_library(note_op SHARED ${note_op_srcs} ${note_op_cuda_o})
+target_link_libraries(note_op ${custom_op_link_lib} "cudart")
