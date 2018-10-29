@@ -449,7 +449,10 @@ def BPMAndETTestCallback(dic, runCallbackParam=None):
     print('generator', [generatorBpm, generatorET])
     print('old one  ', [srcBPM, srcET])
 
-    resArr.append([levelBPM, levelET, generatorBpm, generatorET, srcBPM, srcET, audioFileName, duration])
+    res = [levelBPM, levelET, generatorBpm, generatorET, srcBPM, srcET, audioFileName, duration]
+    resArr.append(res)
+    songTestResPath = os.path.join(util.getRootDir(), 'bpm_test_result', audioFileName+'.csv')
+    TFLstm.SaveFeatures(songTestResPath, [res])
 
     # DownbeatTracking.SaveInstantValue(bpmModelRes[:, 0], audioFilePath, '_bpm_split_0_%d_overlap_%d' % (generator.bpmModelBatchSize, generator.bpmModelOverlap))
     # DownbeatTracking.SaveInstantValue(bpmModelRes[:, 1], audioFilePath, '_bpm_split_1_%d_overlap_%d' % (generator.bpmModelBatchSize, generator.bpmModelOverlap))
@@ -477,11 +480,17 @@ def RunBPMAndETTest():
     if not generator.initialize(runCallbackFunc=BPMAndETTestCallback):
         return False
 
+    rootDir = util.getRootDir()
     calcOldBPMAndET = False
+    skipExist = True
     count = len(testCaseArr)
     resArr = []
     for idx, (audioFilePath, bpm, et) in enumerate(testCaseArr):
         print('%d/%d %s' % (idx + 1, count, audioFilePath))
+        songTestResPath = os.path.join(rootDir, 'bpm_test_result', os.path.basename(audioFilePath)+'.csv')
+        if skipExist and os.path.exists(songTestResPath):
+            print('songTestResPath exist. skip.', songTestResPath)
+            continue
         iteStart = time.time()
         generator.run(audioFilePath, '', isTranscodeByQAAC=True, outputDebugInfo=True, runCallbackParam=(bpm, et, resArr, calcOldBPMAndET))
         print('test cost', time.time() - iteStart)
@@ -489,8 +498,7 @@ def RunBPMAndETTest():
     generator.releaseResource()
 
     resArr = np.array(resArr)
-    rootDir = util.getRootDir()
-    bpmTestResPath = os.path.join(rootDir, 'bpm_test_result.csv')
+    bpmTestResPath = os.path.join(rootDir, 'bpm_test_result', bpm_test_result.csv)
     TFLstm.SaveFeatures(bpmTestResPath, resArr)
 
     levelBPMArr = resArr[:, 0].astype(float)
