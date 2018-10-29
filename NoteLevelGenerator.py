@@ -31,11 +31,13 @@ class NoteLevelGenerator():
         self.bpmModelBatchSize = 16
         self.bpmModelOverlap = 500
 
+        self.runCallbackFunc = None
+
         # todo limit time duraion
         self.minDuration = 10
         self.maxDuration = 60 * 20
 
-    def initialize(self, resourceDir=None):
+    def initialize(self, resourceDir=None, runCallbackFunc=None):
         if resourceDir is None:
             resourceDir = self.defaultResourceDir()
 
@@ -43,6 +45,7 @@ class NoteLevelGenerator():
             return False
 
         self.resourceDir = resourceDir
+        self.runCallbackFunc = runCallbackFunc
 
         shortModelPath = self.getModelPath(resourceDir, 'model_singing')
         longModelPath = self.getModelPath(resourceDir, 'model_longnote')
@@ -115,7 +118,7 @@ class NoteLevelGenerator():
 
         return True
 
-    def run(self, inputFilePath, outputFilePath, isTranscodeByQAAC=False, fakeAudioData=None, outputDebugInfo=False, saveDebugFile=False):
+    def run(self, inputFilePath, outputFilePath, isTranscodeByQAAC=False, fakeAudioData=None, outputDebugInfo=False, saveDebugFile=False, runCallbackParam=None):
         if self.graph is None or self.sess is None:
             return False
 
@@ -161,7 +164,7 @@ class NoteLevelGenerator():
             tfLogMel = preprocessRes[2]
             tfSpecDiff = preprocessRes[3]
             if outputDebugInfo:
-                print('cost process', time.time() - timeStart)
+                print('cost pre process', time.time() - timeStart)
                 timeStart = time.time()
 
             noteModelSeqLen = [len(noteModelInputData[0])] * self.noteModelBatchSize
@@ -194,9 +197,18 @@ class NoteLevelGenerator():
         shortModelRes = self.postProcessNoteModelRes(res[0], len(tfSpecDiff))
         longModelRes = self.postProcessNoteModelRes(res[1], len(tfSpecDiff))
         onsetModelRes = res[2]
-        bpm, et, duration = self.postProcessBPMModelRes(res, audioData, tfSpecDiff, inputFilePath, isTranscodeByQAAC)
+        bpm, et, duration, bpmModelRes = self.postProcessBPMModelRes(res, audioData, tfSpecDiff, inputFilePath, isTranscodeByQAAC)
         if outputDebugInfo:
             print('cost post', time.time() - timeStart)
+
+        if self.runCallbackFunc is not None:
+            callbackDic = {'generator': self, 'specDiff': tfSpecDiff, 'logMel': tfLogMel, 'isTranscodeByQAAC': isTranscodeByQAAC, 
+                            'shortModelRes': shortModelRes, 'longModelRes': longModelRes, 'onsetModelRes': onsetModelRes, 'bpmModelRes': bpmModelRes, 
+                            'bpm': bpm, 'et': et, 'audioData': audioData, 'sampleRate': self.sampleRate, 'audioFilePath': inputFilePath}
+            self.runCallbackFunc(callbackDic, runCallbackParam=runCallbackParam)
+
+        if outputFilePath is None or len(outputFilePath) <= 0:
+            return True
 
         postprocess.GenerateLevelImp(inputFilePath, duration, bpm, et, 
                     shortModelRes, longModelRes, outputFilePath, templateFilePath, 0.7, 0.7, 
@@ -287,6 +299,9 @@ class NoteLevelGenerator():
         res = res[0:frameCount]
         return res
 
+    def getBPMAnalysisRange(self, duration):
+        return (0, int(duration))
+
     def postProcessBPMModelRes(self, sessRes, audioData, featureData, audioFilePath, isTranscodeByQAAC):
         if self.bpmModelUseMerged:
             bpmRes = sessRes[3]
@@ -303,7 +318,7 @@ class NoteLevelGenerator():
         downBeatOutput = act(predict)
 
         duration = len(audioData) / self.sampleRate
-        analysisRange = (0, int(duration))
+        analysisRange = self.getBPMAnalysisRange(duration)
         bpm, et = NotePreprocess.CalcBpmET(audioData, self.sampleRate, duration, downBeatOutput, downBeatOutput, analysisRange)
         if isTranscodeByQAAC:
             et = et + NotePreprocess.DecodeOffset(audioFilePath)
@@ -311,21 +326,7 @@ class NoteLevelGenerator():
         duration = int(duration * 1000)
         et = int(et * 1000)
 
-        # proc = NotePreprocess.CustomRNNDownBeatProcessor()
-        # srcRes = proc(featureData)
-        # srcBPM, srcET = NotePreprocess.CalcBpmET(audioData, self.sampleRate, duration, srcRes, srcRes, analysisRange)
-        # if isTranscodeByQAAC:
-        #     srcET = srcET + NotePreprocess.DecodeOffset(audioFilePath)
-        # srcDuration = duration
-        # srcET = int(srcET * 1000)
-        # print('src bpm', srcBPM, 'et', srcET, 'duration', srcDuration)
-        # import DownbeatTracking
-        # DownbeatTracking.SaveInstantValue(downBeatOutput[:, 0], audioFilePath, '_bpm_split_0_%d_overlap_%d' % (self.bpmModelBatchSize, self.bpmModelOverlap))
-        # DownbeatTracking.SaveInstantValue(downBeatOutput[:, 1], audioFilePath, '_bpm_split_1_%d_overlap_%d' % (self.bpmModelBatchSize, self.bpmModelOverlap))
-        # DownbeatTracking.SaveInstantValue(srcRes[:, 0], audioFilePath, '_bpm_src_0')
-        # DownbeatTracking.SaveInstantValue(srcRes[:, 1], audioFilePath, '_bpm_src_1')
-
-        return bpm, et, duration
+        return bpm, et, duration, downBeatOutput
 
     def tfSplitData(self, arr, splitCount, overlap):
         srcArrShape = tf.shape(arr)
