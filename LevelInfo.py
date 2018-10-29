@@ -18,7 +18,7 @@ posCountPerBeat = 8
 beatPerBar = 4
 posCountPerBar = posCountPerBeat * beatPerBar
 
-def parse_level_info(tree):
+def parse_level_info(tree, getSongFileName=False):
     #解析传统关卡中的bpm和et
     #root = tree.getroot() #level
     root = tree
@@ -36,11 +36,15 @@ def parse_level_info(tree):
     id = id.split('.')[0]
 
     info = {'id':id, 'bpm':str(bpm), 'et':str(et)}
+    if getSongFileName:
+        songFilePath = musicInfo.find('FilePath').text
+        info['songFilePath'] = songFilePath
+        info['songFileName'] = os.path.basename(songFilePath)
     print(info)
     return info
 
 
-def load_levels(path):
+def load_levels(path, getSongFileName=False):
     # 遍历目录下的xml，
     infos = []
     for f in os.listdir(path):
@@ -56,7 +60,7 @@ def load_levels(path):
         #tree = ElementTree.parse(pathname, parser=xmlparser)
         tree = ElementTree.fromstring(text)
         
-        info = parse_level_info(tree)
+        info = parse_level_info(tree, getSongFileName=getSongFileName)
         infos.append(info)
 
     return infos
