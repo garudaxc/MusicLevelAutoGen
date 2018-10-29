@@ -420,6 +420,7 @@ def BPMAndETTestCallback(dic, runCallbackParam=None):
     levelBPM = runCallbackParam[0]
     levelET = runCallbackParam[1]
     resArr = runCallbackParam[2]
+    calcOldBPMAndET = runCallbackParam[3]
 
     generator = dic['generator']
     specDiff = dic['specDiff']
@@ -431,21 +432,24 @@ def BPMAndETTestCallback(dic, runCallbackParam=None):
     bpmModelRes = dic['bpmModelRes']
     audioFilePath = dic['audioFilePath']
 
-    proc = NotePreprocess.CustomRNNDownBeatProcessor()
-    srcRes = proc(specDiff)
     duration = len(audioData) / sampleRate
-    analysisRange = generator.getBPMAnalysisRange(duration)
-    srcBPM, srcET = NotePreprocess.CalcBpmET(audioData, sampleRate, duration, srcRes, srcRes, analysisRange)
-    if isTranscodeByQAAC:
-        srcET = srcET + NotePreprocess.DecodeOffset(audioFilePath)
-    srcET = int(srcET * 1000)
+    srcBPM = 0
+    srcET = 0
+    if calcOldBPMAndET:
+        proc = NotePreprocess.CustomRNNDownBeatProcessor()
+        srcRes = proc(specDiff)
+        analysisRange = generator.getBPMAnalysisRange(duration)
+        srcBPM, srcET = NotePreprocess.CalcBpmET(audioData, sampleRate, duration, srcRes, srcRes, analysisRange)
+        if isTranscodeByQAAC:
+            srcET = srcET + NotePreprocess.DecodeOffset(audioFilePath)
+        srcET = int(srcET * 1000)
     audioFileName = os.path.basename(audioFilePath)
     print('song', audioFileName)
     print('level    ', [levelBPM, levelET])
     print('generator', [generatorBpm, generatorET])
     print('old one  ', [srcBPM, srcET])
 
-    resArr.append([levelBPM, levelET, generatorBpm, generatorET, srcBPM, srcET, audioFileName])
+    resArr.append([levelBPM, levelET, generatorBpm, generatorET, srcBPM, srcET, audioFileName, duration])
 
     # DownbeatTracking.SaveInstantValue(bpmModelRes[:, 0], audioFilePath, '_bpm_split_0_%d_overlap_%d' % (generator.bpmModelBatchSize, generator.bpmModelOverlap))
     # DownbeatTracking.SaveInstantValue(bpmModelRes[:, 1], audioFilePath, '_bpm_split_1_%d_overlap_%d' % (generator.bpmModelBatchSize, generator.bpmModelOverlap))
@@ -473,11 +477,14 @@ def RunBPMAndETTest():
     if not generator.initialize(runCallbackFunc=BPMAndETTestCallback):
         return False
 
+    calcOldBPMAndET = True
     count = len(testCaseArr)
     resArr = []
     for idx, (audioFilePath, bpm, et) in enumerate(testCaseArr):
         print('%d/%d %s' % (idx + 1, count, audioFilePath))
-        generator.run(audioFilePath, '', isTranscodeByQAAC=True, outputDebugInfo=True, runCallbackParam=(bpm, et, resArr))
+        iteStart = time.time()
+        generator.run(audioFilePath, '', isTranscodeByQAAC=True, outputDebugInfo=True, runCallbackParam=(bpm, et, resArr, calcOldBPMAndET))
+        print('test cost', time.time() - iteStart)
 
     generator.releaseResource()
 
