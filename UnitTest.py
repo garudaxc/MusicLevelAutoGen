@@ -437,8 +437,8 @@ def CalcBPMDiff(bpmA, bpmB):
     scale = np.round(maxBpm / minBpm)
     dis = abs(maxBpm - scale * minBpm)
     disTime = abs(60 / maxBpm - 60 / (scale * minBpm))
-    if bpmA < bpmB:
-        scale = -scale
+    if bpmA < bpmB and scale > 0:
+        scale = 1.0 / scale
 
     return dis, scale, disTime * 1000
 
@@ -451,13 +451,14 @@ def CompareBPM(arrA, arrB):
     allDisArr = []
     allScaleArr = []
     allDisTimeArr = []
+    invalidValue = 10000000
     for idx, (bpmA, bpmB) in enumerate(zip(arrA, arrB)):
         dis, scale, disTime = CalcBPMDiff(bpmA, bpmB)
         if dis < 0:
             invalidArr.append(idx)
-            allDisArr.append(bpmA)
+            allDisArr.append(invalidValue)
             allScaleArr.append(0)
-            allDisTimeArr.append(10000)
+            allDisTimeArr.append(invalidValue)
             continue
 
         disArr.append(dis)
@@ -472,6 +473,20 @@ def CompareBPM(arrA, arrB):
     minDis= np.min(disArr)
     print('bpm ave dis', ave, 'maxDis', maxDis, 'minDis', minDis)
     return disArr, scaleArr, disTimeArr, allDisArr, allScaleArr, allDisTimeArr
+
+def CompareET(bpmArrA, etArrA, bpmArrB, etArrB, scaleArr):
+    etDisArr = []
+    for bpmA, etA, bpmB, etB, scale in zip(bpmArrA, etArrA, bpmArrB, etArrB, scaleArr):
+        beatInterval = 60 / bpmA * 1000.0
+        halfBeatInterval = beatInterval / 2
+        dis = abs(etA - etB)
+        if bpmB > 0:
+            while dis > halfBeatInterval:
+                dis = dis - beatInterval
+        else:
+            dis = 10000000
+        etDisArr.append(dis)
+    return etDisArr
 
 def BPMAndETTestCallback(dic, runCallbackParam=None):
     levelBPM = runCallbackParam[0]
@@ -521,7 +536,7 @@ def RunCompareBPMAndET():
     mergeFilePath = os.path.join(resultDir, mergeFileName)
     lineArr = []
     for fileName in resultList:
-        if fileName == mergeFileName or os.path.splitext(fileName)[0] != '.csv':
+        if fileName == mergeFileName or os.path.splitext(fileName)[1] != '.csv':
             continue
 
         with open(os.path.join(resultDir, fileName), 'r') as resultFile:
@@ -545,7 +560,13 @@ def RunCompareBPMAndET():
         srcET = resArr[:, 5].astype(int)
 
         disArr, scaleArr, disTimeArr, allDisArr, allScaleArr, allDisTimeArr = CompareBPM(levelBPMArr, generatorBpmArr)
-        resArr = np.concatenate((resArr, np.reshape(allDisArr, (-1, 1)), np.reshape(allScaleArr, (-1, 1)), np.reshape(allDisTimeArr, (-1, 1))), 1)
+        etDisArr = CompareET(levelBPMArr, levelETArr, generatorBpmArr, generatorET, allScaleArr)
+        resArr = np.concatenate((resArr, 
+                    np.reshape(allDisArr, (-1, 1)), 
+                    np.reshape(allScaleArr, (-1, 1)), 
+                    np.reshape(allDisTimeArr, (-1, 1)), 
+                    np.reshape(etDisArr, (-1, 1))
+                    ), 1)
 
         CompareData(levelBPMArr, srcBPM)
         CompareData(generatorBpmArr, srcBPM)
