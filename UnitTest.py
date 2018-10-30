@@ -417,11 +417,66 @@ def RunNoteLevelGenerator():
 
     return True
 
+def BPMTestAudioResultDir():
+    return os.path.join(util.getRootDir(), 'bpm_test_result')
+
+def BPMTestAudioResultPath(audioFilePath):
+    return os.path.join(BPMTestAudioResultDir(), os.path.basename(audioFilePath)+'.csv')
+
+def CalcBPMDiff(bpmA, bpmB):
+    if bpmB <= 0.0:
+        return -1, -1, -1
+
+    if bpmA > bpmB:
+        maxBpm = bpmA
+        minBpm = bpmB
+    else:
+        maxBpm = bpmB
+        minBpm = bpmA
+
+    scale = np.round(maxBpm / minBpm)
+    dis = abs(maxBpm - scale * minBpm)
+    disTime = abs(60 / maxBpm - 60 / (scale * minBpm))
+    if bpmA < bpmB:
+        scale = -scale
+
+    return dis, scale, disTime * 1000
+
+
+def CompareBPM(arrA, arrB):
+    invalidArr = []
+    disArr = []
+    scaleArr = []
+    disTimeArr = []
+    allDisArr = []
+    allScaleArr = []
+    allDisTimeArr = []
+    for idx, (bpmA, bpmB) in enumerate(zip(arrA, arrB)):
+        dis, scale, disTime = CalcBPMDiff(bpmA, bpmB)
+        if dis < 0:
+            invalidArr.append(idx)
+            allDisArr.append(bpmA)
+            allScaleArr.append(0)
+            allDisTimeArr.append(10000)
+            continue
+
+        disArr.append(dis)
+        scaleArr.append(scale)
+        disTimeArr.append(disTime)
+        allDisArr.append(dis)
+        allScaleArr.append(scale)
+        allDisTimeArr.append(disTime)
+
+    ave = np.average(disArr)
+    maxDis = np.max(disArr)
+    minDis= np.min(disArr)
+    print('bpm ave dis', ave, 'maxDis', maxDis, 'minDis', minDis)
+    return disArr, scaleArr, disTimeArr, allDisArr, allScaleArr, allDisTimeArr
+
 def BPMAndETTestCallback(dic, runCallbackParam=None):
     levelBPM = runCallbackParam[0]
     levelET = runCallbackParam[1]
-    resArr = runCallbackParam[2]
-    calcOldBPMAndET = runCallbackParam[3]
+    calcOldBPMAndET = runCallbackParam[2]
 
     generator = dic['generator']
     specDiff = dic['specDiff']
@@ -451,14 +506,54 @@ def BPMAndETTestCallback(dic, runCallbackParam=None):
     print('old one  ', [srcBPM, srcET])
 
     res = [levelBPM, levelET, generatorBpm, generatorET, srcBPM, srcET, audioFileName, duration]
-    resArr.append(res)
-    songTestResPath = os.path.join(util.getRootDir(), 'bpm_test_result', audioFileName+'.csv')
-    TFLstm.SaveFeatures(songTestResPath, [res])
+    audioResultPath = audioResultPath = BPMTestAudioResultPath(audioFilePath)
+    TFLstm.SaveFeatures(audioResultPath, [res])
 
     # DownbeatTracking.SaveInstantValue(bpmModelRes[:, 0], audioFilePath, '_bpm_split_0_%d_overlap_%d' % (generator.bpmModelBatchSize, generator.bpmModelOverlap))
     # DownbeatTracking.SaveInstantValue(bpmModelRes[:, 1], audioFilePath, '_bpm_split_1_%d_overlap_%d' % (generator.bpmModelBatchSize, generator.bpmModelOverlap))
     # DownbeatTracking.SaveInstantValue(srcRes[:, 0], audioFilePath, '_bpm_src_0')
     # DownbeatTracking.SaveInstantValue(srcRes[:, 1], audioFilePath, '_bpm_src_1')
+
+def RunCompareBPMAndET():
+    resultDir = BPMTestAudioResultDir()
+    resultList = os.listdir(resultDir)
+    mergeFileName = 'bpm_test_result.csv'
+    mergeFilePath = os.path.join(resultDir, mergeFileName)
+    lineArr = []
+    for fileName in resultList:
+        if fileName == mergeFileName or os.path.splitext(fileName)[0] != '.csv':
+            continue
+
+        with open(os.path.join(resultDir, fileName), 'r') as resultFile:
+            for line in resultFile:
+                lineArr.append(line)
+
+    resArr = []
+    for line in lineArr:
+        line = line.replace('\r', '\n')
+        line = line.replace('\n', '')
+        arr = line.split(',')
+        resArr.append(arr)
+
+    resArr = np.array(resArr)
+    if len(resArr) > 0:
+        levelBPMArr = resArr[:, 0].astype(float)
+        levelETArr = resArr[:, 1].astype(int)
+        generatorBpmArr = resArr[:, 2].astype(float)
+        generatorET = resArr[:, 3].astype(int)
+        srcBPM = resArr[:, 4].astype(float)
+        srcET = resArr[:, 5].astype(int)
+
+        disArr, scaleArr, disTimeArr, allDisArr, allScaleArr, allDisTimeArr = CompareBPM(levelBPMArr, generatorBpmArr)
+        resArr = np.concatenate((resArr, np.reshape(allDisArr, (-1, 1)), np.reshape(allScaleArr, (-1, 1)), np.reshape(allDisTimeArr, (-1, 1))), 1)
+
+        CompareData(levelBPMArr, srcBPM)
+        CompareData(generatorBpmArr, srcBPM)
+        CompareData(levelETArr, generatorET)
+        CompareData(levelETArr, srcET)
+        CompareData(generatorET, srcET)
+
+        TFLstm.SaveFeatures(mergeFilePath, resArr)
 
 def RunBPMAndETTest():
     resourceDir = 'F:/p4resroot/H3D_X51_res/QQX5_Mainland/trunc/exe/resources'
@@ -485,36 +580,20 @@ def RunBPMAndETTest():
     calcOldBPMAndET = False
     skipExist = True
     count = len(testCaseArr)
-    resArr = []
     for idx, (audioFilePath, bpm, et) in enumerate(testCaseArr):
         print('%d/%d %s' % (idx + 1, count, audioFilePath))
-        songTestResPath = os.path.join(rootDir, 'bpm_test_result', os.path.basename(audioFilePath)+'.csv')
-        if skipExist and os.path.exists(songTestResPath):
-            print('songTestResPath exist. skip.', songTestResPath)
+        audioResultPath = BPMTestAudioResultPath(audioFilePath)
+        if skipExist and os.path.exists(audioResultPath):
+            print('songTestResPath exist. skip.', audioResultPath)
             continue
         iteStart = time.time()
-        generator.run(audioFilePath, '', isTranscodeByQAAC=True, outputDebugInfo=True, runCallbackParam=(bpm, et, resArr, calcOldBPMAndET))
+        generator.run(audioFilePath, '', isTranscodeByQAAC=True, outputDebugInfo=True, runCallbackParam=(bpm, et, calcOldBPMAndET))
         print('test cost', time.time() - iteStart)
 
     generator.releaseResource()
 
-    resArr = np.array(resArr)
-    if len(resArr) > 0:
-        bpmTestResPath = os.path.join(rootDir, 'bpm_test_result', 'bpm_test_result.csv')
-        TFLstm.SaveFeatures(bpmTestResPath, resArr)
+    RunCompareBPMAndET()
 
-        levelBPMArr = resArr[:, 0].astype(float)
-        levelETArr = resArr[:, 1].astype(int)
-        generatorBpmArr = resArr[:, 2].astype(float)
-        generatorET = resArr[:, 3].astype(int)
-        srcBPM = resArr[:, 4].astype(float)
-        srcET = resArr[:, 5].astype(int)
-        CompareData(levelBPMArr, generatorBpmArr)
-        CompareData(levelBPMArr, srcBPM)
-        CompareData(generatorBpmArr, srcBPM)
-        CompareData(levelETArr, generatorET)
-        CompareData(levelETArr, srcET)
-        CompareData(generatorET, srcET)
     return True
 
 def RunLoadNoteOp():
@@ -524,8 +603,8 @@ def RunLoadNoteOp():
     noteOpLib = NoteEnvironment.LoadOpLibrary(libFilePath)
 
 if __name__ == '__main__':
-    RunLoadNoteOp()
-    # RunBPMAndETTest()
+    # RunLoadNoteOp()
+    RunBPMAndETTest()
     # RunNoteLevelGenerator()
     # RunOnsetModel()
     # RunAudioPreprocess()
