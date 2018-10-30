@@ -19,6 +19,16 @@ def getCompileFlags():
 def getLinkFlags():
     return postProcessString(" ".join(tf.sysconfig.get_link_flags()))
 
+def checkDevice():
+    deviceList = device_lib.list_local_devices()
+    res ='CPU'
+    if deviceList is not None:
+        for device in deviceList:
+            if device.device_type == 'GPU':
+                res = 'GPU'
+                break
+    return res
+
 if __name__ == '__main__':
     func = globals()[sys.argv[1]]
     outputResult(func())

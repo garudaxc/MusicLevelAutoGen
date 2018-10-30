@@ -46,25 +46,35 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_61,code=\"sm_61,com
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_70,code=\"sm_70,compute_70\")
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-ftz=true)  # Flush denormals to zero
 
-message("get tf dir and flags by execute python...")
+set(py_work_dir ${note_op_proj_SOURCE_DIR})
 
+message("check tensorflow version...")
+execute_process(COMMAND python get_tensorflow_info.py checkDevice
+  WORKING_DIRECTORY ${py_work_dir} 
+  RESULT_VARIABLE tf_device_result 
+  OUTPUT_VARIABLE tf_device)
+if (${tf_device} NOT STREQUAL "GPU")
+  message(FATAL_ERROR "note op lib need tensorflow-gpu version" )
+endif()
+
+message("get tensorflow dir and flags...")
 execute_process(COMMAND python get_tensorflow_info.py getIncludeDir
-  WORKING_DIRECTORY ${note_op_proj_SOURCE_DIR} 
+  WORKING_DIRECTORY ${py_work_dir} 
   RESULT_VARIABLE tf_include_dir_result 
   OUTPUT_VARIABLE tf_include_dir)
 
 execute_process(COMMAND python get_tensorflow_info.py getLibDir
-  WORKING_DIRECTORY ${note_op_proj_SOURCE_DIR} 
+  WORKING_DIRECTORY ${py_work_dir} 
   RESULT_VARIABLE tf_lib_dir_result 
   OUTPUT_VARIABLE tf_lib_dir)
 
 execute_process(COMMAND python get_tensorflow_info.py getCompileFlags
-  WORKING_DIRECTORY ${note_op_proj_SOURCE_DIR} 
+  WORKING_DIRECTORY ${py_work_dir} 
   RESULT_VARIABLE tf_cflag_result 
   OUTPUT_VARIABLE tf_cflag)
 
 execute_process(COMMAND python get_tensorflow_info.py getLinkFlags
-  WORKING_DIRECTORY ${note_op_proj_SOURCE_DIR} 
+  WORKING_DIRECTORY ${py_work_dir} 
   RESULT_VARIABLE tf_lflag_result 
   OUTPUT_VARIABLE tf_lflag)
 
