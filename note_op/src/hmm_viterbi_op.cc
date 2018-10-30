@@ -13,9 +13,6 @@ NoteHMMViterbiOp::NoteHMMViterbiOp(OpKernelConstruction *context): OpKernel(cont
 }
 
 void NoteHMMViterbiOp::Compute(OpKernelContext *context) {
-
-    // todo 支持多个batch
-
     const Tensor &stateCountTensor = context->input(0);
     int stateCount = stateCountTensor.flat<int32>().data()[0];
 
@@ -39,15 +36,23 @@ void NoteHMMViterbiOp::Compute(OpKernelContext *context) {
     const Tensor &initialDistributionTensor = context->input(6);
     auto initialDistribution = initialDistributionTensor.flat<double>().data();
 
+    Tensor preViterbiTensor = Tensor();
+    OP_REQUIRES_OK(context, context->allocate_temp(DT_DOUBLE, TensorShape({stateCount}), &preViterbiTensor));
+    double *preViterbi = preViterbiTensor.template flat<double>().data();
+    memcpy(preViterbi, initialDistribution, sizeof(double) * stateCount);
 
-    // todo allocate and copy from initialDistribution
-    double *preViterbi = nullptr;
-    double *curViterbi = nullptr;
-    unsigned int *btPointers = nullptr;
+    Tensor curViterbiTensor = Tensor();
+    OP_REQUIRES_OK(context, context->allocate_temp(DT_DOUBLE, TensorShape({stateCount}), &curViterbiTensor));
+    double *curViterbi = curViterbiTensor.template flat<double>().data();
 
-    // todo output shape
+    Tensor btPointersTensor = Tensor();
+    OP_REQUIRES_OK(context, context->allocate_temp(DT_UINT32, TensorShape({frameCount, stateCount}), &btPointersTensor));
+    unsigned int *btPointers = btPointersTensor.template flat<uint32>().data();
+
     Tensor *pathTensor = nullptr;
     OP_REQUIRES_OK(context, context->allocate_output(0, TensorShape({stateCount}), &pathTensor));
+    
+    // todo scalar tensor shape is what?
     Tensor *logProbabilityTensor = nullptr;
     OP_REQUIRES_OK(context, context->allocate_output(1, TensorShape({}), &logProbabilityTensor));
     
@@ -56,8 +61,7 @@ void NoteHMMViterbiOp::Compute(OpKernelContext *context) {
         HMMViterbiStep(i, stateCount, tmStates, tmPointers, tmProbabilities, 
             omDensities, omDensitiesSliceSize, omPointers, preViterbi, curViterbi, btPointers);
     }
-
-    // template flat<int32>(); ??
+    
     auto path = pathTensor->template flat<int32>().data();
     auto logProbability = logProbabilityTensor->template flat<double>().data();
     

@@ -37,4 +37,5 @@ void HMMViterbiStep(int frameIdx, int stateCount,
     dim3 gridSize(blockCount);
     HMMViterbiStateKernel<<<gridSize, blockCount>>>(frameIdx, stateCount, tmStates, tmPointers, tmProbabilities, 
                 omDensities, omDensitiesSliceSize, omPointers, preViterbi, curViterbi, btPointers);
+    cudaDeviceSynchronize();
 }
