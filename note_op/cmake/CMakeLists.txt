@@ -46,10 +46,9 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_61,code=\"sm_61,com
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_70,code=\"sm_70,compute_70\")
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-ftz=true)  # Flush denormals to zero
 
-set(py_work_dir ${note_op_proj_SOURCE_DIR})
-
 set(common_config_done "not_done" CACHE STRING "common_config_done")
 if (NOT (${common_config_done} STREQUAL "done"))
+  set(py_work_dir ${note_op_proj_SOURCE_DIR})
   message("check tensorflow version...")
   execute_process(COMMAND python get_tensorflow_info.py checkDevice
     WORKING_DIRECTORY ${py_work_dir} 
@@ -89,6 +88,7 @@ if (NOT (${common_config_done} STREQUAL "done"))
 else()
   message("common config have done, skip check tensorflow")
 endif()
+set(common_config_done "done" CACHE STRING "common_config_done" FORCE)
 
 message("tf_include_dir: ${tf_include_dir}")
 message("tf_lib_dir: ${tf_lib_dir}")
@@ -122,5 +122,9 @@ set(note_op_srcs
 )
 
 add_library(note_op SHARED ${note_op_srcs} ${note_op_cuda_o})
+
 target_link_libraries(note_op ${custom_op_link_lib} "cudart")
-set(common_config_done "done" CACHE STRING "common_config_done" FORCE)
+
+get_filename_component(install_dir ${note_op_src_dir} PATH)
+set(install_dir "${install_dir}/lib")
+install(TARGETS note_op DESTINATION ${install_dir})
