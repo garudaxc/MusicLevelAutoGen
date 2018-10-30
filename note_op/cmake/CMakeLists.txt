@@ -48,42 +48,52 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-ftz=true)  # Flush denormals to zero
 
 set(py_work_dir ${note_op_proj_SOURCE_DIR})
 
-message("check tensorflow version...")
-execute_process(COMMAND python get_tensorflow_info.py checkDevice
-  WORKING_DIRECTORY ${py_work_dir} 
-  RESULT_VARIABLE tf_device_result 
-  OUTPUT_VARIABLE tf_device)
+set(common_config_done "not_done" CACHE STRING "common_config_done")
+if (NOT (${common_config_done} STREQUAL "done"))
+  message("check tensorflow version...")
+  execute_process(COMMAND python get_tensorflow_info.py checkDevice
+    WORKING_DIRECTORY ${py_work_dir} 
+    RESULT_VARIABLE tf_device_result 
+    OUTPUT_VARIABLE tf_device)
 
-message("tensorflow version ${tf_device}")
-if (NOT (${tf_device} STREQUAL "GPU"))
-  message(FATAL_ERROR "note op lib need tensorflow-gpu version" )
+  message("tensorflow version ${tf_device}")
+  if (NOT (${tf_device} STREQUAL "GPU"))
+    message(FATAL_ERROR "note op lib need tensorflow-gpu version" )
+  endif()
+
+  message("get tensorflow dir and flags...")
+  execute_process(COMMAND python get_tensorflow_info.py getIncludeDir
+    WORKING_DIRECTORY ${py_work_dir} 
+    RESULT_VARIABLE tf_include_dir_result 
+    OUTPUT_VARIABLE tf_include_dir_value)
+
+  execute_process(COMMAND python get_tensorflow_info.py getLibDir
+    WORKING_DIRECTORY ${py_work_dir} 
+    RESULT_VARIABLE tf_lib_dir_result 
+    OUTPUT_VARIABLE tf_lib_dir_value)
+
+  execute_process(COMMAND python get_tensorflow_info.py getCompileFlags
+    WORKING_DIRECTORY ${py_work_dir} 
+    RESULT_VARIABLE tf_cflag_result 
+    OUTPUT_VARIABLE tf_cflag_value)
+
+  execute_process(COMMAND python get_tensorflow_info.py getLinkFlags
+    WORKING_DIRECTORY ${py_work_dir} 
+    RESULT_VARIABLE tf_lflag_result 
+    OUTPUT_VARIABLE tf_lflag_value)
+
+  set(tf_include_dir "${tf_include_dir_value}" CACHE STRING "tf_include_dir")
+  set(tf_lib_dir "${tf_lib_dir_value}" CACHE STRING "tf_lib_dir")
+  set(tf_cflag "${tf_cflag_value}" CACHE STRING "tf_cflag")
+  set(tf_lflag "${tf_lflag_value}" CACHE STRING "tf_lflag")
+else()
+  message("common config have done, skip check tensorflow")
 endif()
 
-message("get tensorflow dir and flags...")
-execute_process(COMMAND python get_tensorflow_info.py getIncludeDir
-  WORKING_DIRECTORY ${py_work_dir} 
-  RESULT_VARIABLE tf_include_dir_result 
-  OUTPUT_VARIABLE tf_include_dir)
-
-execute_process(COMMAND python get_tensorflow_info.py getLibDir
-  WORKING_DIRECTORY ${py_work_dir} 
-  RESULT_VARIABLE tf_lib_dir_result 
-  OUTPUT_VARIABLE tf_lib_dir)
-
-execute_process(COMMAND python get_tensorflow_info.py getCompileFlags
-  WORKING_DIRECTORY ${py_work_dir} 
-  RESULT_VARIABLE tf_cflag_result 
-  OUTPUT_VARIABLE tf_cflag)
-
-execute_process(COMMAND python get_tensorflow_info.py getLinkFlags
-  WORKING_DIRECTORY ${py_work_dir} 
-  RESULT_VARIABLE tf_lflag_result 
-  OUTPUT_VARIABLE tf_lflag)
-
-message("tf_include_dir_result: ${tf_include_dir_result}; value: ${tf_include_dir}")
-message("tf_lib_dir_result: ${tf_lib_dir_result}; value: ${tf_lib_dir}")
-message("tf_cflag_result: ${tf_cflag_result}; value: ${tf_cflag}")
-message("tf_lflag_result: ${tf_lflag_result}; value: ${tf_lflag}")
+message("tf_include_dir: ${tf_include_dir}")
+message("tf_lib_dir: ${tf_lib_dir}")
+message("tf_cflag: ${tf_cflag}")
+message("tf_lflag: ${tf_lflag}")
 
 set(custom_op_link_lib_dir "${tf_lib_dir}/python")
 set(custom_op_link_lib "pywrap_tensorflow_internal")
@@ -113,3 +123,4 @@ set(note_op_srcs
 
 add_library(note_op SHARED ${note_op_srcs} ${note_op_cuda_o})
 target_link_libraries(note_op ${custom_op_link_lib} "cudart")
+set(common_config_done "done" CACHE STRING "common_config_done" FORCE)
