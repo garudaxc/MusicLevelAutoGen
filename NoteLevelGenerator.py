@@ -33,6 +33,8 @@ class NoteLevelGenerator():
 
         self.runCallbackFunc = None
 
+        self.bpmInvalidThreshold = 10
+
         # todo limit time duraion
         self.minDuration = 10
         self.maxDuration = 60 * 20
@@ -209,6 +211,9 @@ class NoteLevelGenerator():
 
         if outputFilePath is None or len(outputFilePath) <= 0:
             return True
+
+        if bpm < self.bpmInvalidThreshold:
+            return False
 
         postprocess.GenerateLevelImp(inputFilePath, duration, bpm, et, 
                     shortModelRes, longModelRes, outputFilePath, templateFilePath, 0.7, 0.7, 
