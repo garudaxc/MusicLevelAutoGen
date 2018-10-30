@@ -1,5 +1,6 @@
 import tensorflow as tf
 import sys
+from tensorflow.python.client import device_lib
 
 def postProcessString(val):
     return val.replace('\\', '/')

@@ -53,7 +53,9 @@ execute_process(COMMAND python get_tensorflow_info.py checkDevice
   WORKING_DIRECTORY ${py_work_dir} 
   RESULT_VARIABLE tf_device_result 
   OUTPUT_VARIABLE tf_device)
-if (${tf_device} NOT STREQUAL "GPU")
+
+message("tensorflow version ${tf_device}")
+if (NOT (${tf_device} STREQUAL "GPU"))
   message(FATAL_ERROR "note op lib need tensorflow-gpu version" )
 endif()
 
