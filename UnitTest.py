@@ -405,7 +405,7 @@ def RunNoteLevelGenerator():
     if not generator.initialize():
         return False
 
-    songArr = ['ouxiangwanwansui', 'jinzhongzhao', 'gundong', 'baaifangkai']
+    songArr = ['song_70085', 'ouxiangwanwansui', 'jinzhongzhao', 'gundong', 'baaifangkai']
     for song in songArr:
         audioFilePath = TFLstm.MakeMp3Pathname(song)
         levelFilePath = os.path.join(os.path.dirname(audioFilePath), song+'.xml')
@@ -622,11 +622,12 @@ def RunLoadNoteOp():
     fileDir = os.path.dirname(filePath)
     libFilePath = os.path.join(fileDir, 'note_op', 'lib', 'note_op.so')
     noteOpLib = NoteEnvironment.LoadOpLibrary(libFilePath)
+    print('noteOpLib:', noteOpLib)
 
 if __name__ == '__main__':
     # RunLoadNoteOp()
-    RunBPMAndETTest()
-    # RunNoteLevelGenerator()
+    # RunBPMAndETTest()
+    RunNoteLevelGenerator()
     # RunOnsetModel()
     # RunAudioPreprocess()
     # RunAllDownbeatsTFModel(TFLstm.MakeMp3Pathname('ouxiangwanwansui'))
