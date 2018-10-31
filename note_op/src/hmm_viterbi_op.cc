@@ -3,10 +3,11 @@
 
 using namespace tensorflow;
 
-void HMMViterbiStep(int frameIdx, int stateCount, 
+void HMMViterbi(int frameCount, int stateCount, double minProb, 
     const unsigned int *tmStates, const unsigned int *tmPointers, const double *tmProbabilities, 
     const double *omDensities, int omDensitiesSliceSize, const unsigned int *omPointers, 
-    const double *preViterbi, double *curViterbi, unsigned int *btPointers);
+    double *preViterbi, const double *initialDistribution, double *curViterbi, unsigned int *btPointers, 
+    unsigned int *path, double *logProbability);
 
 NoteHMMViterbiOp::NoteHMMViterbiOp(OpKernelConstruction *context): OpKernel(context) {
 
@@ -14,7 +15,7 @@ NoteHMMViterbiOp::NoteHMMViterbiOp(OpKernelConstruction *context): OpKernel(cont
 
 void NoteHMMViterbiOp::Compute(OpKernelContext *context) {
     const Tensor &stateCountTensor = context->input(0);
-    int stateCount = stateCountTensor.flat<int32>().data()[0];
+    int stateCount = stateCountTensor.scalar<int32>()();
 
     const Tensor &tmStatesTensor = context->input(1);
     auto tmStates = tmStatesTensor.flat<uint32>().data();
@@ -39,7 +40,6 @@ void NoteHMMViterbiOp::Compute(OpKernelContext *context) {
     Tensor preViterbiTensor = Tensor();
     OP_REQUIRES_OK(context, context->allocate_temp(DT_DOUBLE, TensorShape({stateCount}), &preViterbiTensor));
     double *preViterbi = preViterbiTensor.template flat<double>().data();
-    memcpy(preViterbi, initialDistribution, sizeof(double) * stateCount);
 
     Tensor curViterbiTensor = Tensor();
     OP_REQUIRES_OK(context, context->allocate_temp(DT_DOUBLE, TensorShape({stateCount}), &curViterbiTensor));
@@ -50,25 +50,14 @@ void NoteHMMViterbiOp::Compute(OpKernelContext *context) {
     unsigned int *btPointers = btPointersTensor.template flat<uint32>().data();
 
     Tensor *pathTensor = nullptr;
-    OP_REQUIRES_OK(context, context->allocate_output(0, TensorShape({stateCount}), &pathTensor));
-    
-    // todo scalar tensor shape is what?
+    OP_REQUIRES_OK(context, context->allocate_output(0, TensorShape({frameCount}), &pathTensor));
+
     Tensor *logProbabilityTensor = nullptr;
     OP_REQUIRES_OK(context, context->allocate_output(1, TensorShape({}), &logProbabilityTensor));
     
     int omDensitiesSliceSize = omDensitiesTensorShape.dim_size(1);
-    for (int i = 0; i < frameCount; ++i) {
-        HMMViterbiStep(i, stateCount, tmStates, tmPointers, tmProbabilities, 
-            omDensities, omDensitiesSliceSize, omPointers, preViterbi, curViterbi, btPointers);
-    }
-    
-    auto path = pathTensor->template flat<int32>().data();
+    auto path = pathTensor->template flat<uint32>().data();
     auto logProbability = logProbabilityTensor->template flat<double>().data();
-    
-    int state = note_op_util::ArgMax(curViterbi, stateCount);
-    *logProbability = curViterbi[state];
-    for (int i = frameCount - 1; i >= 0; --i) {
-        path[i] = state;
-        state = btPointers[i * stateCount + state];
-    }
+    double minProb = std::numeric_limits<double>::min();
+    HMMViterbi(frameCount, stateCount, minProb, tmStates, tmPointers, tmProbabilities, omDensities, omDensitiesSliceSize, omPointers, preViterbi, initialDistribution, curViterbi, btPointers, path, logProbability);
 }
