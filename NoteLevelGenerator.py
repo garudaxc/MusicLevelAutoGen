@@ -206,7 +206,7 @@ class NoteLevelGenerator():
         if self.runCallbackFunc is not None:
             callbackDic = {'generator': self, 'specDiff': tfSpecDiff, 'logMel': tfLogMel, 'isTranscodeByQAAC': isTranscodeByQAAC, 
                             'shortModelRes': shortModelRes, 'longModelRes': longModelRes, 'onsetModelRes': onsetModelRes, 'bpmModelRes': bpmModelRes, 
-                            'bpm': bpm, 'et': et, 'audioData': audioData, 'sampleRate': self.sampleRate, 'audioFilePath': inputFilePath}
+                            'bpm': bpm, 'et': et, 'duration': duration, 'audioData': audioData, 'sampleRate': self.sampleRate, 'audioFilePath': inputFilePath}
             self.runCallbackFunc(callbackDic, runCallbackParam=runCallbackParam)
 
         if outputFilePath is None or len(outputFilePath) <= 0:
