@@ -39,12 +39,13 @@ find_package(CUDA ${tensorflow_CUDA_VERSION} REQUIRED EXACT)
 
 # by default we assume compute cabability 3.5 and 5.2. If you change this change it in
 # CUDA_NVCC_FLAGS and cuda_config.h below
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_37,code=\"sm_37,compute_37\")
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_52,code=\"sm_52,compute_52\")
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_60,code=\"sm_60,compute_60\")
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_61,code=\"sm_61,compute_61\")
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_70,code=\"sm_70,compute_70\")
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_37,code=[sm_37,compute_37])
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_52,code=[sm_52,compute_52])
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_60,code=[sm_60,compute_60])
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_61,code=[sm_61,compute_61])
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_70,code=[sm_70,compute_70])
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-ftz=true)  # Flush denormals to zero
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-rdc=true)
 
 set(common_config_done "not_done" CACHE STRING "common_config_done")
 if (NOT (${common_config_done} STREQUAL "done"))
@@ -111,7 +112,8 @@ set(note_op_cuda_srcs
     "${note_op_src_dir}/hmm_viterbi_op_kernel.cu"
 )
 set_source_files_properties(${note_op_cuda_srcs} PROPERTIES CUDA_SOURCE_PROPERTY_FORMAT OBJ)
-cuda_compile(note_op_cuda_o ${note_op_cuda_srcs})
+set(CUDA_SEPARABLE_COMPILATION ON)
+CUDA_ADD_LIBRARY(note_op_cuda ${note_op_cuda_srcs} STATIC)
 
 set(note_op_srcs
     "${note_op_src_dir}/note_op_util.h"
@@ -121,9 +123,12 @@ set(note_op_srcs
     "${note_op_src_dir}/note_op.cc"
 )
 
-add_library(note_op SHARED ${note_op_srcs} ${note_op_cuda_o})
+add_library(note_op SHARED ${note_op_srcs})
 
-target_link_libraries(note_op ${custom_op_link_lib} "cudart")
+target_link_libraries(note_op 
+  "note_op_cuda"
+  ${custom_op_link_lib} 
+)
 
 get_filename_component(install_dir ${note_op_src_dir} PATH)
 set(install_dir "${install_dir}/lib")
